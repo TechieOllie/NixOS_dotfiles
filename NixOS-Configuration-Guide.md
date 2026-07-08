@@ -194,6 +194,10 @@ hosts/laptop/
     hardware-configuration.nix
     variables.nix
     features.nix
+    disko.nix
+    secrets.nix
+    secrets/
+        secrets.yaml
 ```
 
 A host defines:
@@ -201,6 +205,8 @@ A host defines:
 - Hardware configuration (generated, not hand-edited).
 - Machine identity (`variables.nix`).
 - Feature overrides for this specific machine (`features.nix`).
+- Disk layout (`disko.nix`).
+- This host's encrypted secrets (`secrets/secrets.yaml`) and the sops-nix wiring that decrypts them (`secrets.nix`) — see **Secrets Management** below for why secrets live here rather than in a shared top-level directory.
 - Which profile(s) it imports.
 
 Hosts should stay small — a few imports and two small data files. A host describes **what machine is being built**, not how any feature works internally.
@@ -388,14 +394,13 @@ NixOS allows alternate versions of a configuration to exist alongside the main o
 ## Directory Philosophy
 
 ```
-hosts/       -> machine definitions (identity + features + profile selection)
+hosts/       -> machine definitions (identity + features + profile selection + this host's encrypted secrets)
 profiles/    -> machine roles (module bundles + default features)
 modules/     -> reusable, machine-agnostic system configuration
 home/        -> Home Manager configuration
 lib/         -> helper functions, introduced only when proven necessary
 overlays/    -> package overlays
 pkgs/        -> custom packages
-secrets/     -> encrypted secrets (never plaintext)
 scripts/     -> helper scripts
 wallpapers/  -> wallpapers
 assets/      -> static assets
@@ -409,18 +414,25 @@ assets/      -> static assets
 
 Secrets are never stored in plaintext in the repository — no passwords, API keys, private tokens, or SSH private keys committed as-is.
 
-**Tool decision:** use **sops-nix** from the start, rather than deciding this in a later phase. Reasoning: secrets are referenced from almost every module eventually (Git identity, Wi-Fi credentials, API tokens, and — see below — the SSH/GPG key material itself), so retrofitting a secrets tool after several hosts already exist means touching every one of them. sops-nix integrates cleanly with a per-host `secrets.yaml` and decrypts at activation time using a host SSH key, which pairs naturally with the SSH setup below. agenix remains a reasonable alternative if age keys are preferred over PGP/age-via-sops, but pick one now rather than leaving it open.
+**Tool decision:** use **sops-nix** from the start, rather than deciding this in a later phase. Reasoning: secrets are referenced from almost every module eventually (Git identity, Wi-Fi credentials, API tokens, and — see below — the SSH/GPG key material itself), so retrofitting a secrets tool after several hosts already exist means touching every one of them. agenix remains a reasonable alternative if age keys are preferred over PGP/age-via-sops, but pick one now rather than leaving it open.
+
+Each host owns its own encrypted file at `hosts/<name>/secrets/secrets.yaml`, colocated with that host's other identity/data files (`variables.nix`, `disko.nix`) rather than in a shared top-level `secrets/` directory — a host directory is meant to hold everything about that one machine, and a top-level `secrets/` would split that across two places for no benefit once each host's secrets are already scoped to that host alone.
 
 ```
 Configuration is public.
 Secrets remain encrypted at rest, decrypted only at activation.
 ```
 
-**Onboarding a new host's secrets:** adding a directory under `hosts/` does not automatically give that machine access to the shared, encrypted secrets — sops-nix only decrypts for recipients listed in `.sops.yaml`. Bringing a new host online is therefore:
+**Decryption key: a standalone per-host age key, not the host's SSH key.** The obvious default — deriving the sops recipient from the host's own SSH host key (`ssh-to-age`) — has a real cost: NixOS regenerates a fresh SSH host key on every reinstall unless you go out of your way to preserve the old one, so decryption capability would silently break on every reinstall too. A dedicated age keypair per host, generated once by the operator and independent of the host's SSH identity, decouples the two lifecycles — reinstalling (or rotating the SSH host key for any other reason) doesn't touch secrets decryption at all. The cost is one more key file to track per host; worth it for how often hosts get reinstalled during setup and testing.
 
-1. Generate (or read) the new host's SSH host key.
-2. Add the corresponding age/PGP public key as a recipient in `.sops.yaml`.
-3. Re-encrypt existing secret files for the new recipient list (`sops updatekeys secrets/secrets.yaml`).
+**Onboarding a new host's secrets:**
+
+1. Generate a standalone age keypair for the host: `age-keygen -o ~/.config/sops/age/<host>.txt` (kept locally by the operator, never committed).
+2. Add its public key as a recipient in `.sops.yaml`, scoped to `hosts/<host>/secrets/.*\.yaml$`.
+3. Write and encrypt `hosts/<host>/secrets/secrets.yaml` against that recipient (`sops --encrypt --in-place hosts/<host>/secrets/secrets.yaml`).
+4. Provision the *private* key onto the target during install via `nixos-anywhere --extra-files <dir>`, where `<dir>/var/lib/sops-nix/key.txt` holds the key — this is the same install run that applies the rest of the host's config, so the machine boots already able to decrypt its own secrets. `hosts/<host>/secrets.nix` points `sops.age.keyFile` at that path.
+
+Re-encrypting after adding a new secret or rotating a key: `sops updatekeys hosts/<host>/secrets/secrets.yaml`.
 
 This is a manual step outside Nix evaluation — nothing in `nix flake check` catches a host that's missing from the recipient list, since the host will simply fail to decrypt secrets at activation time on real hardware, not at build time. Add the new recipient in the same commit as the host directory itself so the two never drift apart.
 
@@ -479,7 +491,15 @@ Two tools close this gap without adding a new mechanism to the repo's data model
 - **[disko](https://github.com/nix-community/disko)** — declares disk partitioning, formatting, and mounting as a Nix module, the same way everything else in this repo is declared. A host's disk layout becomes `hosts/<name>/disko.nix`, imported alongside `hardware-configuration.nix`, instead of a one-time manual `fdisk`/`mkfs` session that's never written down anywhere.
 - **[nixos-anywhere](https://github.com/nix-community/nixos-anywhere)** — installs a flake-defined host over SSH from the installer ISO (or any Linux with SSH access), running disko's partitioning and the NixOS install in one step: `nixos-anywhere --flake .#<host> root@<installer-ip>`. No manual partitioning, no manual `nixos-generate-config` copy-paste.
 
-This also reuses the secrets-onboarding step already described above: the new host's SSH host key — the one added as a recipient in `.sops.yaml` — is the same key `nixos-anywhere` uses to reach the target and the same key sops-nix uses to decrypt secrets at first activation. Onboarding a host becomes one coherent path: generate the key → add it to `.sops.yaml` → write `hosts/<name>/disko.nix` → `nixos-anywhere` → the machine boots already holding its secrets.
+**The installer ISO itself is a flake output**, not an ad hoc image built by hand each time: `packages.<system>.installer-iso`, a minimal installer with the *operator's* own SSH key (not any host's key) pre-authorized for root, so `nixos-anywhere` can reach it non-interactively. This is one key, reused to bootstrap every host — building it is `nix build .#installer-iso`.
+
+Three distinct keys are in play during a bootstrap, worth keeping straight rather than conflating into "the" key:
+
+1. **The operator's SSH key**, baked into the installer ISO — how `nixos-anywhere` reaches the target while it's still running the installer. Same key for every host.
+2. **The host's own SSH host key** — generated fresh by NixOS during install, used afterward for that host's own sshd. Unrelated to secrets.
+3. **The host's sops age key** — generated once by the operator (see **Secrets Management** above), provisioned onto the target via `nixos-anywhere --extra-files` during the same install run. Used only for decrypting that host's secrets, nothing else.
+
+Onboarding a host is therefore: generate its age key → add it to `.sops.yaml` and encrypt its secrets → write `hosts/<name>/disko.nix` → run `nixos-anywhere` with `--extra-files` staging the age key onto the target → the machine boots already holding its secrets, with its own freshly-generated SSH host key for day-to-day access.
 
 Recommended placement: **Phase 1 (Foundation)**, alongside sops-nix — both are "decide once, use for every host after" tooling, and retrofitting disko/nixos-anywhere after several hosts have been manually partitioned means those existing hosts stay undocumented exceptions to the "declarative disk layout" rule.
 
@@ -530,9 +550,9 @@ update:
 check:
     nix flake check
 
-# Re-encrypt secrets after adding a recipient
-secrets-rekey:
-    sops updatekeys secrets/secrets.yaml
+# Re-encrypt a host's secrets after adding a recipient
+secrets-rekey host=`hostname`:
+    sops updatekeys hosts/{{host}}/secrets/secrets.yaml
 ```
 
 This is deliberately last in the roadmap, not first — wrapping commands before the repo has more than one host and a handful of recurring operations would be exactly the kind of premature abstraction this project avoids elsewhere (see **Why We Avoid Over-Engineering**). By Phase 7 the recipes reflect commands that have actually been typed by hand repeatedly, not ones guessed at up front. `direnv` (already part of the terminal stack) puts `just` on `PATH` automatically on entering the repo, so `just` alone is enough to see available recipes.
@@ -679,7 +699,11 @@ Avoid premature abstraction, avoid duplicate sources of truth, and avoid a modul
 │   │   ├── default.nix
 │   │   ├── hardware-configuration.nix
 │   │   ├── variables.nix
-│   │   └── features.nix
+│   │   ├── features.nix
+│   │   ├── disko.nix
+│   │   ├── secrets.nix
+│   │   └── secrets/
+│   │       └── secrets.yaml
 │   └── ...
 │
 ├── profiles/
@@ -703,8 +727,6 @@ Avoid premature abstraction, avoid duplicate sources of truth, and avoid a modul
 ├── overlays/
 │
 ├── pkgs/
-│
-├── secrets/
 │
 ├── scripts/
 │
