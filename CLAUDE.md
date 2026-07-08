@@ -4,26 +4,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state of the repository
 
-This repo currently contains only `NixOS-Configuration-Guide.md` — the design document for a NixOS flake configuration that has **not been implemented yet** (Phase 1 of the roadmap below has not started). There is no `flake.nix`, no `hosts/`, `modules/`, `profiles/`, or `home/` directory yet, and no build/lint/test tooling to run.
+Phase 1 (Foundation) is implemented: `flake.nix` exists with one real host, `the-entertaining-nios-vm` (a VM, bootstrapped and verified via a full nixos-anywhere install). There is one `nixosConfigurations` entry, wired directly in `flake.nix` (no `mkHost` helper yet — deferred until a second host makes the pattern worth extracting, per `flake.nix`'s own comment). `profiles/`, `home/`, `lib/`, `overlays/`, `pkgs/` do not exist yet — that's Phase 2+, not started.
 
-When asked to start implementing, follow the guide's Phase 1 order (see Roadmap) rather than scaffolding the full target structure at once — this repo's stated philosophy is to avoid building abstractions before a real, repeated need exists.
+What exists on disk today:
+- `flake.nix` — inputs (`nixpkgs` nixos-unstable, `home-manager`, `disko`, `sops-nix`), the single `nixosConfigurations.the-entertaining-nios-vm`, and a `packages.${system}.installer-iso` output (a minimal installer ISO with the operator's SSH key pre-authorized for root, so `nixos-anywhere` can bootstrap new hosts without a manual console step).
+- `modules/options.nix` — the `features` submodule option (currently: `docker`, `steam`, `gamemode`, `bluetooth`, `sshAgentUnlock`; all default `false`).
+- `modules/system/` — `boot.nix`, `networking.nix`, `nix.nix`, `ssh.nix`, `users.nix`. No `hardware/`, `desktop/`, `services/`, or `programs/` subdirectories yet.
+- `hosts/the-entertaining-nios-vm/` — `default.nix`, `variables.nix`, `features.nix` (all flags still `false`), `disko.nix` (single-disk GPT, ESP + ext4 root), `hardware-configuration.nix`, `secrets.nix` (wires `sops-nix`, `password-hash` marked `neededForUsers`), `secrets/secrets.yaml`.
+- `.sops.yaml` — one recipient keyed to this host's age key.
+- No Home Manager modules under `home/` yet, even though the `home-manager` input is already pinned in `flake.nix` — it isn't wired into `nixosConfigurations` until Phase 3+ needs it.
+- No `nix flake check` checks (formatting/statix/deadnix) are wired up yet — that's Phase 7.
 
-The guide (`NixOS-Configuration-Guide.md`) is the single source of truth for this project's design; read it in full before making architectural decisions. What follows is a condensed map of its content, not a replacement for it.
+The guide (`NixOS-Configuration-Guide.md`) is the single source of truth for this project's design; read it in full before making architectural decisions that aren't already reflected in the code. What follows is a condensed map of its content, not a replacement for it.
 
-## Commands (once the flake exists)
+## Commands
 
 ```bash
-nixos-rebuild switch --flake .          # build and switch to the current host's config
+nixos-rebuild switch --flake .#the-entertaining-nios-vm   # build and switch to this host's config
 nixos-rebuild switch --rollback         # roll back (covers NixOS + integrated Home Manager together)
 nix flake update                        # update flake inputs
-nix flake check                         # single validation gate: formatting (alejandra), static
-                                         # analysis (statix), dead code (deadnix), eval of every
+nix flake check                         # single validation gate (once wired up): formatting (alejandra),
+                                         # static analysis (statix), dead code (deadnix), eval of every
                                          # nixosConfigurations attribute
-nix build .#nixosConfigurations.<host>.config.system.build.toplevel   # build one host without switching
-sops updatekeys secrets/secrets.yaml    # re-encrypt secrets after adding a recipient in .sops.yaml
+nix build .#nixosConfigurations.the-entertaining-nios-vm.config.system.build.toplevel   # build without switching
+nix build .#installer-iso               # build the bootstrap installer ISO
+nixos-anywhere --flake .#the-entertaining-nios-vm root@<installer-ip>   # (re-)bootstrap this host
+sops updatekeys hosts/the-entertaining-nios-vm/secrets/secrets.yaml     # re-encrypt after adding a recipient in .sops.yaml
 ```
 
-`nix flake check` is meant to be the *only* command CI runs — it should stay the single thing that gates a commit both locally and in CI, so wire new validation in as a flake check rather than a separate script. A `justfile` wrapping these (`just switch`, `just build`, `just check`, ...) is intentionally deferred to Phase 7, once the commands are actually being typed by hand often enough to justify it — don't add one earlier.
+`nix flake check` is meant to become the *only* command CI runs once it's wired up — it should stay the single thing that gates a commit both locally and in CI, so wire new validation in as a flake check rather than a separate script. A `justfile` wrapping these (`just switch`, `just build`, `just check`, ...) is intentionally deferred to Phase 7, once the commands are actually being typed by hand often enough to justify it — don't add one earlier.
 
 ## Architecture
 
@@ -50,8 +59,8 @@ The design separates responsibilities along one line: **configuration lives in m
 
 ## Roadmap (implementation order)
 
-1. **Foundation** — repo structure, flake `specialArgs`/`features` option wiring, sops-nix, disko + nixos-anywhere, first bootable host with no profiles yet.
-2. **Profiles** — introduced only once ≥2 hosts exist with visibly overlapping imports.
+1. **Foundation** — repo structure, flake `specialArgs`/`features` option wiring, sops-nix, disko + nixos-anywhere, first bootable host with no profiles yet. ✅ done (`the-entertaining-nios-vm`).
+2. **Profiles** — introduced only once ≥2 hosts exist with visibly overlapping imports. ← not started; do not add `profiles/` before a second host exists.
 3. **Desktop environment** — Niri, greetd, Noctalia Greeter, Stylix, SSH agent auto-unlock.
 4. **Terminal environment** — Ghostty, Zsh, Starship, Git, Lazygit, shell migrated into Home Manager.
 5. **Applications** — VS Code, Zen Browser, Vesktop, Nautilus.
