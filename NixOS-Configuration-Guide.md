@@ -1,0 +1,714 @@
+# NixOS Configuration Guide
+
+## Purpose
+
+This repository contains a complete, declarative NixOS configuration designed to be understandable, modular, reproducible, and suitable as a long-term personal configuration — one that can grow from a single machine into a small personal infrastructure.
+
+Primary goals:
+
+- A single Git repository containing the entire configuration.
+- Flakes as the entry point.
+- Home Manager integrated into NixOS.
+- Clear separation of responsibilities.
+- Modular organization.
+- Easy expansion to multiple machines.
+- Reproducible installations.
+- Thorough documentation, kept as a single source of truth.
+
+When making changes or suggesting improvements, prefer solutions that preserve these goals over short-term convenience or premature abstraction.
+
+---
+
+# Part 1 — Design Philosophy
+
+## Core Design Principles
+
+The architecture separates responsibilities along one simple line:
+
+```
+Configuration lives in modules.
+Wiring lives in flake.nix.
+Machine identity lives in variables.nix.
+Machine capability lives in features.nix.
+```
+
+Each part of the repository has exactly one job:
+
+- **flake.nix** decides how everything connects together.
+- **Hosts** describe which physical machine is being built.
+- **Profiles** describe what role that machine has, and select a default set of modules and features.
+- **Modules** contain the actual system configuration.
+- **Home Manager** manages the user's personal environment.
+- **Variables** store identity data that differs per machine (hostname, timezone, user).
+- **Features** store capability toggles that differ per machine (Docker on/off, Steam on/off).
+
+Keeping variables and features as two distinct files (rather than one growing `variables.nix`) matters as the repo scales: identity data changes rarely and only makes sense once per machine, while feature flags change often and are meant to be overridden per-host, per-profile, or both. Mixing them turns one file into a second `configuration.nix`.
+
+## The Overall Architecture
+
+```
+                 flake.nix
+                     │
+                     ▼
+                    Host
+                     │
+                     ▼
+                  Profile
+                     │
+                     ▼
+                 Modules
+                     │
+                     ▼
+                  Options
+                     │
+                     ▼
+              Generated System
+```
+
+Higher layers decide **what should be built**. Lower layers decide **how that works**. Each layer should only need to understand the layer directly below it:
+
+- A host knows which profile(s) it uses.
+- A profile knows which modules it imports and which features it defaults to on.
+- A module knows how to configure one feature.
+- A module does not need to know which machine or profile uses it.
+
+## Why We Avoid Over-Engineering
+
+A common mistake in Nix configurations is building abstractions before understanding the problem they solve — a repository arriving on day one with `mkHost`, `mkSystem`, `mkDesktop`, `mkProfile`, `mkFeature`, etc., before a single machine has been built with plain modules.
+
+This project follows the opposite order:
+
+1. Learn how the system works with plain modules.
+2. Identify patterns that are genuinely repeated across two or more real hosts.
+3. Introduce a helper abstraction only once a pattern is proven to repeat.
+
+Every abstraction in `lib/` should be traceable to a specific, already-repeated need — not a hypothetical future one.
+
+---
+
+# Part 2 — Repository Structure
+
+## flake.nix
+
+`flake.nix` is the composition root and entry point. It is the **project coordinator**: it does not contain system configuration, it answers "which inputs, which hosts, which modules, which package set, which Home Manager wiring."
+
+Responsibilities:
+
+- Declare flake inputs (nixpkgs, home-manager, and any others).
+- Define flake outputs (`nixosConfigurations`).
+- Define the list of available hosts.
+- Create the package set (`pkgs`) per host, including overlays.
+- Wire Home Manager into each host's NixOS configuration.
+- Pass shared data (variables, features, `lib` helpers) into modules.
+
+**Two different mechanisms for two different kinds of data — chosen deliberately, not interchangeably:**
+
+- **`vars` (identity data)** is plain, non-optional data with no notion of "default vs. override" — a hostname either is or isn't "laptop." It's passed as `specialArgs`, a plain function argument available to every module:
+
+  ```nix
+  lib.nixosSystem {
+    specialArgs = { inherit vars; };
+    modules = [
+      ./hosts/${hostName}
+      home-manager.nixosModules.home-manager
+      { home-manager.extraSpecialArgs = { inherit vars; }; }
+    ];
+  };
+  ```
+
+  Any module can declare `{ vars, ... }:` to read it.
+
+- **`features` (capability toggles)** deliberately is *not* passed via `specialArgs`. Toggles need real "profile sets a default, host overrides it" semantics, and `specialArgs` values are just function arguments — the module system's priority mechanism (`lib.mkDefault`, `lib.mkForce`, `lib.mkOverride`) only resolves *declared options*, not plain data handed in this way. So `features` is declared once as a real NixOS option (see **Declaring the `features` Option** below) and every host/profile sets it through normal module config (`features.docker = true;` or `features.docker = lib.mkDefault true;`), which the module system merges by priority as usual. Modules read it as `config.features.x`, not as a function argument.
+
+  Home Manager modules don't get `config` for the *NixOS* configuration directly — they read it via the `osConfig` special arg that Home Manager automatically provides when integrated into a NixOS module: `{ osConfig, ... }: osConfig.features.x`.
+
+This is the one and only path each kind of data takes into modules — avoid a second mechanism (e.g. `import` statements reaching into `hosts/`, or passing `features` through `specialArgs` as well "just to be safe") appearing later, since two paths for the same data is how configs drift and silently stop merging the way the diagrams below claim.
+
+`flake.nix` should stay a few hundred lines of *relationships*, never system settings.
+
+## Declaring the `features` Option
+
+Before any host or profile can set `features.docker = true;` or `lib.mkDefault`, `features` must exist as a declared option — otherwise there's nothing for the module system to merge by priority. This is declared once, in a small module every host imports:
+
+```nix
+# modules/options.nix
+{ lib, ... }:
+{
+  options.features = lib.mkOption {
+    type = lib.types.submodule {
+      options = {
+        docker = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Enable Docker Engine + Compose.";
+        };
+        steam = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Enable Steam + gaming stack.";
+        };
+        gamemode = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Enable Feral GameMode.";
+        };
+        bluetooth = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Enable the Bluetooth stack.";
+        };
+        sshAgentUnlock = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Unlock the SSH agent (via gpg-agent) at greetd login.";
+        };
+      };
+    };
+    default = { };
+    description = "Feature flags controlling optional functionality. Every toggle a host or profile can set must be declared here.";
+  };
+}
+```
+
+**Why a submodule instead of `attrsOf bool`:** `attrsOf bool` accepts any key, which means a typo like `features.dcoker = true;` merges into a new, unused attribute — nothing errors, the feature just silently never turns on. Declaring each toggle as its own option costs one extra block here per feature, but turns that typo into an eval-time "unknown option" error instead of a machine that quietly doesn't have Docker. Add the option in this file in the same commit that first references it in a profile or host.
+
+Every host imports this module (typically via a shared list in `flake.nix` rather than repeating the import per host). With the option declared, `features.x = true;`, `lib.mkDefault`, and `lib.mkForce` all behave exactly as the standard NixOS module system merging rules describe — a profile's `mkDefault` (low priority) is cleanly overridden by a host's plain assignment (normal priority), and any module can read the merged result at `config.features.x`.
+
+## Hosts
+
+Each physical machine has its own directory:
+
+```
+hosts/
+    laptop/
+    desktop/
+    server/
+    vm/
+```
+
+Example:
+
+```
+hosts/laptop/
+    default.nix
+    hardware-configuration.nix
+    variables.nix
+    features.nix
+```
+
+A host defines:
+
+- Hardware configuration (generated, not hand-edited).
+- Machine identity (`variables.nix`).
+- Feature overrides for this specific machine (`features.nix`).
+- Which profile(s) it imports.
+
+Hosts should stay small — a few imports and two small data files. A host describes **what machine is being built**, not how any feature works internally.
+
+## Profiles
+
+Profiles describe the *role* a machine plays. A host is the physical machine; a profile is what it's for.
+
+```
+profiles/
+    laptop.nix
+    desktop.nix
+    gaming.nix
+    server.nix
+    workstation.nix
+```
+
+**What a profile actually contains**: a profile is a plain module that does two things — nothing more:
+
+1. Imports the set of modules that role always needs.
+2. Sets the *default* value of relevant feature flags for that role, using `mkDefault` so a host can still override them.
+
+```nix
+# profiles/gaming.nix
+{ lib, ... }:
+{
+  imports = [
+    ../modules/programs/steam.nix
+    ../modules/programs/gaming.nix
+    ../modules/hardware/graphics.nix
+  ];
+
+  features = {
+    steam = lib.mkDefault true;
+    gamemode = lib.mkDefault true;
+  };
+}
+```
+
+Because `features` is a declared option (see **Declaring the `features` Option** above), `lib.mkDefault` here genuinely sets a low-priority default that the module system will merge — it isn't just data sitting in an attrset.
+
+**Rule governing profiles vs. feature flags:** profiles set *defaults* for a role, at `mkDefault` priority; a host's `features.nix` sets plain, normal-priority values, which the module system's standard merging always resolves in the host's favor for any key both define. A module never checks "which profile am I in" — it only ever reads `config.features.x`. This keeps exactly one mechanism (`config.features.*`) controlling whether a module is active, and profiles become nothing more than a convenient bundle of sensible defaults plus module imports. There is never a case where a feature is "on because of a profile" in a way that a plain `features.nix` flag couldn't express directly — profiles are a convenience layer, not a second source of truth, and the module system (not hand-written logic) is what makes host overrides win.
+
+**Pitfall to watch for:** a profile that imports a module but forgets to set that module's `mkDefault` will import inert code — the module is present in the build closure but stays off (via the module's own `lib.mkIf config.features.x`) until some host explicitly sets `features.x = true;`. Treat "add the import" and "set its `mkDefault`" as one atomic edit whenever a profile is touched; a profile with imports but no matching defaults is usually a mistake, not a deliberate choice.
+
+```
+Host
+ │  imports one or more profiles, sets features.nix at normal priority
+ ▼
+Profile
+ │  imports modules, sets features at mkDefault (low) priority
+ ▼
+Modules
+ │  read config.features.* via mkIf, know nothing about hosts or profiles
+ ▼
+System
+```
+
+## Modules
+
+Modules contain the actual NixOS configuration. Each module has a single responsibility and should describe **how a feature works**, never **which machine uses it**.
+
+```
+modules/
+    system/
+        boot.nix
+        networking.nix
+        security.nix
+        users.nix
+
+    hardware/
+        audio.nix
+        bluetooth.nix
+        graphics.nix
+
+    desktop/
+        niri.nix          # compositor package + session, system-level only
+        greetd.nix
+        portals.nix
+        stylix.nix
+
+    services/
+        docker.nix
+        tailscale.nix
+        printing.nix
+
+    programs/
+        steam.nix
+        vscode.nix
+        gaming.nix
+```
+
+**System vs. Home Manager split for desktop modules (previously blurred):** where a program has both a system half and a user half — Niri is the clearest example — the split is:
+
+- `modules/desktop/niri.nix` (NixOS): installs the compositor package, enables the Wayland session entry, and configures greetd to launch it. Nothing about the user's keybindings or layout lives here.
+- `home/niri.nix` (Home Manager): the user's actual Niri configuration — keybindings, workspaces, window rules, appearance.
+
+The same split applies to anything else that's "system package + user config": GTK theming (portal + package at system level, `dconf`/settings at Home Manager level), and shell tools where a system package is needed system-wide versus a user's personal shell config.
+
+## Home Manager
+
+Home Manager manages the user's personal environment; NixOS manages the machine.
+
+```
+NixOS                       Home Manager
+ ├── Hardware                ├── Shell
+ ├── Drivers                 ├── Applications
+ ├── Services                ├── Themes
+ ├── System packages         ├── Editor settings
+ └── Security                └── Desktop preferences (user-level)
+```
+
+Examples of what Home Manager owns: Ghostty, Zsh, Starship, Git configuration, VS Code, Zen Browser, Niri's user configuration, GTK settings, themes, wallpapers.
+
+**Home Manager rollback:** because Home Manager is integrated into the NixOS module (`home-manager.nixosModules.home-manager`), its generations are created and rolled back together with the system generation via `nixos-rebuild switch --rollback` — there is no separate Home Manager generation to manage. This is a deliberate reason to prefer NixOS-integrated Home Manager over standalone Home Manager for this repository: one rollback command covers both.
+
+## Variables
+
+`variables.nix` holds only machine **identity** — values that are set once per machine and rarely change:
+
+```nix
+# hosts/laptop/variables.nix
+{
+  system = {
+    hostName = "laptop";
+    timeZone = "Europe/Paris";
+  };
+
+  user = {
+    name = "myuser";
+    fullName = "My Name";
+  };
+}
+```
+
+## Features
+
+`features.nix` holds only **capability toggles** — set as the `features` option (declared once in `modules/options.nix`, see above), expected to be overridden per host, and read via `config.features.x` with `lib.mkIf` inside modules. Being a module itself (not plain data), it sets `features` directly at normal priority, which overrides any `mkDefault` a profile set:
+
+```nix
+# hosts/laptop/features.nix
+{ ... }:
+{
+  features = {
+    docker = true;
+    steam = false;
+    bluetooth = true;
+    sshAgentUnlock = true;
+  };
+}
+```
+
+Modules consume the merged value, never hardcode it:
+
+```nix
+{ config, lib, ... }:
+lib.mkIf config.features.docker {
+  virtualisation.docker.enable = true;
+}
+```
+
+Splitting `features.nix` out of `variables.nix` keeps each file growing for a single reason — identity data almost never changes; feature flags change with every new machine or every experiment.
+
+## Hardware Configuration
+
+`hardware-configuration.nix` is generated by NixOS and should not be hand-edited. Machine choices belong in `variables.nix` / `features.nix`; hardware detection belongs in `hardware-configuration.nix`.
+
+## Helper Library (`lib/`)
+
+```
+lib/
+    mkHost.nix
+    mkUser.nix
+    utils.nix
+```
+
+Per the over-engineering principle above: a helper only belongs here once the same pattern has already been written by hand at least twice across real hosts. `lib/` holds tools that help build the system; `modules/` holds what the system does. Keeping them separate prevents `flake.nix` from becoming a dumping ground for one-off functions.
+
+## Specialisations
+
+NixOS allows alternate versions of a configuration to exist alongside the main one — useful for experimental configurations, alternate kernels, gaming-specific tweaks, or debug environments, without touching the primary config.
+
+**Cost worth noting:** each specialisation is built and kept in the system closure alongside the main configuration, which roughly multiplies build and switch time by the number of specialisations, and they are easy to silently bit-rot since they aren't boot into by default. Treat specialisations as a tool for short-lived experiments, not a permanent parallel configuration — if a specialisation is still in use after a few weeks, it's a sign it should become its own host or profile instead.
+
+## Directory Philosophy
+
+```
+hosts/       -> machine definitions (identity + features + profile selection)
+profiles/    -> machine roles (module bundles + default features)
+modules/     -> reusable, machine-agnostic system configuration
+home/        -> Home Manager configuration
+lib/         -> helper functions, introduced only when proven necessary
+overlays/    -> package overlays
+pkgs/        -> custom packages
+secrets/     -> encrypted secrets (never plaintext)
+scripts/     -> helper scripts
+wallpapers/  -> wallpapers
+assets/      -> static assets
+```
+
+---
+
+# Part 3 — Operational Concerns
+
+## Secrets Management
+
+Secrets are never stored in plaintext in the repository — no passwords, API keys, private tokens, or SSH private keys committed as-is.
+
+**Tool decision:** use **sops-nix** from the start, rather than deciding this in a later phase. Reasoning: secrets are referenced from almost every module eventually (Git identity, Wi-Fi credentials, API tokens, and — see below — the SSH/GPG key material itself), so retrofitting a secrets tool after several hosts already exist means touching every one of them. sops-nix integrates cleanly with a per-host `secrets.yaml` and decrypts at activation time using a host SSH key, which pairs naturally with the SSH setup below. agenix remains a reasonable alternative if age keys are preferred over PGP/age-via-sops, but pick one now rather than leaving it open.
+
+```
+Configuration is public.
+Secrets remain encrypted at rest, decrypted only at activation.
+```
+
+**Onboarding a new host's secrets:** adding a directory under `hosts/` does not automatically give that machine access to the shared, encrypted secrets — sops-nix only decrypts for recipients listed in `.sops.yaml`. Bringing a new host online is therefore:
+
+1. Generate (or read) the new host's SSH host key.
+2. Add the corresponding age/PGP public key as a recipient in `.sops.yaml`.
+3. Re-encrypt existing secret files for the new recipient list (`sops updatekeys secrets/secrets.yaml`).
+
+This is a manual step outside Nix evaluation — nothing in `nix flake check` catches a host that's missing from the recipient list, since the host will simply fail to decrypt secrets at activation time on real hardware, not at build time. Add the new recipient in the same commit as the host directory itself so the two never drift apart.
+
+## SSH Agent Unlock at greetd Login
+
+Goal: SSH keys are unlocked automatically as part of logging in through greetd, instead of requiring a separate `ssh-add` and passphrase prompt later.
+
+The standard, well-supported way to do this on NixOS is to let **gpg-agent act as the SSH agent**, and use **pam_gnupg** to unlock the GPG keyring (and therefore the SSH support) using the same password entered at the greetd prompt. This avoids inventing a bespoke unlock mechanism and reuses infrastructure that's already maintained upstream.
+
+**System module** (`modules/system/security.nix`):
+
+```nix
+{ config, lib, ... }:
+{
+  # greetd already creates a PAM service named "greetd";
+  # this hooks pam_gnupg into that existing service.
+  security.pam.services.greetd.gnupg = lib.mkIf config.features.sshAgentUnlock {
+    enable = true;
+    noAutostart = true; # gpg-agent is started by the user session instead
+  };
+}
+```
+
+**Home Manager module** (`home/gpg.nix`), gated behind the same feature flag. Home Manager modules don't see the NixOS `config` directly — they read the NixOS configuration through the `osConfig` special arg, which Home Manager provides automatically when integrated via `home-manager.nixosModules.home-manager`:
+
+```nix
+{ osConfig, lib, pkgs, ... }:
+{
+  programs.gpg.enable = osConfig.features.sshAgentUnlock;
+
+  services.gpg-agent = lib.mkIf osConfig.features.sshAgentUnlock {
+    enable = true;
+    enableSshSupport = true;
+    pinentry.package = pkgs.pinentry-gnome3; # or pinentry-qt, matching the desktop stack
+  };
+
+  # Tell the shell / session to use gpg-agent's ssh-agent emulation
+  home.sessionVariables = lib.mkIf osConfig.features.sshAgentUnlock {
+    SSH_AUTH_SOCK = "$(gpgconf --list-dirs agent-ssh-socket)";
+  };
+}
+```
+
+**Prerequisite:** the SSH key must exist as a GPG key with the "authenticate" capability (or be an SSH key added to `gpg-agent`'s `sshcontrol` via `ssh-add`, with `pam_gnupg` unlocking the underlying GPG passphrase that protects it). The private key material itself should be provisioned via sops-nix rather than committed to the repo, so a fresh machine only needs the encrypted secret plus this module to end up with a working, auto-unlocked agent.
+
+Net effect: entering the login password once at the greetd prompt unlocks the GPG keyring, which in turn unlocks SSH authentication for the rest of the session — no second passphrase prompt for `git push`, `ssh`, etc.
+
+This entire feature is gated behind `config.features.sshAgentUnlock` (read as `osConfig.features.sshAgentUnlock` on the Home Manager side) so it can be disabled per-host — e.g. a server host with no interactive greetd session has no use for it.
+
+## Bootstrapping a New Host
+
+**Gap previously left implicit:** "reproducible installations" is a stated goal, but everything above assumes a host already exists and is running — nothing describes going from bare metal (or a fresh VM) to a booted, disk-partitioned NixOS system declaratively. As written, that first step is an unstated manual process: boot the installer ISO, partition and format by hand, run `nixos-generate-config`, copy the result into the repo. That's the one place a fresh install can diverge from the repository before the repository even has a chance to describe the machine.
+
+Two tools close this gap without adding a new mechanism to the repo's data model:
+
+- **[disko](https://github.com/nix-community/disko)** — declares disk partitioning, formatting, and mounting as a Nix module, the same way everything else in this repo is declared. A host's disk layout becomes `hosts/<name>/disko.nix`, imported alongside `hardware-configuration.nix`, instead of a one-time manual `fdisk`/`mkfs` session that's never written down anywhere.
+- **[nixos-anywhere](https://github.com/nix-community/nixos-anywhere)** — installs a flake-defined host over SSH from the installer ISO (or any Linux with SSH access), running disko's partitioning and the NixOS install in one step: `nixos-anywhere --flake .#<host> root@<installer-ip>`. No manual partitioning, no manual `nixos-generate-config` copy-paste.
+
+This also reuses the secrets-onboarding step already described above: the new host's SSH host key — the one added as a recipient in `.sops.yaml` — is the same key `nixos-anywhere` uses to reach the target and the same key sops-nix uses to decrypt secrets at first activation. Onboarding a host becomes one coherent path: generate the key → add it to `.sops.yaml` → write `hosts/<name>/disko.nix` → `nixos-anywhere` → the machine boots already holding its secrets.
+
+Recommended placement: **Phase 1 (Foundation)**, alongside sops-nix — both are "decide once, use for every host after" tooling, and retrofitting disko/nixos-anywhere after several hosts have been manually partitioned means those existing hosts stay undocumented exceptions to the "declarative disk layout" rule.
+
+## Deployment Model
+
+```bash
+# Build and switch to the current configuration
+nixos-rebuild switch --flake .
+
+# Update dependencies
+nix flake update
+
+# Validate before committing
+nix flake check
+
+# Roll back (covers NixOS and integrated Home Manager together)
+nixos-rebuild switch --rollback
+```
+
+A machine should always be fully recoverable from the Git repository alone — this covers *system configuration and Home Manager–managed dotfiles*, not personal data. Documents, photos, and anything not declared as a Home Manager file are outside the scope of this repository and need their own backup strategy; "recoverable from Git" describes the OS and environment, not the whole disk.
+
+## Command Runner (`just`)
+
+**Introduced in Phase 7, once the command surface has actually grown (previously listed in Part 4 but never used):** the raw commands above are fine for a single host, but they grow — building a *specific* host without switching to it, re-encrypting secrets after adding a recipient, running the full check suite — and typing exact `nix`/`nixos-rebuild` invocations from memory gets error-prone as the repo scales to multiple machines. A thin `justfile` at the repo root wraps these as named recipes without introducing a second source of truth: each recipe calls the same underlying command verbatim, so there's nothing to drift.
+
+```just
+# justfile
+default:
+    @just --list
+
+# Build and switch to the current host's configuration
+switch host=`hostname`:
+    nixos-rebuild switch --flake .#{{host}}
+
+# Build without switching — the safe way to test a host
+build host=`hostname`:
+    nix build .#nixosConfigurations.{{host}}.config.system.build.toplevel
+
+# Roll back to the previous generation
+rollback:
+    nixos-rebuild switch --rollback
+
+# Update flake inputs
+update:
+    nix flake update
+
+# Run all checks (formatting, static analysis, dead code, per-host builds)
+check:
+    nix flake check
+
+# Re-encrypt secrets after adding a recipient
+secrets-rekey:
+    sops updatekeys secrets/secrets.yaml
+```
+
+This is deliberately last in the roadmap, not first — wrapping commands before the repo has more than one host and a handful of recurring operations would be exactly the kind of premature abstraction this project avoids elsewhere (see **Why We Avoid Over-Engineering**). By Phase 7 the recipes reflect commands that have actually been typed by hand repeatedly, not ones guessed at up front. `direnv` (already part of the terminal stack) puts `just` on `PATH` automatically on entering the repo, so `just` alone is enough to see available recipes.
+
+## Validation and CI
+
+**Decision (previously left open):** run formatting and static analysis as `nix flake check` checks, not as a separate ad hoc script, so `nix flake check` is the single command that gates a commit both locally and in CI. Recommended tools, wired in as flake checks:
+
+- `alejandra` — formatting
+- `statix` — static analysis / anti-pattern detection
+- `deadnix` — dead code detection
+
+**Gap to close (previously missing):** formatting and static analysis catch style issues, not evaluation or build failures. `nix flake check` already evaluates every attribute under `nixosConfigurations` by default, which surfaces most eval errors, but a check that goes one step further and builds each host's system closure (`nix build .#nixosConfigurations.<host>.config.system.build.toplevel` for every host in the flake) catches breakage that only shows up once a derivation actually builds — a bad package reference, a broken overlay, a module that evaluates fine but fails to build. Wire this in as its own flake check so a host that can't build is caught in CI, not on the machine mid-`switch`.
+
+GitHub Actions (Phase 6 of the roadmap) then only needs to run `nix flake check`, rather than reimplementing a separate validation pipeline — CI and local validation stay identical by construction.
+
+## Naming Conventions
+
+Files use lowercase names describing responsibility, not implementation:
+
+```
+Good:  networking.nix, bluetooth.nix, docker.nix
+Avoid: NetworkStuff.nix, DockerSupport.nix
+```
+
+Note that `hosts/*/features.nix` and a profile's default-setting file don't share a naming pattern — a profile (e.g. `gaming.nix`) sets `features.*` defaults too, it's just named after its role rather than after "features". When auditing every place a feature gets set, grep for `features =` and `config.features` rather than for files literally named `features.nix`.
+
+---
+
+# Part 4 — Software Stack
+
+## Desktop
+
+Niri, greetd, Noctalia Greeter, Stylix, Noctalia V5, GTK theming, Qt theming, fonts, icons, wallpapers, Wayland portals.
+
+## Terminal
+
+Ghostty, Zsh, Starship, Git, Lazygit, Fastfetch, eza, bat, fd, ripgrep, fzf, zoxide, yazi, btop.
+
+## Applications
+
+Zen Browser, Visual Studio Code (official build), Vesktop, Nautilus.
+
+## Gaming
+
+Steam, Proton GE, Gamescope, MangoHud, Gamemode, Millennium.
+
+## Networking
+
+Tailscale.
+
+## Containers
+
+Docker Engine, Docker Compose.
+
+## Core Services
+
+PipeWire, Bluetooth, Printing, NetworkManager.
+
+## Development
+
+nixd, nil, alejandra, statix, deadnix, direnv, just.
+
+---
+
+# Part 5 — Roadmap
+
+## Phase 1 — Foundation
+
+- Repository structure.
+- Flake setup: `specialArgs` wiring for `vars`; `modules/options.nix` declaring the `features` option.
+- `variables.nix` / `features.nix` split, each using its correct mechanism.
+- sops-nix wired in from the start.
+- disko + nixos-anywhere wired in from the start, so every host — including the first — is installed declaratively rather than via manual partitioning.
+- Base system modules.
+- First bootable configuration (no profiles yet — a host importing modules directly).
+
+## Phase 2 — Profiles
+
+- Introduce `profiles/` once at least two hosts exist and their module imports visibly overlap.
+- Extract shared imports and default feature values into the first profile(s) (e.g. `desktop.nix`, `server.nix`).
+
+## Phase 3 — Desktop Environment
+
+- Niri (system module + Home Manager split as described above).
+- greetd, Noctalia Greeter.
+- Stylix.
+- SSH agent auto-unlock at greetd login.
+- Wayland session.
+
+## Phase 4 — Terminal Environment
+
+- Ghostty, Zsh, Starship, Git, Lazygit.
+- Shell migration into Home Manager.
+
+## Phase 5 — Applications
+
+- VS Code, Zen Browser, Vesktop, Nautilus.
+
+## Phase 6 — Extra Features
+
+- Docker, Steam, Proton GE, Tailscale.
+- Gaming profile.
+
+## Phase 7 — Long-Term Improvements
+
+- `nix flake check` as unified CI gate (GitHub Actions calling the same command used locally).
+- Command runner (`justfile`) wrapping `switch`, `build`, `rollback`, `update`, `check`, `secrets-rekey` once these are being typed by hand often enough to be worth naming.
+- Configuration polishing.
+- Documentation upkeep.
+- Multi-host support hardening.
+- *Worth considering, not committing to yet:* NixOS's `nixosTest` framework can boot a host's config in a QEMU VM and assert on runtime behavior (does Docker actually start, does greetd actually produce a login) — a step beyond "does it build" that the current CI gate doesn't cover. Heavier to set up and run, so introduce it only if a build-only check has actually let a real regression through.
+- *Worth considering, not committing to yet:* once `hosts/` has several entries, `flake.nix`'s per-host list in `nixosConfigurations` could be generated from `builtins.readDir ./hosts` instead of hand-maintained. Don't do this until adding a host to the list-by-hand has actually become repetitive — doing it earlier is exactly the kind of abstraction-before-the-pattern-repeats this project avoids.
+
+---
+
+# Design Principles Summary
+
+When making changes, prefer:
+
+- Readability over cleverness.
+- One responsibility per module.
+- Comments explaining *why* a setting exists, not just what it does.
+- Declarative configuration over imperative steps.
+- Minimal duplication — one source of truth per document, per value.
+- Small, understandable commits.
+- Reusable modules, reusable profiles.
+- Abstractions introduced only once a pattern has already repeated.
+- A single mechanism (`config.features.*`, a declared NixOS option) governing whether functionality is active — profiles set `mkDefault` values, hosts set normal-priority overrides, modules only ever read `config.features.*`.
+
+Avoid premature abstraction, avoid duplicate sources of truth, and avoid a module needing to know which machine or profile is using it.
+
+---
+
+# Target Repository Structure
+
+```
+.
+├── flake.nix
+├── flake.lock
+│
+├── hosts/
+│   ├── laptop/
+│   │   ├── default.nix
+│   │   ├── hardware-configuration.nix
+│   │   ├── variables.nix
+│   │   └── features.nix
+│   └── ...
+│
+├── profiles/
+│   ├── laptop.nix
+│   ├── desktop.nix
+│   ├── gaming.nix
+│   ├── server.nix
+│   └── workstation.nix
+│
+├── modules/
+│   ├── system/
+│   ├── hardware/
+│   ├── desktop/
+│   ├── services/
+│   └── programs/
+│
+├── home/
+│
+├── lib/
+│
+├── overlays/
+│
+├── pkgs/
+│
+├── secrets/
+│
+├── scripts/
+│
+├── wallpapers/
+│
+└── assets/
+```
