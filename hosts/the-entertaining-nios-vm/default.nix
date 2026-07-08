@@ -4,6 +4,7 @@
     ./features.nix
     ./disko.nix
     ./hardware-configuration.nix
+    ./secrets.nix
     ../../modules/system/boot.nix
     ../../modules/system/nix.nix
     ../../modules/system/networking.nix

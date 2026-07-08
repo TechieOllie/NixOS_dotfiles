@@ -40,5 +40,23 @@
           ./hosts/the-entertaining-nios-vm
         ];
       };
+
+      # Bootstrap tool, not a host: a minimal installer ISO with the
+      # operator's key pre-authorized for root, so nixos-anywhere can SSH in
+      # without any manual console step. Reuses this host's vars for now
+      # since there's only one operator/key in play; once bootstrapping
+      # needs to be host-independent (multiple operators, multiple hosts),
+      # this should read from its own flake-level identity instead of
+      # reaching into one host's variables.nix.
+      packages.${system}.installer-iso =
+        (nixpkgs.lib.nixosSystem {
+          inherit system;
+          modules = [
+            "${nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-minimal.nix"
+            {
+              users.users.root.openssh.authorizedKeys.keys = [ vars.user.sshPublicKey ];
+            }
+          ];
+        }).config.system.build.isoImage;
     };
 }

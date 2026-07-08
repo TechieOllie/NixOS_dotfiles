@@ -1,0 +1,7 @@
+keys:
+  - &the-entertaining-nios-vm age1hsaqjyj4mtmdyyqtetjn0twlfeppn0vxla724tl9uy702lv0qp7sxmejq5
+creation_rules:
+  - path_regex: hosts/the-entertaining-nios-vm/secrets/.*\.yaml$
+    key_groups:
+      - age:
+          - *the-entertaining-nios-vm
