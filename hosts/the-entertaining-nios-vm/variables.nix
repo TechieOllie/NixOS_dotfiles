@@ -2,6 +2,7 @@
   system = {
     hostName = "the-entertaining-nios-vm";
     timeZone = "Europe/Paris";
+    keyMap = "fr-pc";
   };
 
   user = {

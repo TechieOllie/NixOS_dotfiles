@@ -333,6 +333,7 @@ Examples of what Home Manager owns: Ghostty, Zsh, Starship, Git configuration, V
   system = {
     hostName = "laptop";
     timeZone = "Europe/Paris";
+    keyMap = "fr-pc";
   };
 
   user = {

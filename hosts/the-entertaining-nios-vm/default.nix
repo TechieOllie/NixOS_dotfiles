@@ -14,6 +14,7 @@
 
   networking.hostName = vars.system.hostName;
   time.timeZone = vars.system.timeZone;
+  console.keyMap = vars.system.keyMap;
 
   # Pinned nixpkgs (nixos-unstable) is currently tracking the 26.11 branch,
   # i.e. 26.05 is the latest released stable version — stateVersion should
