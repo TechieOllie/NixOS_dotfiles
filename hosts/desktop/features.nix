@@ -6,6 +6,6 @@
     gamemode = false;
     bluetooth = false;
     sshAgentUnlock = false;
-    snapshots = false;
+    snapshots = true;
   };
 }

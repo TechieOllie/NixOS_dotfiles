@@ -28,6 +28,11 @@
           default = false;
           description = "Unlock the SSH agent (via gpg-agent) at greetd login.";
         };
+        snapshots = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Enable automatic btrfs snapshots (snapper) of / and /home.";
+        };
       };
     };
     default = { };

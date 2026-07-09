@@ -504,6 +504,35 @@ Onboarding a host is therefore: generate its age key → add it to `.sops.yaml` 
 
 Recommended placement: **Phase 1 (Foundation)**, alongside sops-nix — both are "decide once, use for every host after" tooling, and retrofitting disko/nixos-anywhere after several hosts have been manually partitioned means those existing hosts stay undocumented exceptions to the "declarative disk layout" rule.
 
+## Filesystem Choice and Snapshots
+
+Filesystem is a per-host decision made in that host's `disko.nix`, not a repo-wide policy — a disposable test VM has no reason to carry the extra complexity of subvolumes and snapshot tooling, while a primary desktop benefits from being able to recover from a bad `rm` or browse file history. `the-entertaining-nios-vm` stays on plain ext4; hosts that want snapshotting use btrfs instead.
+
+**Why btrfs, not ext4, for a snapshot-capable host:** ext4 has no native snapshot mechanism — the only way to get point-in-time recovery is a separate volume manager (LVM) layered underneath, one more moving part. btrfs bakes subvolumes and copy-on-write snapshots into the filesystem itself, and NixOS's `services.snapper` module manages them directly with no extra layer.
+
+**On NVMe specifically**, btrfs's usual downsides (CoW/checksum overhead, compression CPU cost) are negligible — that overhead mattered more on spinning disks or slow SATA SSDs, where it was a meaningful fraction of total I/O time. On NVMe it's effectively free: `compress=zstd` doesn't measurably cost speed, since zstd's default level is cheap CPU, most already-compressed assets (game/media files) are detected and stored raw by btrfs's own heuristic, and reading fewer physical bytes off an already-fast drive costs nothing.
+
+**Subvolume layout** (see `hosts/desktop/disko.nix` for the reference implementation):
+
+```
+@               -> /             (root)
+@home           -> /home
+@nix            -> /nix          (excluded from root's snapshot scope — the
+                                   Nix store churns constantly and NixOS
+                                   generations already give rollback for it;
+                                   snapshotting it too would just bloat every
+                                   snapshot for no benefit)
+@snapshots      -> /.snapshots        snapper's own subvolumes, per its own
+@home_snapshots -> /home/.snapshots   convention: nested under the subvolume
+                                       each one snapshots
+```
+
+Mount options on every data subvolume: `compress=zstd` (see above) and `noatime` — btrfs is copy-on-write, so even a read-triggered atime update becomes a real write elsewhere on disk; skipping atime avoids that write amplification, at the cost of the handful of atime-dependent tools (some mail servers, `tmpreaper`-style cleaners) this repo doesn't use anyway.
+
+**Swap** is a plain (non-btrfs) partition, sized to match the host's RAM, with disko's `resumeDevice = true` wiring NixOS's hibernation (suspend-to-disk) support automatically. Swap-on-a-btrfs-file is possible but needs extra no-CoW/subvolume ceremony that a dedicated partition avoids entirely — not worth it when a whole partition is cheap on a modern disk.
+
+**Snapshot service, not a bootloader change:** automatic snapshots are handled by `modules/services/snapper.nix`, gated behind `config.features.snapshots` like any other capability toggle (declared in `modules/options.nix` alongside `docker`, `steam`, etc.). This deliberately does *not* involve switching away from `systemd-boot` to GRUB + `grub-btrfs` for per-snapshot boot menu entries — NixOS's own generation rollback (`nixos-rebuild switch --rollback`) already covers "boot into a previous system state," so a second, overlapping mechanism for that isn't worth the extra bootloader complexity. Snapper's snapshots are for file-level recovery (an accidentally deleted file, browsing `/home` history), used via the `snapper` CLI after a normal boot — not a boot-time concern at all.
+
 ## Deployment Model
 
 ```bash
@@ -611,7 +640,7 @@ Docker Engine, Docker Compose.
 
 ## Core Services
 
-PipeWire, Bluetooth, Printing, NetworkManager.
+PipeWire, Bluetooth, Printing, NetworkManager, Snapper (btrfs snapshots).
 
 ## Development
 
@@ -657,6 +686,7 @@ nixd, nil, alejandra, statix, deadnix, direnv, just.
 
 - Docker, Steam, Proton GE, Tailscale.
 - Gaming profile.
+- Btrfs snapshots (snapper) — see **Filesystem Choice and Snapshots** above; the subvolume layout itself is decided per-host at install time (in that host's `disko.nix`), but the `snapper` service module and its `features.snapshots` toggle belong here with the rest of the optional capability modules.
 
 ## Phase 7 — Long-Term Improvements
 

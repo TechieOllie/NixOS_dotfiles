@@ -5,11 +5,7 @@
     ./disko.nix
     ./hardware-configuration.nix
     ./secrets.nix
-    ../../modules/system/boot.nix
-    ../../modules/system/nix.nix
-    ../../modules/system/networking.nix
-    ../../modules/system/users.nix
-    ../../modules/system/ssh.nix
+    ../../profiles/base.nix
   ];
 
   networking.hostName = vars.system.hostName;
