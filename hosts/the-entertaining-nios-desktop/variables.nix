@@ -1,6 +1,6 @@
 {
   system = {
-    hostName = "desktop";
+    hostName = "the-entertaining-nios-desktop";
     timeZone = "Europe/Paris";
     keyMap = "fr-pc";
   };
