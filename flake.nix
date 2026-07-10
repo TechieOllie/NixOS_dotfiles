@@ -21,24 +21,16 @@
   };
 
   outputs =
-    { nixpkgs, disko, sops-nix, ... }:
+    { nixpkgs, home-manager, disko, sops-nix, ... }:
     let
       system = "x86_64-linux";
       vars = import ./hosts/the-entertaining-nios-vm/variables.nix;
+      mkHost = import ./lib/mkHost.nix { inherit nixpkgs disko sops-nix home-manager; };
     in
     {
-      # Phase 1: a single host, wired directly. A mkHost helper belongs in
-      # lib/ once a second real host makes the pattern worth extracting —
-      # not before.
-      nixosConfigurations.the-entertaining-nios-vm = nixpkgs.lib.nixosSystem {
+      nixosConfigurations.the-entertaining-nios-vm = mkHost {
         inherit system;
-        specialArgs = { inherit vars; };
-        modules = [
-          disko.nixosModules.disko
-          sops-nix.nixosModules.sops
-          ./modules/options.nix
-          ./hosts/the-entertaining-nios-vm
-        ];
+        hostPath = ./hosts/the-entertaining-nios-vm;
       };
 
       # Bootstrap tool, not a host: a minimal installer ISO with the
