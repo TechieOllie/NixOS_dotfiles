@@ -21,4 +21,4 @@ A host only gets a `nixosConfigurations` entry in `flake.nix` once it has
 real `hardware-configuration.nix`/`secrets.nix` — see `CLAUDE.md` for which
 hosts are bootstrapped right now.
 
-Full rationale: [`NixOS-Configuration-Guide.md`](../NixOS-Configuration-Guide.md).
+Full rationale: [`ARCHITECTURE.md`](../ARCHITECTURE.md).

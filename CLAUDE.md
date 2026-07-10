@@ -23,7 +23,7 @@ What exists on disk today:
 - `.sops.yaml` — one recipient keyed to `the-entertaining-nios-vm`'s age key only; the desktop and laptop hosts each get their own recipient added when bootstrapped.
 - No `nix flake check` checks (formatting/statix/deadnix) are wired up yet — that's Phase 7.
 
-The guide (`NixOS-Configuration-Guide.md`) is the single source of truth for this project's design; read it in full before making architectural decisions that aren't already reflected in the code. What follows is a condensed map of its content, not a replacement for it.
+The guide (`ARCHITECTURE.md`) is the single source of truth for this project's design; read it in full before making architectural decisions that aren't already reflected in the code. What follows is a condensed map of its content, not a replacement for it.
 
 ## Commands
 

@@ -1,4 +1,4 @@
-# NixOS Configuration Guide
+# Architecture
 
 ## Purpose
 

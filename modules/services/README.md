@@ -10,4 +10,4 @@ flag (see `modules/options.nix`). Currently just `snapper.nix`
 deliberately not wired into the bootloader. Future additions: `tailscale.nix`,
 `docker.nix`, `printing.nix`.
 
-Full rationale: [`NixOS-Configuration-Guide.md`](../../NixOS-Configuration-Guide.md).
+Full rationale: [`ARCHITECTURE.md`](../../ARCHITECTURE.md).

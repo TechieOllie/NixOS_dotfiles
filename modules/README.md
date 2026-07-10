@@ -19,4 +19,4 @@ Subdirectories, split by category rather than by host:
 For anything split between system and user config (Niri is the canonical
 example), the system half lives here; the user half lives in `home/`.
 
-Full rationale: [`NixOS-Configuration-Guide.md`](../NixOS-Configuration-Guide.md).
+Full rationale: [`ARCHITECTURE.md`](../ARCHITECTURE.md).

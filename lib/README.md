@@ -11,4 +11,4 @@ duplication a near-certainty rather than a hypothetical. Treat that as a
 one-off, not a precedent — future helpers here (`mkUser.nix`, ...) should
 still wait for the pattern to actually repeat.
 
-Full rationale: [`NixOS-Configuration-Guide.md`](../NixOS-Configuration-Guide.md).
+Full rationale: [`ARCHITECTURE.md`](../ARCHITECTURE.md).

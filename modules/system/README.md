@@ -9,4 +9,4 @@ Modules every host needs regardless of role or feature flags: `boot.nix`,
 Unlike most of `modules/`, these aren't gated behind `config.features.x` —
 they're the baseline every machine boots with.
 
-Full rationale: [`NixOS-Configuration-Guide.md`](../../NixOS-Configuration-Guide.md).
+Full rationale: [`ARCHITECTURE.md`](../../ARCHITECTURE.md).

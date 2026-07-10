@@ -20,4 +20,4 @@ role, not a role itself. Future role-specific profiles (`desktop.nix`,
 only get introduced once an actual role diverges enough to need one, not
 preemptively.
 
-Full rationale: [`NixOS-Configuration-Guide.md`](../NixOS-Configuration-Guide.md).
+Full rationale: [`ARCHITECTURE.md`](../ARCHITECTURE.md).

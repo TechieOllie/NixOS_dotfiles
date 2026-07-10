@@ -15,4 +15,4 @@ system half and a user half (Niri is the canonical example), the user half —
 keybindings, layout, appearance — belongs here; the system half belongs in
 `modules/desktop/`.
 
-Full rationale: [`NixOS-Configuration-Guide.md`](../NixOS-Configuration-Guide.md).
+Full rationale: [`ARCHITECTURE.md`](../ARCHITECTURE.md).
