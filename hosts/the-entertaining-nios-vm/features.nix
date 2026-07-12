@@ -7,5 +7,6 @@
     bluetooth = false;
     sshAgentUnlock = false;
     snapshots = false;
+    niri = true;
   };
 }

@@ -6,6 +6,7 @@
     ./hardware-configuration.nix
     ./secrets.nix
     ../../profiles/base.nix
+    ../../modules/desktop/niri.nix
   ];
 
   networking.hostName = vars.system.hostName;

@@ -33,6 +33,11 @@
           default = false;
           description = "Enable automatic btrfs snapshots (snapper) of / and /home.";
         };
+        niri = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Enable the Niri Wayland compositor (system package + session entry only; user config lives in home/niri.nix).";
+        };
       };
     };
     default = { };
