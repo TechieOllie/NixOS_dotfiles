@@ -33,6 +33,11 @@
         hostPath = ./hosts/the-entertaining-nios-vm;
       };
 
+      nixosConfigurations.the-entertaining-nios-laptop = mkHost {
+        inherit system;
+        hostPath = ./hosts/the-entertaining-nios-laptop;
+      };
+
       # Bootstrap tool, not a host: a minimal installer ISO with the
       # operator's key pre-authorized for root, so nixos-anywhere can SSH in
       # without any manual console step. Reuses this host's vars for now

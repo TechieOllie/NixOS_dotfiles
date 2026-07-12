@@ -5,20 +5,16 @@ lib.mkIf config.features.snapshots {
     cleanupInterval = "1d";
     configs = {
       root = {
-        subvolume = "/";
-        extraConfig = ''
-          ALLOW_USERS="${vars.user.name}"
-          TIMELINE_CREATE="yes"
-          TIMELINE_CLEANUP="yes"
-        '';
+        SUBVOLUME = "/";
+        ALLOW_USERS = [ vars.user.name ];
+        TIMELINE_CREATE = true;
+        TIMELINE_CLEANUP = true;
       };
       home = {
-        subvolume = "/home";
-        extraConfig = ''
-          ALLOW_USERS="${vars.user.name}"
-          TIMELINE_CREATE="yes"
-          TIMELINE_CLEANUP="yes"
-        '';
+        SUBVOLUME = "/home";
+        ALLOW_USERS = [ vars.user.name ];
+        TIMELINE_CREATE = true;
+        TIMELINE_CLEANUP = true;
       };
     };
   };
