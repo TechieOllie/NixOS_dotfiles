@@ -24,10 +24,14 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # Deliberately not following this repo's nixpkgs: doing so would disable
-    # Noctalia's Cachix binary cache, forcing a from-source build of a
-    # native Wayland/OpenGL project on every host.
-    noctalia.url = "github:noctalia-dev/noctalia";
+    # Deliberately not following this repo's nixpkgs (would disable
+    # Noctalia's Cachix binary cache) and deliberately pinned to the
+    # `cachix` branch rather than `main` — per upstream's own docs, `main`
+    # may point at a commit CI hasn't finished caching yet, while `cachix`
+    # always points at the latest commit that's already been built and
+    # pushed to the cache. Tracking `main` cost a ~20min from-source build
+    # of this native Wayland/OpenGL project before this was caught.
+    noctalia.url = "github:noctalia-dev/noctalia/cachix";
   };
 
   outputs =

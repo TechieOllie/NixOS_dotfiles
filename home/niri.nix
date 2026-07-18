@@ -30,13 +30,13 @@ lib.mkIf osConfig.features.niri {
       source = ./niri/config.kdl;
       force = true;
     };
-    # TODO: these are the v4 Noctalia-generated colors, kept as a static
-    # fallback since niri's `include` of a missing file is a hard error.
-    # Noctalia v5's own theming system may want to own/regenerate this file
-    # at runtime instead (see home/noctalia.nix's builtin_ids TODO) — once
-    # that's confirmed live, this may need the same force = true treatment
-    # config.kdl needed, or to stop being Nix-managed entirely.
-    "niri/noctalia.kdl".source = ./niri/noctalia.kdl;
+    # niri/noctalia.kdl is deliberately NOT managed here (confirmed live:
+    # Noctalia v5's own template engine writes this file itself —
+    # "[WRN] [template_engine] failed to open template output
+    # .../niri/noctalia.kdl" showed up in its log until this stopped being
+    # a Nix-managed symlink into the read-only store). The file that shipped
+    # at home/niri/noctalia.kdl is v4-generated colors, kept in the repo
+    # only as a reference of what it looked like, not deployed anymore.
     "niri/cfg/animation.kdl".source = ./niri/cfg/animation.kdl;
     "niri/cfg/display.kdl".source = ./niri/cfg/display.kdl;
     "niri/cfg/keybinds.kdl".source = ./niri/cfg/keybinds.kdl;
