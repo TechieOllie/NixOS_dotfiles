@@ -30,6 +30,12 @@ lib.mkIf osConfig.features.niri {
       source = ./niri/config.kdl;
       force = true;
     };
+    # TODO: these are the v4 Noctalia-generated colors, kept as a static
+    # fallback since niri's `include` of a missing file is a hard error.
+    # Noctalia v5's own theming system may want to own/regenerate this file
+    # at runtime instead (see home/noctalia.nix's builtin_ids TODO) — once
+    # that's confirmed live, this may need the same force = true treatment
+    # config.kdl needed, or to stop being Nix-managed entirely.
     "niri/noctalia.kdl".source = ./niri/noctalia.kdl;
     "niri/cfg/animation.kdl".source = ./niri/cfg/animation.kdl;
     "niri/cfg/display.kdl".source = ./niri/cfg/display.kdl;
@@ -65,8 +71,11 @@ lib.mkIf osConfig.features.niri {
       ''
         // ────────────── Startup Applications ──────────────
         // https://github.com/YaLTeR/niri/wiki/Configuration:-Miscellaneous#spawn-sh-at-startup
+        //
+        // Noctalia itself is NOT spawned here — it runs as a supervised
+        // systemd user service instead (see home/noctalia.nix), rather than
+        // a fire-and-forget spawn-sh-at-startup line.
 
-            spawn-sh-at-startup "qs -c noctalia-shell"
             spawn-sh-at-startup "systemctl --user start niri-session.target"
             spawn-sh-at-startup "sleep 3 && vesktop"
       ''

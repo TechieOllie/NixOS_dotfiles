@@ -6,16 +6,23 @@ System-level halves of the desktop stack, each gated behind its own
 `config.features.x` flag (see `modules/options.nix`). Where a program has both
 a system half and a user half — Niri is the clearest example — only the
 package, session entry, and greetd wiring live here; keybindings, layout, and
-appearance live in `home/` instead. Currently `niri.nix` and `greetd.nix`
-(both `config.features.niri` — greetd only exists to launch a graphical
-session, and niri is the only one this repo offers so far; see `greetd.nix`'s
-own comment if a second compositor/DE is ever added). `greetd.nix` wires
-[noctalia-greeter](https://github.com/noctalia-dev/noctalia-greeter) (a flake
-input) rather than hand-configuring `services.greetd` directly — its NixOS
-module does that itself. `greetd.nix` imports that module directly (`lib/mkHost.nix`
-only threads the flake input through `specialArgs`), so only hosts that
-actually import `greetd.nix` carry it — unlike disko/sops-nix, which every
-host needs and which `mkHost` does import unconditionally. Future additions:
-`portals.nix`, `stylix.nix`.
+appearance live in `home/` instead. Currently `niri.nix`, `greetd.nix`, and
+`noctalia.nix` (all `config.features.niri` — greetd and Noctalia Shell only
+exist to support a graphical niri session, and niri is the only compositor
+this repo offers so far; see `greetd.nix`'s own comment if a second
+compositor/DE is ever added). `greetd.nix` wires
+[noctalia-greeter](https://github.com/noctalia-dev/noctalia-greeter), and
+`noctalia.nix` wires [noctalia](https://github.com/noctalia-dev/noctalia)
+(Noctalia Shell v5 — a *different* flake input from noctalia-greeter, despite
+the similar name) — both flake inputs, both imported by the module that
+actually uses them rather than unconditionally in `lib/mkHost.nix` (which only
+threads the inputs through `specialArgs`), unlike disko/sops-nix which every
+host needs. `noctalia.nix` deliberately wires Bluetooth/UPower/power-profiles
+individually rather than via `programs.noctalia.recommendedServices.enable`,
+to keep `config.features.bluetooth` the single gate for Bluetooth rather than
+having a second, competing toggle. Stylix was considered and dropped —
+Noctalia Shell already covers GTK/Qt/terminal/app theming natively (see
+`CLAUDE.md`'s Phase 3 note); `stylix.nix` will not be created. Future
+additions: `portals.nix`.
 
 Full rationale: [`ARCHITECTURE.md`](../../ARCHITECTURE.md).

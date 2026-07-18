@@ -8,6 +8,14 @@
         place-within-backdrop true
     }
 
+    // Noctalia v5's own settings window, floating rather than tiled.
+    window-rule {
+        match app-id="dev.noctalia.Noctalia"
+        open-floating true
+        default-column-width { fixed 1080; }
+        default-window-height { fixed 920; }
+    }
+
     window-rule { 
         match app-id="zen$"
         open-maximized-to-edges true

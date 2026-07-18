@@ -3,36 +3,45 @@ binds {
     // ────────────── Keybindings ──────────────
     // https://github.com/YaLTeR/niri/wiki/Configuration:-Key-Bindings
 
-    // ─── noctalia-shell keybinds ───
-    // https://docs.noctalia.dev/getting-started/keybinds/
+    // ─── Noctalia v5 keybinds ───
+    // https://docs.noctalia.dev/v5/compositor-settings/niri/ and /v5/ipc/
+    // Rewritten from v4's `qs -c noctalia-shell ipc call <target> <action>`
+    // (Quickshell IPC) to v5's `noctalia msg <command>` (a from-scratch,
+    // non-Quickshell rewrite — different command surface entirely, not
+    // just a renamed binary).
 
-    //Mod+Shift+ESCAPE                     { show-hotkey-overlay; }
-    Mod+F1                              { spawn-sh "qs -c noctalia-shell ipc call plugin:keybind-cheatsheet toggle"; }
+    // No v5 equivalent exists for v4's keybind-cheatsheet plugin (confirmed:
+    // no such command or doc page exists upstream) — dropped rather than
+    // guessing at a command that doesn't exist.
+    //Mod+F1                             { spawn-sh "noctalia msg ???"; }
+
+    Mod+S                                hotkey-overlay-title="Open Control Center" { spawn-sh "noctalia msg panel-toggle control-center"; }
+    Mod+Comma                            hotkey-overlay-title="Open Noctalia Settings" { spawn-sh "noctalia msg settings-toggle"; }
 
     // ─── Applications ───
     Mod+Return                          hotkey-overlay-title="Open Terminal: Alacritty" { spawn "ghostty"; }
-    Mod+space                           hotkey-overlay-title="Open App Launcher: noctalia launcher" { spawn-sh "qs -c noctalia-shell ipc call launcher toggle"; }
+    Mod+space                           hotkey-overlay-title="Open App Launcher: noctalia launcher" { spawn-sh "noctalia msg panel-toggle launcher"; }
     Mod+Z                               hotkey-overlay-title="Open Browser: Zen-Browser" { spawn "zen-browser"; }
     Mod+B                               hotkey-overlay-title="Open Note App: Obsidian" { spawn "obsidian"; }
-    Mod+ALT+L                           hotkey-overlay-title="Lock Screen: noctalia lock" { spawn-sh "qs -c noctalia-shell ipc call lockScreen lock"; }
-    Mod+Shift+Q                         hotkey-overlay-title="Session Menu: noctalia sessionMenu" { spawn-sh "qs -c noctalia-shell ipc call sessionMenu toggle"; }
+    Mod+ALT+L                           hotkey-overlay-title="Lock Screen: noctalia lock" { spawn-sh "noctalia msg session lock"; }
+    Mod+Shift+Q                         hotkey-overlay-title="Session Menu: noctalia session panel" { spawn-sh "noctalia msg panel-toggle session"; }
     Mod+D                               hotkey-overlay-title="Open App: Discord" { spawn "vesktop"; }
     // Please choose your own file manager.
     Mod+E                               hotkey-overlay-title="File Manager: Nautilus" { spawn "nautilus"; }
 
     // ─── Media Controls ───
-    XF86AudioRaiseVolume                allow-when-locked=true { spawn-sh "qs -c noctalia-shell ipc call volume increase"; }
-    XF86AudioLowerVolume                allow-when-locked=true { spawn-sh "qs -c noctalia-shell ipc call volume decrease"; }
-    XF86AudioMute                       allow-when-locked=true { spawn-sh "qs -c noctalia-shell ipc call volume muteOutput"; }
-    XF86AudioMicMute                    allow-when-locked=true { spawn-sh "qs -c noctalia-shell ipc call volume muteInput"; }
-    XF86AudioNext                       allow-when-locked=true { spawn-sh "qs -c noctalia-shell ipc call media next"; }
-    XF86AudioPrev                       allow-when-locked=true { spawn-sh "qs -c noctalia-shell ipc call media previous"; }
-    XF86AudioPlay                       allow-when-locked=true { spawn-sh "qs -c noctalia-shell ipc call media playPause"; }
-    XF86AudioPause                      allow-when-locked=true { spawn-sh "qs -c noctalia-shell ipc call media playPause"; }
+    XF86AudioRaiseVolume                allow-when-locked=true { spawn-sh "noctalia msg volume-up"; }
+    XF86AudioLowerVolume                allow-when-locked=true { spawn-sh "noctalia msg volume-down"; }
+    XF86AudioMute                       allow-when-locked=true { spawn-sh "noctalia msg volume-mute"; }
+    XF86AudioMicMute                    allow-when-locked=true { spawn-sh "noctalia msg mic-mute"; }
+    XF86AudioNext                       allow-when-locked=true { spawn-sh "noctalia msg media next"; }
+    XF86AudioPrev                       allow-when-locked=true { spawn-sh "noctalia msg media previous"; }
+    XF86AudioPlay                       allow-when-locked=true { spawn-sh "noctalia msg media toggle"; }
+    XF86AudioPause                      allow-when-locked=true { spawn-sh "noctalia msg media toggle"; }
 
     // ─── Brightness Controls ───
-    XF86MonBrightnessUp                 allow-when-locked=true { spawn-sh "qs -c noctalia-shell ipc call brightness increase"; }
-    XF86MonBrightnessDown               allow-when-locked=true { spawn-sh "qs -c noctalia-shell ipc call brightness decrease"; }
+    XF86MonBrightnessUp                 allow-when-locked=true { spawn-sh "noctalia msg brightness-up"; }
+    XF86MonBrightnessDown               allow-when-locked=true { spawn-sh "noctalia msg brightness-down"; }
 
     // ─── Window Movement and Focus ───
     Mod+Q                               { close-window; }
@@ -136,16 +145,25 @@ binds {
     Mod+W                               { toggle-column-tabbed-display; }
 
     // ─── Screenshots ───
-    Mod+Shift+S                         { spawn-sh "screenshot"; }
+    // Was a mystery standalone "screenshot" script under v4; noctalia v5
+    // has real screenshot IPC, so this now calls that directly instead.
+    Mod+Shift+S                         { spawn-sh "noctalia msg screenshot-region"; }
 
     // ─── Display ───
-    Mod+P { spawn-sh "qs -c noctalia-shell ipc call plugin:mirror-mirror toggle"; }
+    // No v5 equivalent for v4's mirror-mirror plugin — confirmed no
+    // screen-mirroring plugin exists among v5's official plugins. Dropped.
+    //Mod+P                              { spawn-sh "noctalia msg ???"; }
 
     // ─── Clipboard History
-    Mod+V                               { spawn-sh "qs -c noctalia-shell ipc call launcher clipboard"; }
+    Mod+V                               { spawn-sh "noctalia msg panel-toggle clipboard"; }
 
     // ─── Calculator ───
-    Mod+Shift+C                         { spawn-sh "qs -c noctalia-shell ipc call plugin:noctalia-calculator toggle"; }
+    // v5 has no dedicated calculator toggle — calculator is now a launcher
+    // provider (shell.launcher.providers.calculator), used by typing a math
+    // expression straight into the launcher (Mod+space) instead of a
+    // separate popup. Dropped as its own keybind.
+    //Mod+Shift+C                        { spawn-sh "noctalia msg ???"; }
+
     // ─── Emergency Escape Key ───
     // Use this when a fullscreen app blocks your keybinds.
     // It disables any active keyboard shortcut inhibitor, restoring control.

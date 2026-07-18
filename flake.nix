@@ -23,14 +23,19 @@
       url = "github:noctalia-dev/noctalia-greeter";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # Deliberately not following this repo's nixpkgs: doing so would disable
+    # Noctalia's Cachix binary cache, forcing a from-source build of a
+    # native Wayland/OpenGL project on every host.
+    noctalia.url = "github:noctalia-dev/noctalia";
   };
 
   outputs =
-    { nixpkgs, home-manager, disko, sops-nix, noctalia-greeter, ... }:
+    { nixpkgs, home-manager, disko, sops-nix, noctalia-greeter, noctalia, ... }:
     let
       system = "x86_64-linux";
       vars = import ./hosts/the-entertaining-nios-vm/variables.nix;
-      mkHost = import ./lib/mkHost.nix { inherit nixpkgs disko sops-nix home-manager noctalia-greeter; };
+      mkHost = import ./lib/mkHost.nix { inherit nixpkgs disko sops-nix home-manager noctalia-greeter noctalia; };
     in
     {
       nixosConfigurations.the-entertaining-nios-vm = mkHost {
