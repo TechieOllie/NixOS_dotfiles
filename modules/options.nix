@@ -18,11 +18,6 @@
           default = false;
           description = "Enable Feral GameMode.";
         };
-        sshAgentUnlock = lib.mkOption {
-          type = lib.types.bool;
-          default = false;
-          description = "Unlock the SSH agent (via gpg-agent) at greetd login.";
-        };
         snapshots = lib.mkOption {
           type = lib.types.bool;
           default = false;

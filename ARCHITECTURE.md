@@ -152,11 +152,6 @@ Before any host or profile can set `features.docker = true;` or `lib.mkDefault`,
           default = false;
           description = "Enable Feral GameMode.";
         };
-        sshAgentUnlock = lib.mkOption {
-          type = lib.types.bool;
-          default = false;
-          description = "Unlock the SSH agent (via gpg-agent) at greetd login.";
-        };
       };
     };
     default = { };
@@ -269,7 +264,6 @@ modules/
     system/
         boot.nix
         networking.nix
-        security.nix
         users.nix
 
     hardware/
@@ -348,7 +342,6 @@ Examples of what Home Manager owns: Ghostty, Zsh, Starship, Git configuration, V
   features = {
     docker = true;
     steam = false;
-    sshAgentUnlock = true;
   };
 }
 ```
@@ -439,47 +432,29 @@ This is a manual step outside Nix evaluation — nothing in `nix flake check` ca
 
 Goal: SSH keys are unlocked automatically as part of logging in through greetd, instead of requiring a separate `ssh-add` and passphrase prompt later.
 
-The standard, well-supported way to do this on NixOS is to let **gpg-agent act as the SSH agent**, and use **pam_gnupg** to unlock the GPG keyring (and therefore the SSH support) using the same password entered at the greetd prompt. This avoids inventing a bespoke unlock mechanism and reuses infrastructure that's already maintained upstream.
+**Revised from an earlier gpg-agent + pam_gnupg design (see git history) once it turned out this repo already has everything needed, for free.** `programs.niri`'s upstream NixOS module sets `services.gnome.gnome-keyring.enable = lib.mkDefault true;` (for portal support), which in turn makes greetd's own module set `security.pam.services.greetd.enableGnomeKeyring = true;` — so gnome-keyring is *already* unlocked automatically at every greetd login, with a GCR-provided ssh-agent (`gcr-ssh-agent`, run as a per-session systemd user unit) already exporting `SSH_AUTH_SOCK` session-wide. Confirmed live: `systemctl --user show-environment` already shows `SSH_AUTH_SOCK=/run/user/<uid>/gcr/ssh` with no configuration from this repo beyond enabling Niri. Layering gpg-agent + pam_gnupg on top would have meant a second identity system (GPG capability subkeys) solving a problem that's already solved.
 
-**System module** (`modules/system/security.nix`):
+What's actually needed, then, is much smaller than originally planned — no new system or Home Manager module at all:
 
-```nix
-{ config, lib, ... }:
-{
-  # greetd already creates a PAM service named "greetd";
-  # this hooks pam_gnupg into that existing service.
-  security.pam.services.greetd.gnupg = lib.mkIf config.features.sshAgentUnlock {
-    enable = true;
-    noAutostart = true; # gpg-agent is started by the user session instead
-  };
-}
-```
+1. **Provision the private key via sops-nix**, decrypted straight to `~/.ssh/id_ed25519` rather than the usual `/run/secrets/` location:
 
-**Home Manager module** (`home/gpg.nix`), gated behind the same feature flag. Home Manager modules don't see the NixOS `config` directly — they read the NixOS configuration through the `osConfig` special arg, which Home Manager provides automatically when integrated via `home-manager.nixosModules.home-manager`:
+   ```nix
+   # hosts/<name>/secrets.nix
+   { vars, ... }:
+   {
+     sops.secrets."ssh-private-key" = {
+       path = "/home/${vars.user.name}/.ssh/id_ed25519";
+       owner = vars.user.name;
+       mode = "0400";
+     };
+   }
+   ```
 
-```nix
-{ osConfig, lib, pkgs, ... }:
-{
-  programs.gpg.enable = osConfig.features.sshAgentUnlock;
+   `sops-install-secrets` creates missing parent directories itself, so `~/.ssh/` doesn't need to already exist.
 
-  services.gpg-agent = lib.mkIf osConfig.features.sshAgentUnlock {
-    enable = true;
-    enableSshSupport = true;
-    pinentry.package = pkgs.pinentry-gnome3; # or pinentry-qt, matching the desktop stack
-  };
+2. **One manual, interactive step, done once per host**: log in graphically and run `ssh-add ~/.ssh/id_ed25519`, entering the passphrase. Whether gnome-keyring's login-keyring caching means this never needs repeating across reboots, or only lasts the one session, needs live verification per host — don't assume either way without checking.
 
-  # Tell the shell / session to use gpg-agent's ssh-agent emulation
-  home.sessionVariables = lib.mkIf osConfig.features.sshAgentUnlock {
-    SSH_AUTH_SOCK = "$(gpgconf --list-dirs agent-ssh-socket)";
-  };
-}
-```
-
-**Prerequisite:** the SSH key must exist as a GPG key with the "authenticate" capability (or be an SSH key added to `gpg-agent`'s `sshcontrol` via `ssh-add`, with `pam_gnupg` unlocking the underlying GPG passphrase that protects it). The private key material itself should be provisioned via sops-nix rather than committed to the repo, so a fresh machine only needs the encrypted secret plus this module to end up with a working, auto-unlocked agent.
-
-Net effect: entering the login password once at the greetd prompt unlocks the GPG keyring, which in turn unlocks SSH authentication for the rest of the session — no second passphrase prompt for `git push`, `ssh`, etc.
-
-This entire feature is gated behind `config.features.sshAgentUnlock` (read as `osConfig.features.sshAgentUnlock` on the Home Manager side) so it can be disabled per-host — e.g. a server host with no interactive greetd session has no use for it.
+**No `config.features.sshAgentUnlock` flag.** Whether a host wants this is expressed entirely by whether its `secrets.nix` declares the `ssh-private-key` secret — there's nothing else in the system that needs to react to a separate boolean, so one would just be a second, redundant way to say the same thing (the same lesson as dropping `features.bluetooth`, see **Features** above).
 
 ## Bootstrapping a New Host
 
