@@ -17,6 +17,14 @@
       # Session name matches the Wayland session entry programs.niri.enable
       # registers; verify with `noctalia-greeter sessions` after first boot.
       greeter-args = "--session niri";
+      # TODO: settings.cursor = { theme = "Bibata-Modern-Classic"; ... } once
+      # cursor theming is tackled repo-wide (greeter + niri + GTK + Qt) —
+      # see CLAUDE.md's Phase 3 note.
+      settings = {
+        keyboard = {
+            layout = "fr";
+        };
+      };
     };
   };
 }

@@ -1,0 +1,49 @@
+// ────────────── Output Configuration ──────────────
+// You can run `niri msg outputs` to get the correct name for your displays.
+// You will have to remove "/-" and edit it before it takes effect.
+// https://github.com/YaLTeR/niri/wiki/Configuration:-Outputs
+
+output "eDP-1" {
+    // off
+    mode "1920x1080@60.059"
+    scale 1.0
+    position x=0 y=0
+    focus-at-startup
+
+    hot-corners {
+        // off
+        top-left
+        // top-right
+        // bottom-left
+        // bottom-right
+    }
+}
+
+output "Dell Inc. DELL P2422HE 4DNXBX3" {
+    // off
+    mode "1920x1080@60.00"
+    scale 1.0
+    hot-corners {
+        // off
+        top-left
+        //top-right
+        // bottom-left
+        // bottom-right
+    }
+}
+
+output "Dell Inc. DELL P2422HE 8QHXBX3" {
+    // off
+    mode "1920x1080@60.00"
+    scale 1.0
+
+    hot-corners {
+        // off
+        //top-left
+        top-right
+        // bottom-left
+        // bottom-right
+    }
+}
+
+
