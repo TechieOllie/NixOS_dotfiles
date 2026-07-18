@@ -285,8 +285,8 @@ modules/
     desktop/
         niri.nix          # compositor package + session, system-level only
         greetd.nix
+        noctalia.nix      # Noctalia Shell — native theming, replaces Stylix (see Phase 3)
         portals.nix
-        stylix.nix
 
     services/
         docker.nix
@@ -304,7 +304,7 @@ modules/
 - `modules/desktop/niri.nix` (NixOS): installs the compositor package and enables the Wayland session entry. Nothing about the user's keybindings or layout lives here. greetd itself — configured to launch that session — is a separate `modules/desktop/greetd.nix`, gated on the same feature flag rather than folded into `niri.nix`, since it's a distinct systemd service with its own concerns (greeter package, PAM).
 - `home/niri.nix` (Home Manager): the user's actual Niri configuration — keybindings, workspaces, window rules, appearance.
 
-The same split applies to anything else that's "system package + user config": GTK theming (portal + package at system level, `dconf`/settings at Home Manager level), and shell tools where a system package is needed system-wide versus a user's personal shell config.
+The same split applies to anything else that's "system package + user config": Noctalia Shell (`modules/desktop/noctalia.nix` for the package/services/Cachix substituter, `home/noctalia.nix` for theming/wallpaper settings), GTK theming (portal + package at system level, `dconf`/settings at Home Manager level), and shell tools where a system package is needed system-wide versus a user's personal shell config.
 
 ## Home Manager
 
@@ -616,7 +616,7 @@ Note that `hosts/*/features.nix` and a profile's default-setting file don't shar
 
 ## Desktop
 
-Niri, greetd, Noctalia Greeter, Stylix, Noctalia V5, GTK theming, Qt theming, fonts, icons, wallpapers, Wayland portals.
+Niri, greetd, Noctalia Greeter, Noctalia Shell v5 (native theming, GTK/Qt theming templates), fonts, icons, wallpapers, Wayland portals.
 
 ## Terminal
 
@@ -669,9 +669,11 @@ nixd, nil, alejandra, statix, deadnix, direnv, just.
 
 - Niri (system module + Home Manager split as described above).
 - greetd, Noctalia Greeter.
-- Stylix.
+- Noctalia Shell (native theming — see note below on why this replaces Stylix).
 - SSH agent auto-unlock at greetd login.
 - Wayland session.
+
+**Stylix was dropped, not implemented alongside the above (decision made mid-Phase 3, not anticipated when this roadmap was first written).** Noctalia Shell — the desktop bar/shell paired with Niri here — turned out to already generate a palette from the wallpaper and render it into external app configs (official templates for GTK and Qt, community templates for terminals/editors/browsers) — the same job Stylix would have done. Running both would mean two systems fighting over the same GTK/Qt/terminal config files. `modules/desktop/stylix.nix` will not be created; the module tree above reflects this.
 
 ## Phase 4 — Terminal Environment
 
