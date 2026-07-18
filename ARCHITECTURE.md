@@ -301,7 +301,7 @@ modules/
 
 **System vs. Home Manager split for desktop modules (previously blurred):** where a program has both a system half and a user half — Niri is the clearest example — the split is:
 
-- `modules/desktop/niri.nix` (NixOS): installs the compositor package, enables the Wayland session entry, and configures greetd to launch it. Nothing about the user's keybindings or layout lives here.
+- `modules/desktop/niri.nix` (NixOS): installs the compositor package and enables the Wayland session entry. Nothing about the user's keybindings or layout lives here. greetd itself — configured to launch that session — is a separate `modules/desktop/greetd.nix`, gated on the same feature flag rather than folded into `niri.nix`, since it's a distinct systemd service with its own concerns (greeter package, PAM).
 - `home/niri.nix` (Home Manager): the user's actual Niri configuration — keybindings, workspaces, window rules, appearance.
 
 The same split applies to anything else that's "system package + user config": GTK theming (portal + package at system level, `dconf`/settings at Home Manager level), and shell tools where a system package is needed system-wide versus a user's personal shell config.

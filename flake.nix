@@ -18,14 +18,19 @@
       url = "github:Mic92/sops-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    noctalia-greeter = {
+      url = "github:noctalia-dev/noctalia-greeter";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
-    { nixpkgs, home-manager, disko, sops-nix, ... }:
+    { nixpkgs, home-manager, disko, sops-nix, noctalia-greeter, ... }:
     let
       system = "x86_64-linux";
       vars = import ./hosts/the-entertaining-nios-vm/variables.nix;
-      mkHost = import ./lib/mkHost.nix { inherit nixpkgs disko sops-nix home-manager; };
+      mkHost = import ./lib/mkHost.nix { inherit nixpkgs disko sops-nix home-manager noctalia-greeter; };
     in
     {
       nixosConfigurations.the-entertaining-nios-vm = mkHost {

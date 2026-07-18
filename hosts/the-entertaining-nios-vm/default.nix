@@ -7,6 +7,7 @@
     ./secrets.nix
     ../../profiles/base.nix
     ../../modules/desktop/niri.nix
+    ../../modules/desktop/greetd.nix
   ];
 
   networking.hostName = vars.system.hostName;
