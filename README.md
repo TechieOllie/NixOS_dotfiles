@@ -35,6 +35,7 @@ Each of these has its own short `README.md` with more detail.
 
 - **[ARCHITECTURE.md](./ARCHITECTURE.md)** — the design doc: why the repo is shaped this way, every convention, the full roadmap.
 - **[CLAUDE.md](./CLAUDE.md)** — condensed, kept-current state for AI-assisted work: what's actually built today versus still scaffolded.
+- **[docs/](./docs/)** — project-specific runbooks: how to actually bootstrap a host or manage secrets in this repo, step by step.
 
 ## Status
 
