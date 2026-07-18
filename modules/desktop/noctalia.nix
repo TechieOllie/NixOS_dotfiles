@@ -8,12 +8,13 @@
   config = lib.mkIf config.features.niri {
     programs.noctalia.enable = true;
 
-    # Wired individually rather than via programs.noctalia.recommendedServices
-    # (which would also force Bluetooth on for every niri host) — this keeps
-    # hardware.bluetooth.enable gated on config.features.bluetooth like the
-    # architecture intends, currently false everywhere.
-    services.upower.enable = true;
-    services.power-profiles-daemon.enable = true;
+    # Enables NetworkManager (already on unconditionally), Bluetooth,
+    # UPower, and a power-profile service — every host that runs Noctalia
+    # wants all of these, so there's no independent config.features.bluetooth
+    # flag to keep in sync (removed from modules/options.nix). Also avoids
+    # hand-tracking what Noctalia actually needs as that list evolves
+    # upstream.
+    programs.noctalia.recommendedServices.enable = true;
 
     # Lets Nix substitute prebuilt Noctalia binaries instead of building
     # this native Wayland/OpenGL project from source on every host.

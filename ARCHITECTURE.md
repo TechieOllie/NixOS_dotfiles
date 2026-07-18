@@ -152,11 +152,6 @@ Before any host or profile can set `features.docker = true;` or `lib.mkDefault`,
           default = false;
           description = "Enable Feral GameMode.";
         };
-        bluetooth = lib.mkOption {
-          type = lib.types.bool;
-          default = false;
-          description = "Enable the Bluetooth stack.";
-        };
         sshAgentUnlock = lib.mkOption {
           type = lib.types.bool;
           default = false;
@@ -279,7 +274,6 @@ modules/
 
     hardware/
         audio.nix
-        bluetooth.nix
         graphics.nix
 
     desktop/
@@ -354,11 +348,12 @@ Examples of what Home Manager owns: Ghostty, Zsh, Starship, Git configuration, V
   features = {
     docker = true;
     steam = false;
-    bluetooth = true;
     sshAgentUnlock = true;
   };
 }
 ```
+
+**Not every capability needs its own flag.** Bluetooth was originally planned as one (`features.bluetooth`, `modules/hardware/bluetooth.nix`), but was dropped once it became clear no host in this repo, real or planned, would ever want a desktop environment (Niri + Noctalia Shell) *without* Bluetooth — the only thing that would have driven a per-host difference. Noctalia's own `programs.noctalia.recommendedServices.enable` now turns Bluetooth on directly (`modules/desktop/noctalia.nix`), rather than through a flag that could never actually differ between hosts. The lesson generalizes: a flag earns its place by expressing a *real* axis of variation between hosts, not just because a capability is optional in the abstract — reserve `features.*` for toggles a host or profile might genuinely set differently.
 
 Modules consume the merged value, never hardcode it:
 
@@ -405,6 +400,9 @@ pkgs/        -> custom packages
 scripts/     -> helper scripts
 wallpapers/  -> wallpapers
 assets/      -> static assets
+docs/        -> project-specific runbooks (how to bootstrap a host, manage
+                secrets) — distinct from this file (why) and per-directory
+                READMEs (what belongs where); see docs/README.md
 ```
 
 ---
@@ -604,7 +602,7 @@ GitHub Actions (Phase 6 of the roadmap) then only needs to run `nix flake check`
 Files use lowercase names describing responsibility, not implementation:
 
 ```
-Good:  networking.nix, bluetooth.nix, docker.nix
+Good:  networking.nix, greetd.nix, docker.nix
 Avoid: NetworkStuff.nix, DockerSupport.nix
 ```
 
@@ -765,5 +763,7 @@ Avoid premature abstraction, avoid duplicate sources of truth, and avoid a modul
 │
 ├── wallpapers/
 │
-└── assets/
+├── assets/
+│
+└── docs/
 ```

@@ -4,7 +4,6 @@
     docker = false;
     steam = false;
     gamemode = false;
-    bluetooth = false;
     sshAgentUnlock = false;
     snapshots = true;
   };

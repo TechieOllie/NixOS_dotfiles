@@ -17,10 +17,11 @@ compositor/DE is ever added). `greetd.nix` wires
 the similar name) — both flake inputs, both imported by the module that
 actually uses them rather than unconditionally in `lib/mkHost.nix` (which only
 threads the inputs through `specialArgs`), unlike disko/sops-nix which every
-host needs. `noctalia.nix` deliberately wires Bluetooth/UPower/power-profiles
-individually rather than via `programs.noctalia.recommendedServices.enable`,
-to keep `config.features.bluetooth` the single gate for Bluetooth rather than
-having a second, competing toggle. Stylix was considered and dropped —
+host needs. `noctalia.nix` sets `programs.noctalia.recommendedServices.enable = true`
+(NetworkManager, Bluetooth, UPower, power-profile) rather than wiring each
+service by hand — no host in this repo has ever wanted Niri/Noctalia without
+also wanting Bluetooth, so a separate `config.features.bluetooth` flag was
+removed as unused complexity rather than kept "just in case." Stylix was considered and dropped —
 Noctalia Shell already covers GTK/Qt/terminal/app theming natively (see
 `CLAUDE.md`'s Phase 3 note); `stylix.nix` will not be created. Future
 additions: `portals.nix`.

@@ -18,11 +18,6 @@
           default = false;
           description = "Enable Feral GameMode.";
         };
-        bluetooth = lib.mkOption {
-          type = lib.types.bool;
-          default = false;
-          description = "Enable the Bluetooth stack.";
-        };
         sshAgentUnlock = lib.mkOption {
           type = lib.types.bool;
           default = false;
