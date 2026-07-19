@@ -20,18 +20,30 @@
 # touched Neovim at all.
 { pkgs, ... }:
 {
+  # git and yazi are deliberately NOT listed here even though
+  # lazy.nvim/Mason need them (git for lazy.nvim's own bootstrap clone;
+  # yazi for yazi.nvim) -- both are already installed by their own
+  # dedicated modules (home/git.nix's programs.git.enable already pulls
+  # in pkgs.git; home/yazi.nix installs yazi itself and carries its
+  # Noctalia theming). Putting them here too would be a redundant second
+  # place declaring the same package, for a tool this file doesn't
+  # actually own. Everything below stays here because its only reason
+  # for existing in this repo *is* Neovim/Mason's own needs -- if a
+  # future phase adds general-purpose Python/Node/Go/PHP tooling on its
+  # own merits, move the relevant entry to that phase's own module
+  # instead of leaving it here as a coincidental side effect.
   home.packages = with pkgs; [
     neovim
-    git # lazy.nvim's own bootstrap clone
     gnumake # telescope-fzf-native.nvim / LuaSnip jsregexp build steps
     gcc # nvim-treesitter's runtime parser compilation
     tree-sitter # the CLI itself -- the new main-branch nvim-treesitter
     # shells out to `tree-sitter build`, confirmed live ("ENOENT: no
     # such file or directory (cmd): 'tree-sitter'" without this); a C
     # compiler alone isn't enough for this rewritten version.
-    ripgrep # Telescope live_grep / grep_string
-    yazi # yazi.nvim
-    # lazygit already provided by home/lazygit.nix
+    ripgrep # Telescope live_grep / grep_string -- also on this repo's
+    # planned general terminal-tool stack, but has no configuration of
+    # its own to warrant a dedicated file (unlike yazi); fine here until
+    # that changes.
     python3 # Mason's debugpy installer needs a python3 on PATH to build
     # its own venv (confirmed live: "Unable to find python3 installation
     # in PATH" without this) -- also just generally needed to run/debug

@@ -12,6 +12,7 @@
     ./lazygit.nix
     ./git.nix
     ./ghostty.nix
+    ./yazi.nix
   ];
 
   home.username = vars.user.name;

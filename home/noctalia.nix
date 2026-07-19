@@ -56,8 +56,25 @@
             # conflicting with the Nix-managed home/lazygit.nix from
             # Phase 4 the same way starship's builtin template would;
             # replaced by our own custom user template below instead.
+            #
+            # "yazi" only — not a separate "yazi-syntax" entry too.
+            # Confirmed by reading template_apply_service.cpp directly:
+            # communityIds entries key a *cached catalog directory*
+            # (community-templates' own yazi/template.toml), fetched and
+            # then fully processed as one file — and that one file
+            # happens to define both [templates.yazi] (flavor colors) and
+            # [templates.yazi-syntax] (tmTheme), both applied together
+            # once "yazi" is cached. "yazi-syntax" isn't its own
+            # fetchable catalog entry; listing it separately would just
+            # produce a "not cached yet" warning, the same one seen
+            # earlier for "lazygit" before that was dropped in favor of
+            # the custom template. Both outputs land in a clean, separate
+            # directory (~/.config/yazi/flavors/noctalia.yazi/) — no
+            # conflict, since home/yazi.nix doesn't manage any yazi config
+            # with Nix at all.
             community_ids = [
               "neovim"
+              "yazi"
             ];
 
             # Custom templates, written and checked into this repo
