@@ -69,8 +69,15 @@ the full reasoning on when this is worth it versus the simpler default.
 `github:TechieOllie/neovim_dotfiles` (its own lazy.nvim + Mason setup,
 not this flake) — not an out-of-store symlink, not Nix-managed in any
 way. `home/neovim.nix` only installs the base toolchain that config
-needs (the `neovim` binary, `git`, `gnumake`, `gcc`, `ripgrep`, `yazi`).
-Clone it directly on any host that wants Neovim configured:
+needs but can't provide for itself: the `neovim` binary, plus
+`gnumake`/`gcc`/`tree-sitter` (plugin native builds and parser
+compilation), `ripgrep` (Telescope), and Mason's own installer
+prerequisites (`python3`, `unzip`, `nodejs`, `go`, `php`). `git` and
+`yazi` are needed too (lazy.nvim's bootstrap clone, `yazi.nvim`) but are
+deliberately *not* listed there — both already come from their own
+dedicated modules (`home/git.nix`, `home/yazi.nix`), so they're not
+duplicated in `home/neovim.nix`. Clone the config repo directly on any
+host that wants Neovim configured:
 
 ```bash
 git clone git@github.com:TechieOllie/neovim_dotfiles.git ~/.config/nvim

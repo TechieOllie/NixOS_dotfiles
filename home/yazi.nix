@@ -5,7 +5,8 @@
 # zoxide/btop) independent of Neovim — home/neovim.nix's yazi.nvim plugin
 # is one consumer of this, not the reason it's installed. No settings
 # configured yet beyond enabling it; Noctalia themes it live (see
-# home/noctalia.nix's community_ids: "yazi" + "yazi-syntax"), writing to
+# home/noctalia.nix's community_ids: "yazi" — one cached catalog entry
+# covers both the flavor and tmTheme templates it defines), writing to
 # ~/.config/yazi/flavors/noctalia.yazi/ and activating it in
 # ~/.config/yazi/theme.toml -- deliberately not Nix-managed here at all,
 # so there's nothing for Noctalia's runtime writes to conflict with.
