@@ -23,11 +23,25 @@
           mode = "dark";
           source = "wallpaper";
           wallpaper_scheme = "m3-content";
-          # TODO: builtin_ids for GTK/Qt app-theming templates aren't
-          # documented as literal strings anywhere upstream — run
-          # `noctalia theme --list-templates` once Noctalia is actually
-          # built/running to find them, then fill in
-          # theme.templates.builtin_ids here.
+
+          # Resolves the earlier "undocumented anywhere upstream" TODO —
+          # confirmed by reading assets/templates/builtin.toml directly in
+          # the noctalia flake input's source (the [catalog.*] entries are
+          # the real builtin_ids). "ghostty" keeps
+          # ~/.config/ghostty/themes/noctalia in sync with the wallpaper
+          # (see home/ghostty.nix); "gtk3"/"gtk4"/"qt" close the GTK/Qt
+          # theming gap open since Phase 3. Deliberately NOT including
+          # "starship" — its template live-edits ~/.config/starship.toml
+          # itself (sed-inserting a palette line + marked block), which
+          # would conflict with programs.starship.settings' Nix-managed
+          # store symlink the same way niri/noctalia.kdl once did; left
+          # for its own separate session.
+          templates.builtin_ids = [
+            "ghostty"
+            "gtk3"
+            "gtk4"
+            "qt"
+          ];
         };
 
         # Deliberately no default.path/enabled here — confirmed live that

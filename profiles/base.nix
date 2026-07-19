@@ -10,5 +10,7 @@
     ../modules/system/networking.nix
     ../modules/system/users.nix
     ../modules/system/ssh.nix
+    ../modules/system/shell.nix
+    ../modules/system/fonts.nix
   ];
 }

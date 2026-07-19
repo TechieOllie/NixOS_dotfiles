@@ -3,7 +3,16 @@
 # ...) get imported from this file as they're written.
 { vars, ... }:
 {
-  imports = [ ./niri.nix ./noctalia.nix ];
+  imports = [
+    ./niri.nix
+    ./noctalia.nix
+    ./zsh.nix
+    ./starship.nix
+    ./neovim.nix
+    ./lazygit.nix
+    ./git.nix
+    ./ghostty.nix
+  ];
 
   home.username = vars.user.name;
   home.homeDirectory = "/home/${vars.user.name}";
