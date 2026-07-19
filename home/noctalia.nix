@@ -24,24 +24,77 @@
           source = "wallpaper";
           wallpaper_scheme = "m3-content";
 
-          # Resolves the earlier "undocumented anywhere upstream" TODO —
-          # confirmed by reading assets/templates/builtin.toml directly in
-          # the noctalia flake input's source (the [catalog.*] entries are
-          # the real builtin_ids). "ghostty" keeps
-          # ~/.config/ghostty/themes/noctalia in sync with the wallpaper
-          # (see home/ghostty.nix); "gtk3"/"gtk4"/"qt" close the GTK/Qt
-          # theming gap open since Phase 3. Deliberately NOT including
-          # "starship" — its template live-edits ~/.config/starship.toml
-          # itself (sed-inserting a palette line + marked block), which
-          # would conflict with programs.starship.settings' Nix-managed
-          # store symlink the same way niri/noctalia.kdl once did; left
-          # for its own separate session.
-          templates.builtin_ids = [
-            "ghostty"
-            "gtk3"
-            "gtk4"
-            "qt"
-          ];
+          templates = {
+            # Resolves the earlier "undocumented anywhere upstream" TODO —
+            # confirmed by reading assets/templates/builtin.toml directly
+            # in the noctalia flake input's source (the [catalog.*]
+            # entries are the real builtin_ids). "ghostty" keeps
+            # ~/.config/ghostty/themes/noctalia in sync with the
+            # wallpaper (see home/ghostty.nix); "gtk3"/"gtk4"/"qt" close
+            # the GTK/Qt theming gap open since Phase 3. Deliberately NOT
+            # "starship" here — its official template live-edits
+            # ~/.config/starship.toml directly (sed-inserting a palette
+            # line + marked block); replaced by our own custom user
+            # template below instead, which avoids that conflict by
+            # design (see templates.user.starship).
+            builtin_ids = [
+              "ghostty"
+              "gtk3"
+              "gtk4"
+              "qt"
+            ];
+
+            # "neovim" fetched from the separate community catalog
+            # (github:noctalia-dev/community-templates), not
+            # builtin_ids — writes ~/.config/nvim/lua/matugen.lua at
+            # runtime (nvim-base16 sub-template), which is exactly the
+            # mechanism the operator's own neovim_dotfiles config already
+            # uses (confirmed: same output filename, same
+            # RRethy/base16-nvim plugin already in their lazy-lock.json).
+            # Deliberately NOT "lazygit" — its community template
+            # rewrites ~/.config/lazygit/config.yml directly via `mv`,
+            # conflicting with the Nix-managed home/lazygit.nix from
+            # Phase 4 the same way starship's builtin template would;
+            # replaced by our own custom user template below instead.
+            community_ids = [
+              "neovim"
+            ];
+
+            # Custom templates, written and checked into this repo
+            # (home/noctalia-templates/), for the two cases where the
+            # official (builtin/community) template would conflict with
+            # a file Home Manager already manages. Since we control
+            # input_path/output_path/post_hook completely here — unlike
+            # the official templates, which must stay compatible with an
+            # arbitrary pre-existing user file via in-place sed/mv edits
+            # — these render their *entire* output file fresh each time,
+            # the same way ghostty/gtk/qt/niri's own templates already
+            # behave, sidestepping the conflict entirely rather than
+            # working around it.
+            user = {
+              starship = {
+                input_path = ./noctalia-templates/starship.toml.tmpl;
+                # No post_hook needed: Starship re-reads its config file
+                # on every new prompt render, no daemon/signal to
+                # restart. home/starship.nix deliberately has no
+                # `settings` — this template is the sole owner of the
+                # whole file.
+                output_path = [ "$XDG_CONFIG_HOME/starship.toml" ];
+              };
+
+              lazygit = {
+                input_path = ./noctalia-templates/lazygit-theme.yml.tmpl;
+                # Deliberately a SEPARATE file from home/lazygit.nix's
+                # Nix-managed config.yml (nerdFontsVersion,
+                # notARepository) — merged at invocation time via
+                # LG_CONFIG_FILE (see home/lazygit.nix's
+                # home.sessionVariables), not by overwriting config.yml.
+                # Keeps the already-completed Phase 4 home/lazygit.nix
+                # completely untouched.
+                output_path = [ "$XDG_CONFIG_HOME/lazygit/themes/noctalia.yml" ];
+              };
+            };
+          };
         };
 
         # Deliberately no default.path/enabled here — confirmed live that

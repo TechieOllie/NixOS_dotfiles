@@ -313,6 +313,14 @@ Examples of what Home Manager owns: Ghostty, Zsh, Starship, Git configuration, V
 
 **Autostarting applications: systemd user services, not niri's `spawn-sh-at-startup`.** niri's own docs support a `spawn-sh-at-startup` directive for launching things at compositor start, but this repo prefers `systemd.user.services.<name>` instead, bound to the standard `graphical-session.target` (`Unit.PartOf`/`Unit.After = "graphical-session.target"`, `Install.WantedBy = [ "graphical-session.target" ]`) — the same target niri's own packaged systemd integration (`niri.service`) already binds to and pulls in automatically. This gets proper start/stop lifecycle (services stop when the session ends, rather than leaking a process), `Restart=on-failure`, `journalctl --user` logging, and ordering handled by systemd instead of a hardcoded `sleep N` guessing how long niri takes to be ready. Noctalia Shell already follows this (`programs.noctalia.systemd.enable = true`, paired with `shell.launch_apps_as_systemd_services = true`); apply the same pattern to any future autostarted application (Vesktop, Zen Browser, ...) as its own Home Manager module is written, rather than a shared `cfg/autostart.kdl`.
 
+**Noctalia theming: three template layers, pick the right one per app.** `home/noctalia.nix`'s `theme.templates` has three distinct mechanisms, not one:
+
+- `builtin_ids` — templates shipped with the `noctalia` package itself (ghostty, gtk3, gtk4, qt, niri, starship, ...).
+- `community_ids` — templates fetched at runtime from `github:noctalia-dev/community-templates` (neovim, lazygit, zed, ...).
+- `templates.user.<id>` — templates **this repo writes and checks in itself** (`home/noctalia-templates/`), registered with an explicit `input_path`/`output_path`/`post_hook`.
+
+Prefer `builtin_ids`/`community_ids` whenever the official template's own output path is a *separate* file from anything Home Manager manages (e.g. `ghostty/themes/noctalia`, `niri/noctalia.kdl`, `nvim/lua/matugen.lua`) — no conflict, nothing to write. Some official templates instead mutate an *existing* file in place (Starship's builtin template `sed -i`s `starship.toml`; Lazygit's community template `mv`s a rebuilt `config.yml` over the original) — both mechanisms destroy a Home-Manager-managed symlink at that path the same way. For those cases, write a custom `templates.user.<id>` entry instead: since we control the whole template rather than needing to stay compatible with an arbitrary pre-existing file, it can render its *entire* output fresh each time (the same behavior the clean, separate-file official templates already have), sidestepping the conflict by construction. `home/starship.nix` (whole file, no `post_hook` needed) and `home/lazygit.nix` (a separate theme-only file, merged at invocation time via lazygit's own `LG_CONFIG_FILE`) are the reference examples — follow this same triage (does the official template touch a separate file, or mutate an existing one in place?) before wiring up theming for any future app.
+
 ## Variables
 
 `variables.nix` holds only machine **identity** — values that are set once per machine and rarely change:
@@ -599,7 +607,7 @@ Niri, greetd, Noctalia Greeter, Noctalia Shell v5 (native theming, GTK/Qt themin
 
 ## Terminal
 
-Ghostty, Zsh, Starship, Git, Lazygit, Fastfetch, eza, bat, fd, ripgrep, fzf, zoxide, yazi, btop.
+Ghostty, Zsh, Starship, Git, Lazygit, Neovim, Fastfetch, eza, bat, fd, ripgrep, fzf, zoxide, yazi, btop.
 
 ## Applications
 
@@ -658,6 +666,7 @@ nixd, nil, alejandra, statix, deadnix, direnv, just.
 
 - Ghostty, Zsh, Starship, Git, Lazygit.
 - Shell migration into Home Manager.
+- Full Neovim configuration (plugins, LSP, etc.) — done. Deliberately **not** ported to native Nix, unlike the rest of this phase: the operator's config (lazy.nvim + Mason) is rewritten upstream at `github:TechieOllie/neovim_dotfiles` instead, and `~/.config/nvim` stays an ordinary manually-cloned git checkout, not Home-Manager-managed at all. `home/neovim.nix` only installs base toolchain prerequisites (a C compiler and the `tree-sitter` CLI for parser compilation, `unzip`/`nodejs`/`go`/`php`/`python3` for Mason's own installers, `programs.nix-ld.enable` for running Mason-installed prebuilt dynamically-linked binaries at all). See `CLAUDE.md` for the full reasoning (a native port was drafted in detail first, then reversed once every finding — a breaking upstream API rewrite, a plugin needing vendoring, lost lazy-loading, a Noctalia-template compatibility hack — showed it bought nothing once Mason/lazy.nvim were kept anyway) and the live-verification details.
 
 ## Phase 5 — Applications
 

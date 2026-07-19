@@ -5,40 +5,14 @@
 # hand-written here — programs.starship.enableZshIntegration defaults to
 # true once both programs.zsh.enable and programs.starship.enable are
 # true, and home-manager adds the eval line to .zshrc itself.
+#
+# Deliberately no `settings` here — home/noctalia.nix's custom "starship"
+# user template is the sole owner of ~/.config/starship.toml, rendering
+# the whole file fresh on every wallpaper/palette change (see that file's
+# theme.templates.user.starship for the actual config content, ported
+# from what used to live here verbatim). `enable` alone still installs
+# the package and adds the zsh-integration eval line; that's unrelated to
+# the config file's content and unaffected by this.
 {
-  programs.starship = {
-    enable = true;
-
-    # Ported verbatim from the operator's starship.toml.
-    settings = {
-      "$schema" = "https://starship.rs/config-schema.json";
-
-      format = ''
-        [┌─ ](bold green)$username$directory $git_branch$python
-        [└─$character ](green bold) '';
-
-      git_branch.format = "[$symbol$branch(:$remote_branch) ]($style)";
-
-      python = {
-        # `${symbol}` here is literal Starship template syntax, not Nix
-        # interpolation — escaped as `\${symbol}` so Nix doesn't try to
-        # resolve a `symbol` variable that isn't in scope. `\(`/`\)` are
-        # Starship's own literal-parenthesis escapes, doubled (`\\(`,
-        # `\\)`) so Nix emits a literal backslash instead of consuming it
-        # as an escape of the following character.
-        format = "[via \${symbol} (\\($virtualenv\\)) ]($style)";
-        symbol = ""; # deliberately empty — operator's own choice, no icon
-      };
-
-      character.disabled = false;
-
-      username.show_always = true;
-
-      directory = {
-        format = "[$path](blue bold)";
-        truncation_length = 8;
-        truncation_symbol = "…/";
-      };
-    };
-  };
+  programs.starship.enable = true;
 }

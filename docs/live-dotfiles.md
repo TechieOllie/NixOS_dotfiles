@@ -62,3 +62,23 @@ flake checkout it's invoked from, never this clone.
 Only do this for files that are genuinely static (no per-host Nix
 templating) and either large or edited often — see `ARCHITECTURE.md` for
 the full reasoning on when this is worth it versus the simpler default.
+
+## A different case: Neovim's config isn't part of this mechanism at all
+
+`~/.config/nvim` is an ordinary git checkout of a separate repo,
+`github:TechieOllie/neovim_dotfiles` (its own lazy.nvim + Mason setup,
+not this flake) — not an out-of-store symlink, not Nix-managed in any
+way. `home/neovim.nix` only installs the base toolchain that config
+needs (the `neovim` binary, `git`, `gnumake`, `gcc`, `ripgrep`, `yazi`).
+Clone it directly on any host that wants Neovim configured:
+
+```bash
+git clone git@github.com:TechieOllie/neovim_dotfiles.git ~/.config/nvim
+```
+
+Same "manual, one-time, per host" shape as the `~/.dotfiles` clone above,
+but a genuinely different mechanism — there's no "repo A managing repo
+B's content" relationship here, just a second, unrelated repo living at
+its own path. Keeping it up to date is `git pull` inside `~/.config/nvim`
+itself, same as any other git-cloned dotfiles setup, whether on this
+NixOS host or anywhere else.

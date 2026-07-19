@@ -12,5 +12,6 @@
     ../modules/system/ssh.nix
     ../modules/system/shell.nix
     ../modules/system/fonts.nix
+    ../modules/system/nix-ld.nix
   ];
 }
