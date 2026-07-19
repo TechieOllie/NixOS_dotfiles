@@ -10,4 +10,4 @@ nothing more.
 
 - [`bootstrapping-a-host.md`](./bootstrapping-a-host.md) — disko + nixos-anywhere, start to finish for a brand-new machine.
 - [`secrets.md`](./secrets.md) — sops-nix day to day: adding secrets, adding a recipient, rotating a key.
-- [`wallpapers.md`](./wallpapers.md) — cloning this repo to `~/.dotfiles` on a host, adding a wallpaper.
+- [`live-dotfiles.md`](./live-dotfiles.md) — cloning this repo to `~/.dotfiles` on a host, and which files (wallpapers, niri config) are read live from it instead of the Nix store.

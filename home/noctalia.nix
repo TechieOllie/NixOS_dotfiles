@@ -47,7 +47,7 @@
         # repo's own on-disk clone instead means: one copy of the files,
         # and dropping a new wallpaper in just works with no rebuild.
         # Requires this repo to be cloned to ~/.dotfiles on every host that
-        # uses this module — see docs/wallpapers.md.
+        # uses this module — see docs/live-dotfiles.md.
         wallpaper.directory = "/home/${vars.user.name}/.dotfiles/wallpapers";
       };
     };
