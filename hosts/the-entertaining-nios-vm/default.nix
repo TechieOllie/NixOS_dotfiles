@@ -9,6 +9,7 @@
     ../../modules/desktop/niri.nix
     ../../modules/desktop/greetd.nix
     ../../modules/desktop/noctalia.nix
+    ../../modules/desktop/theming.nix
   ];
 
   networking.hostName = vars.system.hostName;

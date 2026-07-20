@@ -6,6 +6,9 @@
   imports = [
     ./niri.nix
     ./noctalia.nix
+    ./cursor.nix
+    ./gtk.nix
+    ./qt.nix
     ./zsh.nix
     ./starship.nix
     ./neovim.nix

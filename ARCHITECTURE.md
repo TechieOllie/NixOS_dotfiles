@@ -274,6 +274,7 @@ modules/
         niri.nix          # compositor package + session, system-level only
         greetd.nix
         noctalia.nix      # Noctalia Shell — native theming, replaces Stylix (see Phase 3)
+        theming.nix        # cursor/icon-theme packages installed system-wide, for the greeter (see Phase 5)
         portals.nix
 
     services/
@@ -540,7 +541,7 @@ Choosing between the two is a per-file judgment call, not a rule: store-copy by 
 
 ## Command Runner (`just`)
 
-**Introduced in Phase 7, once the command surface has actually grown (previously listed in Part 4 but never used):** the raw commands above are fine for a single host, but they grow — building a *specific* host without switching to it, re-encrypting secrets after adding a recipient, running the full check suite — and typing exact `nix`/`nixos-rebuild` invocations from memory gets error-prone as the repo scales to multiple machines. A thin `justfile` at the repo root wraps these as named recipes without introducing a second source of truth: each recipe calls the same underlying command verbatim, so there's nothing to drift.
+**Introduced in Phase 8, once the command surface has actually grown (previously listed in Part 4 but never used):** the raw commands above are fine for a single host, but they grow — building a *specific* host without switching to it, re-encrypting secrets after adding a recipient, running the full check suite — and typing exact `nix`/`nixos-rebuild` invocations from memory gets error-prone as the repo scales to multiple machines. A thin `justfile` at the repo root wraps these as named recipes without introducing a second source of truth: each recipe calls the same underlying command verbatim, so there's nothing to drift.
 
 ```just
 # justfile
@@ -572,7 +573,7 @@ secrets-rekey host=`hostname`:
     sops updatekeys hosts/{{host}}/secrets/secrets.yaml
 ```
 
-This is deliberately last in the roadmap, not first — wrapping commands before the repo has more than one host and a handful of recurring operations would be exactly the kind of premature abstraction this project avoids elsewhere (see **Why We Avoid Over-Engineering**). By Phase 7 the recipes reflect commands that have actually been typed by hand repeatedly, not ones guessed at up front. `direnv` (already part of the terminal stack) puts `just` on `PATH` automatically on entering the repo, so `just` alone is enough to see available recipes.
+This is deliberately last in the roadmap, not first — wrapping commands before the repo has more than one host and a handful of recurring operations would be exactly the kind of premature abstraction this project avoids elsewhere (see **Why We Avoid Over-Engineering**). By Phase 8 the recipes reflect commands that have actually been typed by hand repeatedly, not ones guessed at up front. `direnv` (already part of the terminal stack) puts `just` on `PATH` automatically on entering the repo, so `just` alone is enough to see available recipes.
 
 ## Validation and CI
 
@@ -584,7 +585,7 @@ This is deliberately last in the roadmap, not first — wrapping commands before
 
 **Gap to close (previously missing):** formatting and static analysis catch style issues, not evaluation or build failures. `nix flake check` already evaluates every attribute under `nixosConfigurations` by default, which surfaces most eval errors, but a check that goes one step further and builds each host's system closure (`nix build .#nixosConfigurations.<host>.config.system.build.toplevel` for every host in the flake) catches breakage that only shows up once a derivation actually builds — a bad package reference, a broken overlay, a module that evaluates fine but fails to build. Wire this in as its own flake check so a host that can't build is caught in CI, not on the machine mid-`switch`.
 
-GitHub Actions (Phase 6 of the roadmap) then only needs to run `nix flake check`, rather than reimplementing a separate validation pipeline — CI and local validation stay identical by construction.
+GitHub Actions (Phase 8 of the roadmap) then only needs to run `nix flake check`, rather than reimplementing a separate validation pipeline — CI and local validation stay identical by construction.
 
 ## Naming Conventions
 
@@ -668,17 +669,52 @@ nixd, nil, alejandra, statix, deadnix, direnv, just.
 - Shell migration into Home Manager.
 - Full Neovim configuration (plugins, LSP, etc.) — done. Deliberately **not** ported to native Nix, unlike the rest of this phase: the operator's config (lazy.nvim + Mason) is rewritten upstream at `github:TechieOllie/neovim_dotfiles` instead, and `~/.config/nvim` stays an ordinary manually-cloned git checkout, not Home-Manager-managed at all. `home/neovim.nix` only installs base toolchain prerequisites (a C compiler and the `tree-sitter` CLI for parser compilation, `unzip`/`nodejs`/`go`/`php`/`python3` for Mason's own installers, `programs.nix-ld.enable` for running Mason-installed prebuilt dynamically-linked binaries at all). See `CLAUDE.md` for the full reasoning (a native port was drafted in detail first, then reversed once every finding — a breaking upstream API rewrite, a plugin needing vendoring, lost lazy-loading, a Noctalia-template compatibility hack — showed it bought nothing once Mason/lazy.nvim were kept anyway) and the live-verification details.
 
-## Phase 5 — Applications
+## Phase 5 — Theming
+
+Icon theme, cursor theme, GTK/Qt modernization — also folds in theming work
+already landed during Phases 3/4 (Noctalia's wallpaper-driven palette, the
+official `ghostty`/`gtk3`/`gtk4`/`qt` color templates, the `neovim`/`yazi`
+community templates, the custom `starship`/`lazygit` user templates, niri's
+own cursor line) rather than leaving it scattered across those phases.
+
+- Cursor: `home.pointerCursor` (Bibata-Modern-Classic) as the single Home
+  Manager source of truth for GTK/Qt/Wayland, plus `modules/desktop/theming.nix`
+  installing the package system-wide and `greetd.nix`'s `settings.cursor` so
+  the greeter is themed too — resolving the cursor-theme TODO left open
+  since Phase 3.
+- Icons: Papirus-Dark (`home/gtk.nix`), with folder colors recolored live to
+  the wallpaper accent via Noctalia's own official `papirus-icons` community
+  template — the same live-theming mechanism as `neovim`/`yazi`, not a new
+  one invented for this.
+- GTK modernization: `adw-gtk3` gives GTK3 apps a modern, libadwaita-like
+  rounded look; GTK4 apps already render rounded via libadwaita itself, so
+  no override is needed there.
+- Qt: deliberately **color-theming only, no rounded corners**. Kvantum (the
+  only way to get rounded Qt widgets) hardcodes its own palette per theme and
+  never reads qt5ct/qt6ct's colors — confirmed by reading Kvantum's own
+  source, not assumed — so adopting it would mean losing Noctalia's live
+  wallpaper-color tracking for Qt apps. Decided to keep the existing
+  Fusion + qt5ct/qt6ct live-color path instead, and finally install the
+  actual `qt5ct`/`qt6ct` packages via Home Manager's `qt.*` module (a gap
+  left open since Phase 4, when only a bare `QT_QPA_PLATFORMTHEME` env var
+  was set). Revisit Kvantum + a theme like `kvmarwaita` later as its own
+  research task if rounded Qt corners are wanted badly enough to accept that
+  trade-off.
+
+See `CLAUDE.md`'s Phase 5 section for full implementation detail and the
+exact packages/options verified.
+
+## Phase 6 — Applications
 
 - VS Code, Zen Browser, Vesktop, Nautilus.
 
-## Phase 6 — Extra Features
+## Phase 7 — Extra Features
 
 - Docker, Steam, Proton GE, Tailscale.
 - Gaming profile.
 - Btrfs snapshots (snapper) — see **Filesystem Choice and Snapshots** above; the subvolume layout itself is decided per-host at install time (in that host's `disko.nix`), but the `snapper` service module and its `features.snapshots` toggle belong here with the rest of the optional capability modules.
 
-## Phase 7 — Long-Term Improvements
+## Phase 8 — Long-Term Improvements
 
 - `nix flake check` as unified CI gate (GitHub Actions calling the same command used locally).
 - Command runner (`justfile`) wrapping `switch`, `build`, `rollback`, `update`, `check`, `secrets-rekey` once these are being typed by hand often enough to be worth naming.

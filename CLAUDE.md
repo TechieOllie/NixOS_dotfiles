@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state of the repository
 
-Phase 1 (Foundation) is done, Phase 2 (Profiles) is in progress, Phase 3 (Desktop environment) is done, and Phase 4 (Terminal environment) is done (Zsh, Starship, Lazygit, Git, Ghostty, a bare Neovim package — all landed and verified live). `flake.nix` now has two `nixosConfigurations` entries: `the-entertaining-nios-vm` (a VM, bootstrapped and verified via a full nixos-anywhere install) and `the-entertaining-nios-laptop` (fully wired and eval-clean, but **not yet installed** — see below). Both are built through `lib/mkHost.nix` (`{ system, hostPath }: nixosSystem`, wiring `disko`, `sops-nix`, `modules/options.nix`, the host itself, and `home-manager.nixosModules.home-manager`) rather than inline. `mkHost` was extracted ahead of the guide's usual "wait for a second *bootstrapped* host" trigger — bootstrapped meaning installed on real/virtual hardware via nixos-anywhere, which the laptop still isn't — because the desktop and laptop hosts' imminent bootstrap made the duplication a near-certainty rather than a hypothetical; treat this as a deliberate, explicitly-requested exception, not a precedent for extracting other `lib/` helpers early.
+Phase 1 (Foundation) is done, Phase 2 (Profiles) is in progress, Phase 3 (Desktop environment) is done, Phase 4 (Terminal environment) is done (Zsh, Starship, Lazygit, Git, Ghostty, a bare Neovim package — all landed and verified live), and Phase 5 (Theming) has landed and is mostly verified live on `the-entertaining-nios-vm` — cursor/icon theme/GTK3 modernization/Qt color-scheme all confirmed working (see the roadmap section below for the full writeup, the two accepted trade-offs, and two real bugs found and fixed during verification); the greeter's own cursor still needs its one-time `greeter.toml` reset (same gotcha as any other `greetd.nix` `settings` change) to actually show on an already-booted host. `flake.nix` now has two `nixosConfigurations` entries: `the-entertaining-nios-vm` (a VM, bootstrapped and verified via a full nixos-anywhere install) and `the-entertaining-nios-laptop` (fully wired and eval-clean, but **not yet installed** — see below). Both are built through `lib/mkHost.nix` (`{ system, hostPath }: nixosSystem`, wiring `disko`, `sops-nix`, `modules/options.nix`, the host itself, and `home-manager.nixosModules.home-manager`) rather than inline. `mkHost` was extracted ahead of the guide's usual "wait for a second *bootstrapped* host" trigger — bootstrapped meaning installed on real/virtual hardware via nixos-anywhere, which the laptop still isn't — because the desktop and laptop hosts' imminent bootstrap made the duplication a near-certainty rather than a hypothetical; treat this as a deliberate, explicitly-requested exception, not a precedent for extracting other `lib/` helpers early.
 
 `the-entertaining-nios-laptop` is the machine this repo is currently developed on (still running CachyOS, not NixOS yet). It now has everything nixos-anywhere needs except a resolved disk device: real `hardware-configuration.nix` (generated via `nixos-generate-config --dir`, run read-only alongside the live CachyOS install, with the scan's `fileSystems`/`swapDevices` entries dropped since `disko.nix` owns that instead), its own sops age key (`~/.config/sops/age/the-entertaining-nios-laptop.txt`, operator-held, not committed) added as a `.sops.yaml` recipient with its own `creation_rules` entry, an encrypted `secrets/secrets.yaml` (`password-hash`, hashed and encrypted by the user directly so the plaintext never touched the assistant), `secrets.nix` mirroring the VM's, and both wired into `default.nix`'s imports and into `flake.nix`'s `nixosConfigurations`. `nix eval` on its `system.build.toplevel` succeeds. The **only** thing left before an actual install is resolving the placeholder `/dev/CHANGEME` disk device in `disko.nix` (only knowable from an installer environment via `lsblk`) — and then actually running `nixos-anywhere`, which is deliberately deferred since that step wipes the target disk and the user wants to keep CachyOS bootable until the dotfiles are fully functional. `the-entertaining-nios-desktop` is still scaffold-only: no `hardware-configuration.nix`, `secrets.nix`, or `flake.nix` entry yet, since it hasn't been bootstrapped against real hardware either.
 
@@ -32,17 +32,17 @@ What exists on disk today:
 - `lib/mkHost.nix` — the host-building helper described above; also threads the `noctalia-greeter` and `noctalia` flake inputs through `specialArgs`/HM `extraSpecialArgs` (not imported directly — see Phase 3 note above) so `modules/desktop/{greetd,noctalia}.nix` and `home/noctalia.nix` can import the actual modules themselves.
 - `home/default.nix` — the Home Manager entry point described above.
 - `modules/options.nix` — the `features` submodule option (currently: `docker`, `steam`, `gamemode`, `snapshots`, `niri`; all default `false`). Neither `bluetooth` nor `sshAgentUnlock` exist as flags — both removed after Phase 3 discussions concluded neither expressed a real per-host difference: no real or planned host would ever want Niri/Noctalia without Bluetooth (the VM doesn't count, being test-only) — Bluetooth is enabled directly by `programs.noctalia.recommendedServices.enable` in `modules/desktop/noctalia.nix` instead — and nothing in the system needs to react to a separate `sshAgentUnlock` boolean when whether a host's `secrets.nix` declares the `ssh-private-key` secret is already the complete signal.
-- `modules/system/` — `boot.nix`, `networking.nix`, `nix.nix`, `ssh.nix`, `users.nix`. `modules/services/` has one module, `snapper.nix` (gated on `config.features.snapshots`). `modules/desktop/` now has three modules, `niri.nix`, `greetd.nix`, and `noctalia.nix` (all gated on `config.features.niri`). No `hardware/` or `programs/` subdirectories yet.
+- `modules/system/` — `boot.nix`, `networking.nix`, `nix.nix`, `ssh.nix`, `users.nix`. `modules/services/` has one module, `snapper.nix` (gated on `config.features.snapshots`). `modules/desktop/` now has four modules, `niri.nix`, `greetd.nix`, `noctalia.nix`, and `theming.nix` (all gated on `config.features.niri`) — `theming.nix` (Phase 5) only installs cursor/icon-theme packages system-wide, for noctalia-greeter's benefit; the actual theming config is Home Manager's (`home/cursor.nix`, `home/gtk.nix`, `home/qt.nix`). No `hardware/` or `programs/` subdirectories yet.
 - `wallpapers/` — top-level directory (per `ARCHITECTURE.md`'s target layout) holding the operator's full wallpaper collection (~30 images as of this writing, various formats), used by Noctalia's wallpaper-driven theming (`home/noctalia.nix`). Read live from this repo's own clone at `~/.dotfiles/wallpapers` on each host rather than Nix-store-managed — see the wallpaper-directory paragraph below and `docs/live-dotfiles.md`.
 - `profiles/base.nix` — the first (and so far only) profile: bundles the 5 `modules/system/*` modules every host needs regardless of role (not a role itself — see the guide's "Filesystem Choice and Snapshots"-adjacent profile-naming discussion). All three hosts import it instead of the individual modules.
-- `hosts/the-entertaining-nios-vm/` — fully bootstrapped: `default.nix` (now also imports `../../modules/desktop/niri.nix`, `../../modules/desktop/greetd.nix`, and `../../modules/desktop/noctalia.nix`), `variables.nix` (`hostName`/`timeZone`/`keyMap`), `features.nix` (`niri = true`, rest `false`), `disko.nix` (single-disk GPT, ESP + ext4 root, no swap), `hardware-configuration.nix`, `secrets.nix` (wires `sops-nix`, `password-hash` marked `neededForUsers`), `secrets/secrets.yaml`.
+- `hosts/the-entertaining-nios-vm/` — fully bootstrapped: `default.nix` (now also imports `../../modules/desktop/niri.nix`, `../../modules/desktop/greetd.nix`, `../../modules/desktop/noctalia.nix`, and `../../modules/desktop/theming.nix`), `variables.nix` (`hostName`/`timeZone`/`keyMap`), `features.nix` (`niri = true`, rest `false`), `disko.nix` (single-disk GPT, ESP + ext4 root, no swap), `hardware-configuration.nix`, `secrets.nix` (wires `sops-nix`, `password-hash` marked `neededForUsers`), `secrets/secrets.yaml`.
 - `hosts/the-entertaining-nios-desktop/` — scaffold only: `default.nix`, `variables.nix`, `features.nix` (`snapshots = true`, rest `false`), `disko.nix` (btrfs with `@`/`@home`/`@nix`/`@snapshots`/`@home_snapshots` subvolumes, `compress=zstd`+`noatime`, a 16G swap partition matching this host's 16G RAM with `resumeDevice = true` for hibernation, and a placeholder `/dev/CHANGEME` disk device that must be replaced before any real install). No `hardware-configuration.nix` or `secrets.nix` yet — added once this host is actually bootstrapped.
 - `hosts/the-entertaining-nios-laptop/` — `default.nix` (imports `./features.nix`, `./disko.nix`, `./hardware-configuration.nix`, `./secrets.nix`, `../../profiles/base.nix`, `../../modules/services/snapper.nix`), `variables.nix`, `features.nix` (`snapshots = true`, rest `false`), `disko.nix` (same btrfs subvolume layout as the desktop, a 32G swap partition matching this host's 32G RAM, still a placeholder `/dev/CHANGEME` disk device), `hardware-configuration.nix` (generated from the real laptop hardware — Intel CPU/microcode, NVMe + VMD storage, no `fileSystems`/`swapDevices` since `disko.nix` covers those), `secrets.nix` (mirrors the VM's: `sops.defaultSopsFile`, `sops.age.keyFile`, `password-hash` marked `neededForUsers`), `secrets/secrets.yaml` (encrypted, contains `password-hash`). Has a `nixosConfigurations` entry in `flake.nix` and evaluates cleanly (`nix eval .#nixosConfigurations.the-entertaining-nios-laptop.config.system.build.toplevel`). Only remaining before an actual install: resolve the real disk device in `disko.nix` (currently `/dev/CHANGEME`, only knowable from an installer environment via `lsblk`), then run `nixos-anywhere` — that last step is intentionally on hold since it would wipe this machine's current CachyOS install, which the user wants to keep until the dotfiles are fully functional.
 - `.sops.yaml` — two recipients now: `the-entertaining-nios-vm` and `the-entertaining-nios-laptop`, each with their own `creation_rules` entry scoped to that host's `secrets/*.yaml`. The desktop host gets its own recipient added once bootstrapped.
 - `README.md` — human-facing quick start (build/switch/rollback/bootstrap commands, a one-line-per-directory layout table); deliberately does not restate design rationale, only links to `ARCHITECTURE.md` and `docs/`.
 - A short `README.md` in each structural directory (`hosts/`, `profiles/`, `modules/`, `modules/system/`, `modules/services/`, `modules/desktop/`, `lib/`, `home/`) — a stable "what belongs here and why" orientation, not a changelog of current contents (that's this file's job). Add one when a new structural directory is introduced, and update an existing one only when that directory's *purpose* changes, not when a file is added/removed inside it.
 - `docs/` — new directory, project-specific runbooks (not general tool tutorials): `bootstrapping-a-host.md` (disko + nixos-anywhere, start to finish) and `secrets.md` (sops-nix day-to-day: onboarding a host, adding a secret, rotating a recipient). Distinct from `ARCHITECTURE.md` (why) and the per-directory `README.md`s (what belongs where) — this is "what do I actually type."
-- No `nix flake check` checks (formatting/statix/deadnix) are wired up yet — that's Phase 7.
+- No `nix flake check` checks (formatting/statix/deadnix) are wired up yet — that's Phase 8.
 
 The guide (`ARCHITECTURE.md`) is the single source of truth for this project's design; read it in full before making architectural decisions that aren't already reflected in the code. What follows is a condensed map of its content, not a replacement for it.
 
@@ -61,7 +61,7 @@ nixos-anywhere --flake .#the-entertaining-nios-vm root@<installer-ip>   # (re-)b
 sops updatekeys hosts/the-entertaining-nios-vm/secrets/secrets.yaml     # re-encrypt after adding a recipient in .sops.yaml
 ```
 
-`nix flake check` is meant to become the *only* command CI runs once it's wired up — it should stay the single thing that gates a commit both locally and in CI, so wire new validation in as a flake check rather than a separate script. A `justfile` wrapping these (`just switch`, `just build`, `just check`, ...) is intentionally deferred to Phase 7, once the commands are actually being typed by hand often enough to justify it — don't add one earlier.
+`nix flake check` is meant to become the *only* command CI runs once it's wired up — it should stay the single thing that gates a commit both locally and in CI, so wire new validation in as a flake check rather than a separate script. A `justfile` wrapping these (`just switch`, `just build`, `just check`, ...) is intentionally deferred to Phase 8, once the commands are actually being typed by hand often enough to justify it — don't add one earlier.
 
 ## Architecture
 
@@ -119,11 +119,11 @@ Fixed and verified live: `sops-install-secrets` creates a missing parent directo
 
    `cfg/autostart.kdl` was converted to a live file too, and lost two lines in the process, both confirmed dead via live investigation rather than assumption:
    - The VM-only conditional `spice-vdagent` spawn line (gated on `osConfig.services.spice-vdagentd.enable`) — dropped at the operator's request, since converting this file to a static live-symlinked file meant it could no longer carry Nix-side conditional logic anyway, and the underlying SPICE cursor-duplication issue this was working around was already deprioritized as an unresolved VM-only cosmetic quirk (see above) — the fix never reliably worked (the spice-vdagent client's connection kept resetting).
-   - An unconditional `systemctl --user start niri-session.target` line, ported as-is from the operator's old CachyOS config. Investigated live rather than assumed correct, prompted by the operator asking why niri isn't launched via its own `niri-session` wrapper script — turns out it already is: niri's packaged `niri.desktop` session entry has `Exec=niri-session` (confirmed by reading the niri package's `share/wayland-sessions/niri.desktop` directly), and greetd's post-login session command is built from that `.desktop` entry, the same convention every greetd greeter follows. The real `niri-session` script already does everything needed (imports the login environment, runs `dbus-update-activation-environment`, starts `niri.service`, which itself declares `BindsTo=graphical-session.target`/`Before=graphical-session.target`) with no help required. Worse, `niri-session.target` **never existed as a real unit at all** — confirmed via `systemctl --user list-unit-files "niri*"` on the live VM, which lists only `niri.service` and `niri-shutdown.target`. Noctalia's own systemd unit (which needs `launch_apps_as_systemd_services = true` to actually start) is ordered against `graphical-session.target` directly (confirmed via `systemctl --user cat noctalia.service`), not "niri-session.target" — so the line was harmless dead code from day one, not load-bearing for anything. Dropped initially so `cfg/autostart.kdl` was left spawning only `vesktop` — then, prompted by the operator asking whether autostarted apps should instead be systemd user services bound to `graphical-session.target` (matching niri's own docs and the Noctalia precedent already in this repo), `cfg/autostart.kdl` was removed entirely (along with its `include` line in `config.kdl`), since its one remaining line (`vesktop`) was already inert — Vesktop isn't packaged by this flake yet (Phase 5) — so there was nothing left worth keeping a `spawn-sh-at-startup` mechanism around for. Recorded as a standing convention in `ARCHITECTURE.md`'s "Home Manager" section: future autostarted apps get their own `systemd.user.services.<name>` (`PartOf`/`After = "graphical-session.target"`, `WantedBy = [ "graphical-session.target" ]`) in their own Home Manager module when written, not a shared autostart file.
+   - An unconditional `systemctl --user start niri-session.target` line, ported as-is from the operator's old CachyOS config. Investigated live rather than assumed correct, prompted by the operator asking why niri isn't launched via its own `niri-session` wrapper script — turns out it already is: niri's packaged `niri.desktop` session entry has `Exec=niri-session` (confirmed by reading the niri package's `share/wayland-sessions/niri.desktop` directly), and greetd's post-login session command is built from that `.desktop` entry, the same convention every greetd greeter follows. The real `niri-session` script already does everything needed (imports the login environment, runs `dbus-update-activation-environment`, starts `niri.service`, which itself declares `BindsTo=graphical-session.target`/`Before=graphical-session.target`) with no help required. Worse, `niri-session.target` **never existed as a real unit at all** — confirmed via `systemctl --user list-unit-files "niri*"` on the live VM, which lists only `niri.service` and `niri-shutdown.target`. Noctalia's own systemd unit (which needs `launch_apps_as_systemd_services = true` to actually start) is ordered against `graphical-session.target` directly (confirmed via `systemctl --user cat noctalia.service`), not "niri-session.target" — so the line was harmless dead code from day one, not load-bearing for anything. Dropped initially so `cfg/autostart.kdl` was left spawning only `vesktop` — then, prompted by the operator asking whether autostarted apps should instead be systemd user services bound to `graphical-session.target` (matching niri's own docs and the Noctalia precedent already in this repo), `cfg/autostart.kdl` was removed entirely (along with its `include` line in `config.kdl`), since its one remaining line (`vesktop`) was already inert — Vesktop isn't packaged by this flake yet (Phase 6) — so there was nothing left worth keeping a `spawn-sh-at-startup` mechanism around for. Recorded as a standing convention in `ARCHITECTURE.md`'s "Home Manager" section: future autostarted apps get their own `systemd.user.services.<name>` (`PartOf`/`After = "graphical-session.target"`, `WantedBy = [ "graphical-session.target" ]`) in their own Home Manager module when written, not a shared autostart file.
 
    **`config.features.bluetooth` was removed** (from `modules/options.nix` and every host's `features.nix`) shortly after `noctalia.nix` landed, following a design discussion: the flag was declared since Phase 1 but never implemented or consumed anywhere, and `modules/desktop/noctalia.nix` initially wired Bluetooth/UPower/power-profiles individually specifically to keep it meaningful. The VM was originally cited as a reason to keep host-level control (a disposable test VM has no real use for Bluetooth), but that doesn't hold up as a real divergence case — the VM is explicitly non-representative, and both real planned hosts (laptop, desktop) want Bluetooth whenever they have a desktop environment at all. With no host, real or planned, ever wanting to decouple "has Niri/Noctalia" from "wants Bluetooth," keeping a separate flag was pure unused complexity, and hand-wiring the individual services instead of using `programs.noctalia.recommendedServices.enable` meant manually tracking what Noctalia itself considers necessary — a real, ongoing maintenance cost for no actual benefit. `modules/desktop/noctalia.nix` now just sets `programs.noctalia.recommendedServices.enable = true` (NetworkManager, Bluetooth, UPower, power-profile, all in one call). `ARCHITECTURE.md`'s module tree still lists `hardware/bluetooth.nix` as a planned module (a stale line from before this decision — nothing currently plans to create it).
 
-   Cursor-theme TODO (see comment in `modules/desktop/greetd.nix`) is still partly done: Niri's half landed as part of the ported `misc.kdl` (`xcursor-theme "Bibata-Modern-Classic"`); noctalia-greeter/GTK/Qt still don't have it — and now that GTK/Qt theming routes through Noctalia's own `builtin_ids` templates (see gap above) rather than Stylix, that's likely where it'll end up being set, once those template IDs are known. Development happens against `the-entertaining-nios-vm` — kept around long-term for this purpose — rather than waiting on the desktop/laptop hosts' physical bootstrap. The GUI stack sits behind its own feature flag (`config.features.niri`, not hardcoded as the only option), so alternate WMs/DEs (e.g. GNOME) can be added later without restructuring.
+   Cursor-theme TODO (see comment in `modules/desktop/greetd.nix`) was partly done here: Niri's half landed as part of the ported `misc.kdl` (`xcursor-theme "Bibata-Modern-Classic"`); noctalia-greeter/GTK/Qt were still missing it. **Resolved in Phase 5 (Theming)** — see that section below for the full writeup (`home/cursor.nix`, `modules/desktop/theming.nix`, `greetd.nix`'s `settings.cursor`). Development happens against `the-entertaining-nios-vm` — kept around long-term for this purpose — rather than waiting on the desktop/laptop hosts' physical bootstrap. The GUI stack sits behind its own feature flag (`config.features.niri`, not hardcoded as the only option), so alternate WMs/DEs (e.g. GNOME) can be added later without restructuring.
 4. **Terminal environment** — Ghostty, Zsh, Starship, Git, Lazygit, shell migrated into Home Manager. ← **done**: Zsh, Starship, Lazygit, Git, Ghostty, and a bare (unconfigured) Neovim package all landed and are verified live on `the-entertaining-nios-vm`.
 
    **Git and Ghostty, planned via Plan mode before implementation, same as the Zsh/Starship/Lazygit work above.** Research found real existing config for both, ported rather than invented: `~/.gitconfig` (`user.name = TechieOllie`, `user.email = oliverwest06@outlook.com`, `init.defaultBranch = main`; no aliases/editor/excludesfile/color settings to port) → `home/git.nix` (`programs.git`, plus `lfs.enable = true` to auto-manage the `[filter "lfs"]` block already present rather than hand-copying it, plus `ignores` for the one-line global gitignore at `~/.config/git/ignore`). A `[safe] directory` entry scoped to a specific non-repo path was deliberately not ported (not portable/relevant). Ghostty's config was confusingly split across `~/.config/ghostty/config` (actually loaded: `font-family`, `theme = noctalia`) and `~/.config/ghostty/config.ghostty` (NOT loaded under that filename: `background-opacity = 0.90`, `shell-integration-features = ssh-env,ssh-terminfo`) — merged into the one real config in `home/ghostty.nix`, per the operator's confirmation. An old, unrelated prior NixOS repo (`TechieOllie/NixOS-Config`, superseded, last pushed 2025-04-20) had a materially different Ghostty config (different theme/font/extensive leader-key keybindings) — explicitly treated as historical only, not ported.
@@ -150,13 +150,182 @@ Fixed and verified live: `sops-install-secrets` creates a missing parent directo
    - **Git identity/config and Ghostty are explicitly out of scope for this pass** — no existing Ghostty config was found (unlike zsh/starship/lazygit, which all had one), and Git needs the operator's name/email, so both remain open items in the existing task list.
    - File layout: `modules/system/shell.nix` (new, system-level `programs.zsh.enable`) + `modules/system/users.nix` (adds `pkgs` arg, sets `shell = pkgs.zsh`) for the system half, mirroring the niri system/home split; `home/zsh.nix`, `home/starship.nix`, `home/lazygit.nix`, `home/neovim.nix` each their own file (one responsibility per module, matching the `niri.nix`/`noctalia.nix` precedent) rather than bundled — none of them gated on any `osConfig.features.*` flag, since (per the already-established bluetooth/sshAgentUnlock precedent) every real host wants a terminal environment, so there's no per-host axis of variation for a flag to express.
    - **Verified live on `the-entertaining-nios-vm`**: both hosts' `system.build.toplevel` build cleanly; `config.programs.zsh.enable`, `config.users.users.ol.shell.pname` ("zsh"), and the Home Manager `programs.{zsh,zoxide,starship,lazygit}.enable` all evaluate `true`. After redeploy: login shell is zsh, all seven aliases (`l`/`ll`/`la`/`grep`/`lg`/`q`/`cl`/`nv`) work, `EDITOR`/`VISUAL`/`PATH` (`~/.local/bin`, `~/go/bin`) are correct, `starship.toml` and `lazygit/config.yml` match the ported originals exactly, `oh-my-zsh`/autosuggestions/fast-syntax-highlighting are all sourced in the generated `.zshrc`, and the history-substring-search bindkeys resolve correctly. One test artifact worth noting for future debugging: testing via `ssh ... zsh -i -c` initially showed `bindkey: cannot bind to an empty key sequence` — this was **not a real bug**, just `$TERM` being unset in a bare non-interactive SSH command (so the `zsh/terminfo` module had nothing to look up); setting `TERM=xterm-256color` for the test reproduced a real terminal's environment and resolved cleanly (`kcuu1`/`kcud1` → real escape codes). A real terminal session (Ghostty, or anything inside niri) always has `TERM` set, so this was never an issue for actual use.
-5. **Applications** — VS Code, Zen Browser, Vesktop, Nautilus.
-6. **Extra features** — Docker, Steam, Proton GE, Tailscale, gaming profile.
-7. **Long-term** — `nix flake check` as the CI gate, `justfile` command runner, doc upkeep, multi-host hardening.
+5. **Theming** — icon theme, cursor theme, GTK/Qt modernization, folding in the theming work already landed in Phases 3/4. ← **landed, not yet verified on a live boot**: see the dedicated writeup below.
+6. **Applications** — VS Code, Zen Browser, Vesktop, Nautilus.
+7. **Extra features** — Docker, Steam, Proton GE, Tailscale, gaming profile.
+8. **Long-term** — `nix flake check` as the CI gate, `justfile` command runner, doc upkeep, multi-host hardening.
+
+### Phase 5 — Theming
+
+Folds in theming work already landed in earlier phases rather than leaving it
+scattered across their sections: Noctalia v5's wallpaper-driven Material-You
+palette, the `ghostty`/`gtk3`/`gtk4`/`qt` official color templates, the
+`neovim`/`yazi` community color templates, the custom `starship`/`lazygit`
+user templates, and niri's own cursor line (all `home/noctalia.nix` /
+`home/niri/cfg/misc.kdl`, documented in Phases 3/4 above). What's actually
+new this phase:
+
+- **Cursor** — `home/cursor.nix` (new): `home.pointerCursor` (`pkgs.bibata-cursors`,
+  `"Bibata-Modern-Classic"`, size 22, `gtk.enable = true`) is now the single
+  Home Manager source of truth for GTK/Qt/Wayland toolkit apps.
+  `x11.enable` deliberately omitted — XWayland is disabled repo-wide.
+  `home/niri/cfg/misc.kdl`'s own `cursor { ... }` block (niri renders its own
+  compositor cursor independently) is untouched, so the same value is
+  intentionally duplicated in two places — keep them in sync by hand if
+  either ever changes. `modules/desktop/greetd.nix`'s standing cursor TODO is
+  resolved: `programs.noctalia-greeter.settings.cursor = { theme =
+  "Bibata-Modern-Classic"; size = 22; }` (schema confirmed real by reading
+  the `noctalia-greeter` flake input's own `nix/nixos-module.nix` example).
+  New `modules/desktop/theming.nix` installs `bibata-cursors` +
+  `papirus-icon-theme` via `environment.systemPackages`, since
+  noctalia-greeter runs outside any user's Home Manager profile and can't
+  see packages Home Manager installs for the user session. Remember the
+  existing `greeter.toml` gotcha (Phase 3): it's only ever seeded once, so
+  an already-booted host needs `sudo rm
+  /var/lib/noctalia-greeter/greeter.toml && sudo systemd-tmpfiles --create
+  && sudo systemctl restart greetd` for this to take effect.
+- **Icons** — `home/gtk.nix` (new): `gtk.enable = true`, `gtk.iconTheme` =
+  `pkgs.papirus-icon-theme` / `"Papirus-Dark"`. Folder recoloring uses
+  Noctalia's own **official `papirus-icons` community template** (added to
+  `home/noctalia.nix`'s `community_ids`) — found by checking the live
+  community-template catalog (`https://api.noctalia.dev/templates`) rather
+  than assumed unavailable; it maps the live wallpaper accent to the closest
+  `papirus-folders` preset color via HSV distance and recolors in place, the
+  same mechanism already used for `neovim`/`yazi`. Its `apply.sh` falls back
+  to `cp -r /usr/share/icons/Papirus` (a path that doesn't exist on NixOS) if
+  `~/.local/share/icons/Papirus` isn't already present — worked around by
+  `home/gtk.nix`'s own `home.activation.seedPapirusIcons`, which seeds a
+  *writable* copy from the Nix-store package so the template's own check
+  always finds the directory already there and never hits that fallback.
+  **Accepted trade-off**: since a mutable copy is required (`papirus-folders`
+  rewrites the SVGs in place — a store symlink wouldn't work), the seed
+  script re-copies on every Home Manager activation, resetting folder colors
+  to Papirus' default blue after every `nixos-rebuild switch` until
+  Noctalia's next automatic re-theme pass repaints them.
+- **GTK modernization** — `home/gtk.nix` also sets `gtk.gtk3.theme` to
+  `pkgs.adw-gtk3` / `"adw-gtk3-dark"` (both folder names confirmed via a live
+  build) for a modern, libadwaita-like rounded look on GTK3 apps. GTK4 gets
+  no theme override — GTK4 apps already render rounded via libadwaita
+  itself, and Home Manager's own `gtk.gtk4.theme` option is an unofficial,
+  being-deprecated `@import` workaround with nothing to gain here. Noctalia's
+  existing `gtk3`/`gtk4` color templates are untouched and layer their
+  palette on top exactly as before. **Only verified config-side so far**
+  (dconf keys, `gtk-3.0/settings.ini`) — unlike Qt, which was verified by
+  actually opening qt5ct/qt6ct, this VM has no real GTK3/GTK4 application
+  installed yet to open and visually confirm against. **TODO: re-check GTK
+  theming (rounded corners, icon theme, colors) once a real GTK app lands**
+  — Nautilus is the first one on the roadmap (Phase 6, Applications).
+- **Qt — deliberately still color-only, gap closed, no rounding.** Real
+  research, not assumed: `kvmarwaita` (KvMarwaita) is a genuine nixpkgs
+  package — the closest available libadwaita/Materia-styled, rounded Kvantum
+  theme — but reading Kvantum's own source (`Kvantum.cpp`) and KvMarwaita's
+  `.kvconfig` directly confirmed Kvantum themes hardcode their own palette in
+  `[GeneralColors]`, and `respect_DE` (the only DE-integration setting) only
+  affects icon visibility, never color — Kvantum never reads qt5ct/qt6ct's
+  palette. Separately, reading Noctalia v5's own source
+  (`assets/templates/qt/qtct.conf`, `builtin.toml`) confirmed its `qt`
+  template specifically targets qt5ct/qt6ct's native `[ColorScheme]`
+  mechanism (the one Fusion reads), with zero Kvantum awareness anywhere in
+  Noctalia. **Decided against Kvantum this phase** — switching would mean
+  losing Noctalia's live wallpaper-color tracking for Qt apps in exchange for
+  rounded corners; revisit Kvantum + KvMarwaita later as its own research
+  task if wanted. What *did* land: new `home/qt.nix` finally installs the
+  actual `qt5ct`/`qt6ct` packages via Home Manager's `qt.enable` +
+  `qt.platformTheme.name = "qtct"` + `qt.style.name = "fusion"` (plus
+  `qt5ctSettings`/`qt6ctSettings.Appearance.icon_theme = "Papirus-Dark"`) —
+  closing a gap left open since Phase 4, where `QT_QPA_PLATFORMTHEME=qt6ct`
+  was set as a bare env var (`home/zsh.nix`, `home/niri/cfg/misc.kdl`) but
+  the package itself was explicitly never installed. Those env vars are now
+  redundant but harmless (same value) — left as-is, not worth touching. This
+  also means Phase 4's `~/.config/qt5ct/colors/noctalia.conf` /
+  `qt6ct/colors/noctalia.conf` verification (files existed and were
+  generated) can finally be re-verified as actually *taking effect* at
+  runtime, now that `qt6ct` itself is genuinely present as a package.
+- All exact package/attribute names and option shapes above (`bibata-cursors`
+  containing a real `Bibata-Modern-Classic` folder, `adw-gtk3`/`adw-gtk3-dark`,
+  `Papirus-Dark`, `home.pointerCursor`'s/`gtk.*`'s/`qt.*`'s option shapes)
+  were verified directly against this repo's pinned `nixpkgs` and
+  `home-manager` revisions — built and inspected live, not recalled from
+  general knowledge.
+- **Three real bugs found and fixed during live verification, all in
+  `home/qt.nix`, each caught by actually opening qt5ct/qt6ct on the VM
+  rather than trusting that the config files merely existed:**
+  1. Originally set `qt5ctSettings`/`qt6ctSettings.Appearance.icon_theme`
+     but never `color_scheme_path` — the actual key (confirmed by reading
+     qt5ct's/qt6ct's own `appearancepage.cpp` source) that makes either app
+     *use* Noctalia's live-generated
+     `~/.config/qt5ct|qt6ct/colors/noctalia.conf` file; merely having that
+     file exist did nothing on its own. Fixed via
+     `color_scheme_path = "${config.xdg.configHome}/qt5ct|qt6ct/colors/noctalia.conf"`
+     — the Nix-resolved absolute path, not a literal `"$XDG_CONFIG_HOME"`
+     string, the same class of bug already caught once for
+     `home/lazygit.nix`'s `LG_CONFIG_FILE` (Phase 4).
+  2. Originally set `qt.style.name = "fusion"`, which sets
+     `QT_STYLE_OVERRIDE` — qt5ct's own `mainwindow.cpp` explicitly checks
+     `if (env.contains("QT_STYLE_OVERRIDE"))` and shows exactly the "not
+     themed correctly" warning this surfaced as. Forcing a style this way
+     also bypasses qt5ct/qt6ct's own style application entirely, defeating
+     the point of using them. Removed outright — nothing lost, since
+     qt5ct's own default `Appearance.style` is already `"Fusion"` (same
+     source).
+  3. **The actual remaining blocker after both of the above**: even with
+     `color_scheme_path` correct and `QT_STYLE_OVERRIDE` gone, qt5ct/qt6ct
+     still reported "not themed correctly." Root cause, found by reading
+     `qt5ctplatformtheme.cpp`/`qt6ctplatformtheme.cpp`'s `readSettings()`
+     directly: `color_scheme_path` is only actually used when
+     `custom_palette = true` is *also* set — it defaults to `false`, so the
+     path was being read but silently never applied. Fixed by adding
+     `custom_palette = true` to both `qt5ctSettings.Appearance` and
+     `qt6ctSettings.Appearance`.
+  **Verified live end-to-end**: `qt5ct.conf`/`qt6ct.conf` both have the
+  correct `color_scheme_path` + `custom_palette=true`; qt5ct's own 3-item
+  self-check (`QT_STYLE_OVERRIDE` set, `QT_QPA_PLATFORMTHEME` unset/invalid,
+  missing `libqt5ct-style.so`) shows no warnings; the referenced color file's
+  `active_colors` has 22 entries (comfortably above `QPalette::NColorRoles`,
+  so `loadColorScheme()` doesn't silently fall back to the default
+  palette); and the operator confirmed both qt5ct and qt6ct show as
+  correctly themed when actually opened in the live niri session.
+- **A separate, real gotcha found on the live VM, not caused by this
+  session's changes**: Noctalia Shell keeps its own persistent runtime
+  overrides sidecar, `~/.local/state/noctalia/settings.toml`, which
+  deep-merges *on top of* the Nix-managed `~/.config/noctalia/config.toml`
+  (confirmed by reading `ConfigService::deepMerge` in Noctalia's own
+  source — its own comment states "arrays: overlay replaces base wholesale").
+  This sidecar had a stale `community_ids` (missing `"papirus-icons"`, still
+  carrying `"lazygit"` from before the custom-template switch) and a stale
+  `wallpaper_scheme` override (`"m3-tonal-spot"` instead of the Nix-declared
+  `"m3-content"`) — almost certainly left over from earlier manual testing
+  via Noctalia's own Settings UI at some point in this project's history.
+  This silently overrode the Nix config with no conflict warning of any
+  kind (a different failure mode than the already-known `[template_engine]`
+  conflicts) — structurally the same class of "seed once, Nix change has no
+  effect until manually reset" gotcha as `noctalia-greeter`'s `greeter.toml`,
+  but for Noctalia Shell itself. Fixed on the VM by backing up
+  `settings.toml` and correcting just its stale `[theme]`/`[theme.templates]`
+  values to match `config.toml`, leaving its other genuine state (lockscreen
+  widget layout, notification opacity, launcher settings) untouched. **Not
+  yet automated or re-checked for the laptop/desktop hosts** — this is a
+  per-host manual reset, same operational shape as the greeter's, worth
+  checking again if either of those hosts is ever bootstrapped with a
+  pre-existing Noctalia state directory (e.g. migrated from a different
+  setup) rather than a truly fresh one.
+- **Investigated and confirmed NOT a bug**: `QT_QPA_PLATFORMTHEME` resolves
+  to `"qt5ct"` via Home Manager's own `qt.platformTheme.name = "qtct"`
+  (its internal `styleNames` table only has one hardcoded mapping, with no
+  Qt5/Qt6-version-aware distinction), while niri's `misc.kdl` (Phase 4)
+  separately sets it to the literal `"qt6ct"` in its own spawn environment,
+  which wins inside the actual graphical session. Confirmed by reading
+  qt5ct's own plugin source (`qt5ct.json`: `"Keys": [ "qt5ct", "qt6ct" ]`;
+  `main.cpp`: `if (key.toLower() == "qt5ct" || key.toLower() == "qt6ct")`)
+  and empirically, by running `qt5ct --platform offscreen` with
+  `QT_DEBUG_PLUGINS=1` and `QT_QPA_PLATFORMTHEME=qt6ct` set — the Qt5 build
+  of qt5ct's platform-theme plugin deliberately answers to *both* key names,
+  specifically so one shared env var value works for mixed Qt5/Qt6
+  environments. Both values work correctly in practice; no fix needed.
 
 ## Software stack (for context on what modules will eventually cover)
 
-Niri, greetd, Noctalia Greeter, Noctalia Shell v5 (native theming, GTK/Qt theming templates) · Ghostty, Zsh, Starship, Git, Lazygit, Fastfetch, eza, bat, fd, ripgrep, fzf, zoxide, yazi, btop · Zen Browser, VS Code, Vesktop, Nautilus · Steam, Proton GE, Gamescope, MangoHud, Gamemode, Millennium · Tailscale · Docker Engine + Compose · PipeWire, Bluetooth, Printing, NetworkManager, Snapper (btrfs snapshots) · nixd, nil, alejandra, statix, deadnix, direnv, just.
+Niri, greetd, Noctalia Greeter, Noctalia Shell v5 (native theming, GTK/Qt theming templates), Papirus icons, Bibata cursors, adw-gtk3, qt5ct/qt6ct · Ghostty, Zsh, Starship, Git, Lazygit, Fastfetch, eza, bat, fd, ripgrep, fzf, zoxide, yazi, btop · Zen Browser, VS Code, Vesktop, Nautilus · Steam, Proton GE, Gamescope, MangoHud, Gamemode, Millennium · Tailscale · Docker Engine + Compose · PipeWire, Bluetooth, Printing, NetworkManager, Snapper (btrfs snapshots) · nixd, nil, alejandra, statix, deadnix, direnv, just.
 
 **Neovim: reduced-scope config, kept on lazy.nvim/Mason rather than going native — done.** A full native Nix port (`programs.neovim` + nixpkgs `vimPlugins`, dropping lazy.nvim/Mason for reproducibility, matching the zsh/Antidote precedent) was planned and drafted in complete, verified detail — then reversed. Every new finding added friction: `nvim-treesitter`'s breaking main-branch API rewrite needing manual translation, one plugin (`sqls.nvim`) needing vendoring via `fetchFromGitHub`, no native lazy-loading without hand-rolling `optional = true` + `packadd` triggers, and Noctalia's own official `neovim` community template needing a compatibility hack since it assumes lazy.nvim's directory layout. None of that bought anything once lazy.nvim/Mason were kept anyway (plugins still git-clone/download at runtime either way), so the decision was: **rewrite the operator's actual `neovim_dotfiles` GitHub repo** (a real, separate repo — `github:TechieOllie/neovim_dotfiles`, previously already checked out at `~/.config/nvim`) for the reduced scope, push it, and treat `~/.config/nvim` as an ordinary manually-cloned git checkout, not something Home Manager manages at all. `home/neovim.nix` only provides base toolchain prerequisites.
 

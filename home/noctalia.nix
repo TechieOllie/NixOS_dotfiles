@@ -72,9 +72,19 @@
             # directory (~/.config/yazi/flavors/noctalia.yazi/) — no
             # conflict, since home/yazi.nix doesn't manage any yazi config
             # with Nix at all.
+            # "papirus-icons" (Theming phase): recolors Papirus' folder
+            # icons to the nearest papirus-folders preset for the current
+            # wallpaper accent (HSV-nearest match against
+            # colors.source_color, confirmed by reading the template's own
+            # apply.sh). Its fallback `cp -r /usr/share/icons/Papirus` path
+            # doesn't exist on NixOS — home/gtk.nix seeds a writable
+            # $HOME/.local/share/icons/Papirus copy itself so that check
+            # always finds the directory already present and this fallback
+            # never triggers.
             community_ids = [
               "neovim"
               "yazi"
+              "papirus-icons"
             ];
 
             # Custom templates, written and checked into this repo
