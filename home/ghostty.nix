@@ -15,6 +15,9 @@
 # "ghostty" is added to theme.templates.builtin_ids to keep this in sync
 # automatically instead.
 { pkgs, ... }:
+let
+  opacity = import ./transparency.nix;
+in
 {
   programs.ghostty = {
     enable = true;
@@ -23,7 +26,7 @@
     settings = {
       "font-family" = "JetBrainsMono Nerd Font";
       theme = "noctalia";
-      "background-opacity" = 0.90;
+      "background-opacity" = opacity;
       "shell-integration-features" = "ssh-env,ssh-terminfo";
     };
   };

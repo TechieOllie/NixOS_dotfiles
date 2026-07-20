@@ -124,6 +124,71 @@ Fixed and verified live: `sops-install-secrets` creates a missing parent directo
    **`config.features.bluetooth` was removed** (from `modules/options.nix` and every host's `features.nix`) shortly after `noctalia.nix` landed, following a design discussion: the flag was declared since Phase 1 but never implemented or consumed anywhere, and `modules/desktop/noctalia.nix` initially wired Bluetooth/UPower/power-profiles individually specifically to keep it meaningful. The VM was originally cited as a reason to keep host-level control (a disposable test VM has no real use for Bluetooth), but that doesn't hold up as a real divergence case — the VM is explicitly non-representative, and both real planned hosts (laptop, desktop) want Bluetooth whenever they have a desktop environment at all. With no host, real or planned, ever wanting to decouple "has Niri/Noctalia" from "wants Bluetooth," keeping a separate flag was pure unused complexity, and hand-wiring the individual services instead of using `programs.noctalia.recommendedServices.enable` meant manually tracking what Noctalia itself considers necessary — a real, ongoing maintenance cost for no actual benefit. `modules/desktop/noctalia.nix` now just sets `programs.noctalia.recommendedServices.enable = true` (NetworkManager, Bluetooth, UPower, power-profile, all in one call). `ARCHITECTURE.md`'s module tree still lists `hardware/bluetooth.nix` as a planned module (a stale line from before this decision — nothing currently plans to create it).
 
    Cursor-theme TODO (see comment in `modules/desktop/greetd.nix`) was partly done here: Niri's half landed as part of the ported `misc.kdl` (`xcursor-theme "Bibata-Modern-Classic"`); noctalia-greeter/GTK/Qt were still missing it. **Resolved in Phase 5 (Theming)** — see that section below for the full writeup (`home/cursor.nix`, `modules/desktop/theming.nix`, `greetd.nix`'s `settings.cursor`). Development happens against `the-entertaining-nios-vm` — kept around long-term for this purpose — rather than waiting on the desktop/laptop hosts' physical bootstrap. The GUI stack sits behind its own feature flag (`config.features.niri`, not hardcoded as the only option), so alternate WMs/DEs (e.g. GNOME) can be added later without restructuring.
+
+   **Noctalia v5's dedicated niri compositor-settings doc, cross-checked against this repo's actual config rather than assumed unimplemented.** Fetched
+   [docs.noctalia.dev/v5/compositor-settings/niri](https://docs.noctalia.dev/v5/compositor-settings/niri)
+   twice — the first fetch paraphrased code blocks, the second explicitly
+   asked for verbatim KDL, since this work involves exact syntax going into
+   a live config file. Most of the doc's recommendations were **already
+   correctly implemented** from the earlier v5 migration: rounded corners
+   (`geometry-corner-radius 20`/`clip-to-geometry true`), the
+   `dev.noctalia.Noctalia` settings-window floating rule, the wallpaper
+   "stationary" backdrop pattern (`layer-rule` + `layout { background-color
+   "transparent" }`), and `honor-xdg-activation-with-invalid-serial`. The
+   doc's `spawn-at-startup "noctalia"` autostart recommendation is
+   deliberately **not** followed — this repo runs Noctalia as a supervised
+   Home Manager systemd service instead (documented in Phase 3/4 above),
+   a correct divergence, not a gap.
+
+   Genuine gaps found and fixed, all in `home/niri/cfg/`:
+   - `keybinds.kdl`: added the missing `Alt+Tab` window-switcher bind
+     (`noctalia msg window-switcher`).
+   - `rules.kdl`: added blur — a `window-rule` enabling `background-effect
+     { blur true; xray false; }` broadly, a `layer-rule` disabling xray
+     specifically on Noctalia's own surfaces (bar/notification/dock/panel/
+     attached-panel/osd, matched via a regex) so they don't look
+     see-through, and a third `layer-rule` enabling blur on Noctalia's
+     window switcher. Confirmed this repo's pinned nixpkgs ships niri
+     `26.04` exactly, meeting blur's `26.04+` requirement. The Noctalia
+     surfaces regex uses this repo's existing `r#"..."#` raw-string
+     convention (already used elsewhere in the same file) to embed a
+     literal `"` inside `[^"]+` — the doc's own copy had a stray
+     backslash-escape that isn't valid KDL, so this wasn't copied verbatim.
+     Also fixed the existing wallpaper `layer-rule`'s regex
+     (`"^noctalia-wallpaper*"` → `"^noctalia-wallpaper"`, dropping a stray
+     trailing `*` that was harmless — `p*` still matches the real string —
+     but not what upstream's own doc shows).
+   - `misc.kdl`: added the global `blur { passes 2; offset 3.0; noise 0.03;
+     saturation 1.0; }` tuning block. Also updated the *comment* on the
+     already-existing, already-commented-out lid-close `switch-events`
+     block to Noctalia's current recommended command (`noctalia msg
+     session lock-and-suspend`, replacing the old plain `systemctl
+     suspend-then-hibernate`) — deliberately left commented out and without
+     any system-level `logind.conf` change, since no bootstrapped host has
+     a lid switch yet (VM only; the laptop isn't installed) — revisit once
+     the laptop is actually bootstrapped with real hardware.
+   - **Explicitly not applied**: `niri_overview_type_to_launch_enabled` —
+     despite appearing on the niri doc page, a second fetch asking for
+     surrounding context confirmed this is actually a **Noctalia TOML**
+     `[shell]` setting (`home/noctalia.nix`), not niri KDL at all — the
+     operator asked not to activate this one, so `home/noctalia.nix` is
+     untouched.
+
+   **Verified before and after deploying**: assembled the real config tree
+   (`config.kdl` + its `include`s) in a scratch dir, stubbing the two
+   includes that only exist at build/runtime (`cfg/input.kdl`, Nix-generated;
+   `noctalia.kdl`, Noctalia's own runtime output) and ran `niri validate`
+   against it — passed cleanly, including the new raw-string regex. Synced
+   the three changed files directly to `the-entertaining-nios-vm`'s
+   `~/.dotfiles` clone, confirmed the live `~/.config/niri/cfg/*.kdl`
+   symlinks resolve to the updated content, ran `niri validate` again
+   against the actual live config (also clean), then reloaded it live via
+   `niri msg action load-config-file` (found the running session's IPC
+   socket manually at `/run/user/1000/niri.wayland-1.<pid>.sock` and
+   exported `NIRI_SOCKET`, since an ad-hoc SSH shell has no session context
+   for `niri msg` to find it automatically — the same class of issue as
+   `gcr-ssh-agent`'s `SSH_AUTH_SOCK` scoping, Phase 3) — reloaded with zero
+   errors in niri's log.
 4. **Terminal environment** — Ghostty, Zsh, Starship, Git, Lazygit, shell migrated into Home Manager. ← **done**: Zsh, Starship, Lazygit, Git, Ghostty, and a bare (unconfigured) Neovim package all landed and are verified live on `the-entertaining-nios-vm`.
 
    **Git and Ghostty, planned via Plan mode before implementation, same as the Zsh/Starship/Lazygit work above.** Research found real existing config for both, ported rather than invented: `~/.gitconfig` (`user.name = TechieOllie`, `user.email = oliverwest06@outlook.com`, `init.defaultBranch = main`; no aliases/editor/excludesfile/color settings to port) → `home/git.nix` (`programs.git`, plus `lfs.enable = true` to auto-manage the `[filter "lfs"]` block already present rather than hand-copying it, plus `ignores` for the one-line global gitignore at `~/.config/git/ignore`). A `[safe] directory` entry scoped to a specific non-repo path was deliberately not ported (not portable/relevant). Ghostty's config was confusingly split across `~/.config/ghostty/config` (actually loaded: `font-family`, `theme = noctalia`) and `~/.config/ghostty/config.ghostty` (NOT loaded under that filename: `background-opacity = 0.90`, `shell-integration-features = ssh-env,ssh-terminfo`) — merged into the one real config in `home/ghostty.nix`, per the operator's confirmation. An old, unrelated prior NixOS repo (`TechieOllie/NixOS-Config`, superseded, last pushed 2025-04-20) had a materially different Ghostty config (different theme/font/extensive leader-key keybindings) — explicitly treated as historical only, not ported.
@@ -348,5 +413,11 @@ Niri, greetd, Noctalia Greeter, Noctalia Shell v5 (native theming, GTK/Qt themin
 **Custom Noctalia "user" templates for Starship and Lazygit, resolving the Starship theming gap left open in Phase 4.** Investigating the Neovim port (see below) turned up a third Noctalia template layer beyond the already-used `builtin_ids`/`community_ids`: `theme.templates.user.<id>`, a real, build-time-static field (confirmed by reading `src/config/config_types.h`'s `UserTemplateConfig` and `src/config/schema/config_schema.cpp` in the `noctalia` flake input directly) where **we** control `input_path`/`output_path`/`post_hook` completely, unlike the official builtin/community templates. This matters because Starship's official `builtin_ids` template and Lazygit's official `community_ids` template both mutate an *existing* file in place (`sed -i` for starship.toml, `mv` for lazygit's config.yml — confirmed both use the same temp-file-then-rename mechanism, which destroys a Home-Manager-managed symlink at that path exactly like each other) — a real conflict with the already-completed Phase 4 `home/starship.nix`/`home/lazygit.nix`. Considered and rejected first: dropping Noctalia's theming for Stylix entirely (already litigated in Phase 3 — Stylix is build-time-only, so wallpaper changes need a full rebuild instead of instant live re-theming, and Noctalia Shell's own UI isn't a Stylix target at all, so this would just relocate the "two systems fighting" problem somewhere more visible) and a "seed once, never re-enforce" activation script (matches the existing `noctalia-greeter`/`greeter.toml` precedent, but permanently loses declarative enforcement for these two files). The custom-template fix instead renders the **entire** output file fresh each time — same behavior as ghostty/gtk/qt/niri's own templates — sidestepping the conflict by construction rather than working around it:
 - `home/noctalia-templates/starship.toml.tmpl` (new) — the operator's full starship config, ported verbatim from what used to live in `home/starship.nix`'s `settings`, with the two named colors (`green`/`blue`) replaced by real Noctalia Material-You color-role tokens (`{{colors.primary.default.hex}}`/`{{colors.secondary.default.hex}}` — confirmed real, not guessed, by cross-referencing the same tokens used in the reference implementation below). `home/starship.nix` now has no `settings` at all — `home/noctalia.nix`'s `templates.user.starship` (output `$XDG_CONFIG_HOME/starship.toml`, no `post_hook` needed since Starship just re-reads its config on every prompt) is the sole owner.
 - `home/noctalia-templates/lazygit-theme.yml.tmpl` (new) — ported verbatim from `luxus/luxus-noctalia-templates`' own `lazygit/noctalia-theme.yml` (a real, working reference implementation found via `gh search repos`, confirming the exact token names). Output is a **separate** file (`$XDG_CONFIG_HOME/lazygit/themes/noctalia.yml`), keeping `home/lazygit.nix`'s Nix-managed `config.yml` completely untouched — merged at invocation time via lazygit's own native `LG_CONFIG_FILE` (comma-separated multi-file merge), set as a persistent `home.sessionVariables` entry in `home/lazygit.nix` rather than baked into the `lg` alias, so it applies regardless of what invokes lazygit (a direct terminal call, Neovim's own `lazygit.nvim` plugin, etc.), not just one alias.
-- `home/noctalia.nix`'s `theme.templates` reorganized into `{ builtin_ids, community_ids, user }`; `builtin_ids` no longer includes `"starship"`, and `community_ids` gains `"neovim"` (see below) but not `"lazygit"`.
+- `home/noctalia.nix`'s `theme.templates` reorganized into `{ builtin_ids, community_ids, user }`; `builtin_ids` no longer includes `"starship"`, and `community_ids` gained `"neovim"` at the time (later removed — see the Theming-phase note below) but not `"lazygit"`.
 - **Verified live on the VM**: both `~/.config/starship.toml` and `~/.config/lazygit/themes/noctalia.yml` are plain regular files (not Home-Manager symlinks, confirmed via `ls -la`) containing real rendered hex colors (e.g. `#a6c8ff`), `~/.config/lazygit/config.yml` remains a correct, untouched Home-Manager symlink, the `LG_CONFIG_FILE` session variable resolves correctly in a fresh zsh session, and the post-redeploy Noctalia log shows zero `[template_engine]` conflicts for either file (the pre-existing `niri/noctalia.kdl` warnings in the log are stale, from well before this change, and unrelated).
+
+**"neovim" moved from `community_ids` to its own custom user template too, same Theming-phase session as the niri blur work above, prompted by an operator request to make Neovim's own background transparent so Ghostty/niri's blur shows through it.** Investigation found the Noctalia community `"neovim"` template caches its *own* `matugen-template.lua` from `github:noctalia-dev/community-templates` — a completely separate file from the operator's actual `neovim_dotfiles` repo, despite the same filename and output path, both racing to write `~/.config/nvim/lua/matugen.lua`. Also found, independently: `matugen.get_palette()` never existed on either file, so every highlight override in `neovim_dotfiles`' `lua/plugins/ui.lua` `set_extra_highlights()` (Telescope, Diffview, LSP diagnostics, WhichKey — not just the new transparency lines) had been silently dead code the whole time. Per the operator's explicit choice, resolved by giving this repo sole ownership: `"neovim"` removed from `community_ids`, `home/noctalia.nix` gained `templates.user.neovim` (new `home/noctalia-templates/neovim-matugen.lua.tmpl`, output `$XDG_CONFIG_HOME/nvim/lua/matugen.lua`, `post_hook = "pkill -SIGUSR1 nvim || true"` to hot-reload already-running instances) — same "render the whole file fresh" pattern as starship/lazygit above. The template itself now defines `get_palette()` properly (a named `palette` table shared by both `setup()` and `get_palette()`), and the same fix was pushed to `neovim_dotfiles` (`db82772..9d4d7fb`) so the operator's real machine benefits too, even though that copy is no longer what actually generates the live file under this repo's setup.
+
+`neovim_dotfiles`' `lua/plugins/ui.lua` also gained the actual transparency highlights: `Normal`/`NormalNC`/`SignColumn`/`EndOfBuffer` → `bg = "none"`, with `fg` re-specified explicitly (`nvim_set_hl()` replaces a group's whole definition rather than merging with what base16 already set — confirmed live that omitting `fg` left `Normal` completely empty). Floating windows (`NormalFloat`, Telescope, etc.) deliberately keep their own solid background so they still read as "elevated" above the now-transparent main area.
+
+**A real, host-specific gotcha found during live verification, not a repo bug**: even after all of the above, the VM's actual `nvim` kept reverting to a solid background. Root cause, found by hooking `vim.api.nvim_set_hl` with a stack-trace logger: a stale `~/.config/nvim/lua/plugins/base16.lua` — created earlier by Noctalia's *now-removed* official `"neovim"` community template's own `apply.sh` bootstrap logic (`if [ ! -f "$plugin_file" ] && ! grep -rl "base16-nvim" ...`) back when that template was still active — registers its own second, competing `RRethy/base16-nvim` plugin spec with a bare `matugen.setup()` call and no highlight overrides, and lazy.nvim loads it *after* `ui.lua`, silently reverting every highlight override on every start. Confirmed via `debug.traceback()` that this file's `config()` was the exact source of the reverting call. Not present in `neovim_dotfiles` at all (confirmed via `git ls-files`) — a plain untracked runtime artifact specific to this VM host, deleted directly (`rm ~/.config/nvim/lua/plugins/base16.lua`). Any other host that ever had `"neovim"` in `community_ids` before this change should check for and remove the same file.

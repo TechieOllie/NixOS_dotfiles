@@ -3,6 +3,9 @@
 # lives in modules/desktop/noctalia.nix. Self-gates on osConfig.features.niri
 # the same way home/niri.nix does.
 { lib, osConfig, vars, noctalia, ... }:
+let
+  opacity = import ./transparency.nix;
+in
 {
   imports = [ noctalia.homeModules.default ];
 
@@ -18,6 +21,16 @@
         shell = {
           launch_apps_as_systemd_services = true;
         };
+
+        # Bar defaults to background_opacity = 1.0 (fully opaque) — found
+        # via live testing that this silently defeats niri's blur window/
+        # layer-rules (rules.kdl): a fully-opaque surface has nothing
+        # transparent for blur to show through (confirmed in niri's own
+        # Window-Effects docs). "default" matches BarConfig's own default
+        # name (confirmed live via `niri msg layers`: the real namespace is
+        # "noctalia-bar-default"), so this overrides that one bar's
+        # opacity rather than defining a second one.
+        bar.default.background_opacity = opacity;
 
         theme = {
           mode = "dark";
@@ -44,13 +57,19 @@
               "qt"
             ];
 
-            # "neovim" fetched from the separate community catalog
-            # (github:noctalia-dev/community-templates), not
-            # builtin_ids — writes ~/.config/nvim/lua/matugen.lua at
-            # runtime (nvim-base16 sub-template), which is exactly the
-            # mechanism the operator's own neovim_dotfiles config already
-            # uses (confirmed: same output filename, same
-            # RRethy/base16-nvim plugin already in their lazy-lock.json).
+            # Deliberately NOT "neovim" here — its official community
+            # template turned out to be a *different* file from the
+            # operator's own neovim_dotfiles copy (Noctalia fetches and
+            # caches its own matugen-template.lua from
+            # github:noctalia-dev/community-templates, entirely separate
+            # from ~/.config/nvim's own git history), both writing the
+            # same ~/.config/nvim/lua/matugen.lua — a real risk of one
+            # silently overwriting the other depending on ordering.
+            # Replaced by our own custom user template below instead
+            # (see templates.user.neovim), giving us the one actual
+            # source of truth for this file, matching the
+            # starship/lazygit precedent.
+            #
             # Deliberately NOT "lazygit" — its community template
             # rewrites ~/.config/lazygit/config.yml directly via `mv`,
             # conflicting with the Nix-managed home/lazygit.nix from
@@ -82,7 +101,6 @@
             # always finds the directory already present and this fallback
             # never triggers.
             community_ids = [
-              "neovim"
               "yazi"
               "papirus-icons"
             ];
@@ -119,6 +137,27 @@
                 # Keeps the already-completed Phase 4 home/lazygit.nix
                 # completely untouched.
                 output_path = [ "$XDG_CONFIG_HOME/lazygit/themes/noctalia.yml" ];
+              };
+
+              neovim = {
+                input_path = ./noctalia-templates/neovim-matugen.lua.tmpl;
+                # Same content as the (now superseded) get_palette() fix
+                # pushed to github:TechieOllie/neovim_dotfiles's own
+                # lua/matugen-template.lua, just relocated here to be the
+                # one actual source of truth (see community_ids' comment
+                # above for why the official community template was
+                # dropped instead of used). ~/.config/nvim's own
+                # lua/plugins/ui.lua reads this file's get_palette() to
+                # drive its own highlight overrides (Telescope, Diffview,
+                # LSP diagnostics, and the transparent-background groups
+                # added alongside this).
+                output_path = [ "$XDG_CONFIG_HOME/nvim/lua/matugen.lua" ];
+                # Signals already-running nvim processes to hot-reload,
+                # matching the SIGUSR1 handler baked into the template
+                # itself (and what Noctalia's own official template's
+                # apply.sh did) — `|| true` since pkill exits non-zero
+                # when no nvim process is running.
+                post_hook = "pkill -SIGUSR1 nvim || true";
               };
             };
           };

@@ -28,6 +28,24 @@
     disable-primary
     }
 
+    // Global blur tuning (Noctalia v5 compositor-settings docs), paired
+    // with the per-surface blur/xray window-rule and layer-rules in
+    // rules.kdl. Requires niri 26.04+ (this repo's pinned nixpkgs ships
+    // exactly that version).
+    blur {
+        passes 2
+        offset 3.0
+        noise 0.03
+        saturation 1.0
+    }
+
+    // Command updated to Noctalia's current recommendation
+    // (noctalia msg session lock-and-suspend, replacing the old plain
+    // systemctl suspend-then-hibernate) — still commented out, since no
+    // bootstrapped host has a lid switch yet (VM only; the laptop isn't
+    // installed). Also needs services.logind's HandleLidSwitch=ignore at
+    // the system level once a real laptop host enables this, so niri
+    // itself handles the lid event instead of systemd — revisit then.
     //switch-events {
-       //lid-close { spawn "bash" "-c" "systemctl suspend-then-hibernate"; }
+       //lid-close { spawn "noctalia" "msg" "session" "lock-and-suspend"; }
     //}

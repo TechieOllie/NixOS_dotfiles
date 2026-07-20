@@ -4,8 +4,34 @@
     }
 
     layer-rule {
-        match namespace="^noctalia-wallpaper*"
+        match namespace="^noctalia-wallpaper"
         place-within-backdrop true
+    }
+
+    // Noctalia v5 compositor-settings docs: blur, applied broadly then
+    // tuned down for Noctalia's own surfaces (bar/notification/dock/panel/
+    // attached-panel/osd) so they don't look see-through, plus the window
+    // switcher specifically. https://docs.noctalia.dev/v5/compositor-settings/niri
+    window-rule {
+        background-effect {
+            blur true
+            xray false
+        }
+    }
+
+    layer-rule {
+        match namespace=r#"^noctalia-(bar-[^"]+|notification|dock|panel|attached-panel|osd)$"#
+        background-effect {
+            xray false
+        }
+    }
+
+    layer-rule {
+        match namespace="noctalia-window-switcher"
+        background-effect {
+            blur true
+            xray false
+        }
     }
 
     // Noctalia v5's own settings window, floating rather than tiled.

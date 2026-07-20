@@ -23,6 +23,7 @@
 }:
 lib.mkIf osConfig.features.niri {
   home.pointerCursor = {
+    enable = true; # explicit — implicit-enable-on-set is deprecated upstream
     package = pkgs.bibata-cursors;
     name = "Bibata-Modern-Classic";
     size = 22;

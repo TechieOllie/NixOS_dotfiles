@@ -6,10 +6,12 @@
 {
   programs.git = {
     enable = true;
-    userName = "TechieOllie";
-    userEmail = "oliverwest06@outlook.com";
 
-    settings.init.defaultBranch = "main";
+    settings = {
+      user.name = "TechieOllie";
+      user.email = "oliverwest06@outlook.com";
+      init.defaultBranch = "main";
+    };
 
     # Global gitignore, ported from ~/.config/git/ignore.
     ignores = [ "**/.claude/settings.local.json" ];

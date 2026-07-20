@@ -17,6 +17,7 @@ binds {
 
     Mod+S                                hotkey-overlay-title="Open Control Center" { spawn-sh "noctalia msg panel-toggle control-center"; }
     Mod+Comma                            hotkey-overlay-title="Open Noctalia Settings" { spawn-sh "noctalia msg settings-toggle"; }
+    Alt+Tab                              hotkey-overlay-title="Window Switcher" { spawn-sh "noctalia msg window-switcher"; }
 
     // ─── Applications ───
     Mod+Return                          hotkey-overlay-title="Open Terminal: Alacritty" { spawn "ghostty"; }
