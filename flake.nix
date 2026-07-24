@@ -38,7 +38,7 @@
     { nixpkgs, home-manager, disko, sops-nix, noctalia-greeter, noctalia, ... }:
     let
       system = "x86_64-linux";
-      vars = import ./hosts/the-entertaining-nios-vm/variables.nix;
+      installerVars = import ./hosts/installer/variables.nix;
       mkHost = import ./lib/mkHost.nix { inherit nixpkgs disko sops-nix home-manager noctalia-greeter noctalia; };
     in
     {
@@ -54,18 +54,16 @@
 
       # Bootstrap tool, not a host: a minimal installer ISO with the
       # operator's key pre-authorized for root, so nixos-anywhere can SSH in
-      # without any manual console step. Reuses this host's vars for now
-      # since there's only one operator/key in play; once bootstrapping
-      # needs to be host-independent (multiple operators, multiple hosts),
-      # this should read from its own flake-level identity instead of
-      # reaching into one host's variables.nix.
+      # without any manual console step. Reads hosts/installer/variables.nix
+      # (operator identity only, not a real host — see that file's own
+      # comment) rather than any one real host's variables.nix.
       packages.${system}.installer-iso =
         (nixpkgs.lib.nixosSystem {
           inherit system;
           modules = [
             "${nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-minimal.nix"
             {
-              users.users.root.openssh.authorizedKeys.keys = [ vars.user.sshPublicKey ];
+              users.users.root.openssh.authorizedKeys.keys = [ installerVars.user.sshPublicKey ];
             }
           ];
         }).config.system.build.isoImage;
