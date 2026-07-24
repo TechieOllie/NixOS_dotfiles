@@ -32,9 +32,9 @@ cd /path/to/NixOS_dotfiles   # the repo root, next to flake.nix
 # building. Catches option typos, missing imports, assertion failures.
 .claude/skills/run-nixos-dotfiles/driver.sh check
 
-# Eval-only for a single host (fastest possible check, a few seconds,
-# just resolves .drvPath — doesn't even check assertions the way
-# `flake check` does):
+# Eval-only for a single host (very fast: a few seconds; resolves
+# .drvPath, which still evaluates the full NixOS module graph and runs
+# assertions for that host, but doesn't evaluate other flake checks):
 .claude/skills/run-nixos-dotfiles/driver.sh eval the-entertaining-nios-vm
 
 # Build the bootstrap installer ISO — the one thing this repo actually

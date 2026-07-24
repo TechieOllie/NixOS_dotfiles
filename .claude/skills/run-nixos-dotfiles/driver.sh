@@ -42,7 +42,11 @@ REPO="$(pwd)"
 
 # Optional --repo <path> as the first argument.
 if [ "${1:-}" = "--repo" ]; then
-  REPO="$2"
+  if [ -z "${2:-}" ]; then
+    echo "error: --repo requires a path" >&2
+    exit 1
+  fi
+  REPO="${2/#\~/$HOME}"
   shift 2
 fi
 cd "$REPO"
