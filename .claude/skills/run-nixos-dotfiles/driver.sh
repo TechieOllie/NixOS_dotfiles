@@ -21,10 +21,12 @@
 #                                    # — the one thing this repo actually
 #                                    # ships as a build artifact, so this
 #                                    # is the routine "real build" target.
-#   driver.sh all    [host]         # check + eval + iso, in that order.
+#   driver.sh all    [host]         # check + eval, in that order — the
+#                                    # routine, cheap, eval-only path.
 #                                    # Deliberately does NOT build either
-#                                    # host's full closure — that's `build`,
-#                                    # opt-in only, per host.
+#                                    # host's full closure, and does NOT
+#                                    # build the ISO — both are `build`/
+#                                    # `iso`, opt-in only.
 #
 # host defaults to $DEFAULT_HOST below. Valid hosts (see flake.nix):
 #   the-entertaining-nios-vm        # bootstrapped, the dev/verification host
@@ -101,7 +103,6 @@ case "$cmd" in
   all)
     do_check
     do_eval "$host"
-    do_iso
     ;;
   *)
     echo "unknown command: $cmd (expected: check | eval | build | iso | all)" >&2

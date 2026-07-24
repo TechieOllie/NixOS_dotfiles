@@ -37,13 +37,14 @@ cd /path/to/NixOS_dotfiles   # the repo root, next to flake.nix
 # `flake check` does):
 .claude/skills/run-nixos-dotfiles/driver.sh eval the-entertaining-nios-vm
 
-# Build the bootstrap installer ISO — this is the one thing this repo
-# actually ships as a build artifact, and the routine "do a real full
-# build" step:
+# Build the bootstrap installer ISO — the one thing this repo actually
+# ships as a build artifact. Opt-in, not part of `all` (see below):
 .claude/skills/run-nixos-dotfiles/driver.sh iso
 
-# check + eval (both hosts covered via `check`) + iso, in one go — the
-# routine, default path:
+# check + eval (both hosts covered via `check`) — the routine, default,
+# eval-only path. Deliberately does NOT build the ISO or either host's
+# closure; run `iso`/`build` separately when you actually need a realized
+# build, not as part of every-change verification:
 .claude/skills/run-nixos-dotfiles/driver.sh all the-entertaining-nios-vm
 ```
 
@@ -52,17 +53,18 @@ the actual dev/verification host) and `the-entertaining-nios-laptop`
 (wired and eval-clean, not yet installed on real hardware). `the-entertaining-nios-desktop`
 is scaffold-only and has no `nixosConfigurations` entry yet — don't pass it.
 
-**Full per-host closure builds are opt-in, not routine.** `driver.sh build
-<host>` also exists and works (verified for both hosts — each realizes a
-full `nixos-system-<host>-*` closure, symlinked to `./result-<host>`), but
-it is deliberately **not** part of `all` and not something to run for every
-change: a system closure is heavy, and this repo already ships exactly one
-real build artifact (`installer-iso`) — the two host closures only get
-*built for real* on an actual bootstrap (`nixos-anywhere`) or switch, not
-as a routine agent smoke test. Reach for `build` only when you specifically
-need to confirm a change produces a real closure, not by default; `check`
-(eval-only, no realized output) is enough to catch broken Nix for almost
-every change.
+**Realized builds (`build`, `iso`) are opt-in, not part of `all`.** `driver.sh
+build <host>` (verified for both hosts — each realizes a full
+`nixos-system-<host>-*` closure, symlinked to `./result-<host>`) and
+`driver.sh iso` (verified — realizes the installer ISO, symlinked to
+`./result-iso`) both work, but neither runs as part of `all`: a system
+closure and an ISO are both heavy to actually realize, and this repo's own
+build artifacts only get built for real on an actual bootstrap
+(`nixos-anywhere`) or a CI/release step, not as a routine agent smoke test.
+`all` is deliberately eval-only (`check` + `eval`) — enough to catch broken
+Nix (option typos, missing imports, assertion failures) for almost every
+change. Reach for `build`/`iso` individually only when you specifically
+need to confirm a change produces a real, realized artifact.
 
 All subcommands exit non-zero on failure — check the exit code, the
 `nix build`/`nix eval` error output is the thing to read on failure, not the
