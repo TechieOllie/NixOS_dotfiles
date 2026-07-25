@@ -1,9 +1,11 @@
 # Zen Browser isn't in nixpkgs at all (confirmed via nix eval against this
 # repo's pinned nixpkgs) — packaged via the community zen-browser flake
-# input instead (see flake.nix/lib/mkHost.nix). Beta channel, matching the
-# AUR zen-browser-bin build the operator actually runs today; the flake's
-# twilight/twilight-official channels are both a newer, more unstable
-# nightly channel than what's running now, not a closer match.
+# input instead (see flake.nix/lib/mkHost.nix). Originally set to beta,
+# matching the AUR zen-browser-bin build the operator ran at the time;
+# bumped to twilight-official (upstream zen-browser/desktop's own release
+# artifact for the twilight nightly channel, not the flake maintainer's
+# re-hosted mirror — see the flake's own package.nix/sources.json) at the
+# operator's explicit request, ahead of what beta tracks.
 #
 # No extension/policy porting: the operator's real profile (bookmarks,
 # logins, manually-installed extensions like uBlock Origin/Dark Reader/
@@ -22,7 +24,7 @@
   ...
 }:
 {
-  imports = [ zen-browser.homeModules.beta ];
+  imports = [ zen-browser.homeModules.twilight-official ];
 
   config = lib.mkIf osConfig.features.niri {
     programs.zen-browser = {

@@ -275,6 +275,8 @@ modules/
         greetd.nix
         noctalia.nix      # Noctalia Shell — native theming, replaces Stylix (see Phase 3)
         theming.nix        # cursor/icon-theme packages installed system-wide, for the greeter (see Phase 5)
+        nautilus.nix       # package + dconf/gvfs/tumbler — same system/Home Manager split as niri (see Phase 6)
+        unfree.nix         # nixpkgs.config.allowUnfreePredicate allow-list (see Phase 6, Home Manager section below)
         portals.nix
 
     services/
@@ -284,7 +286,6 @@ modules/
 
     programs/
         steam.nix
-        vscode.nix
         gaming.nix
 ```
 
@@ -293,7 +294,7 @@ modules/
 - `modules/desktop/niri.nix` (NixOS): installs the compositor package and enables the Wayland session entry. Nothing about the user's keybindings or layout lives here. greetd itself — configured to launch that session — is a separate `modules/desktop/greetd.nix`, gated on the same feature flag rather than folded into `niri.nix`, since it's a distinct systemd service with its own concerns (greeter package, PAM).
 - `home/niri.nix` (Home Manager): the user's actual Niri configuration — keybindings, workspaces, window rules, appearance.
 
-The same split applies to anything else that's "system package + user config": Noctalia Shell (`modules/desktop/noctalia.nix` for the package/services/Cachix substituter, `home/noctalia.nix` for theming/wallpaper settings), GTK theming (portal + package at system level, `dconf`/settings at Home Manager level), and shell tools where a system package is needed system-wide versus a user's personal shell config.
+The same split applies to anything else that's "system package + user config": Noctalia Shell (`modules/desktop/noctalia.nix` for the package/services/Cachix substituter, `home/noctalia.nix` for theming/wallpaper settings), Nautilus (`modules/desktop/nautilus.nix` for the package plus `programs.dconf`/`services.gvfs`/`services.tumbler`, `home/nautilus.nix` for preferences/sidebar bookmarks — see Phase 6), and shell tools where a system package is needed system-wide versus a user's personal shell config.
 
 ## Home Manager
 

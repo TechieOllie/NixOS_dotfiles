@@ -405,20 +405,25 @@ this repo's pinned nixpkgs revision) — added as its own flake input,
 both `.follows` this repo's, unlike `noctalia` — no separate binary cache to
 lose by doing so), threaded through `lib/mkHost.nix`'s
 `home-manager.extraSpecialArgs` only (it has no NixOS module).
-`home/zen-browser.nix` imports `zen-browser.homeModules.beta` — **beta**
-specifically, matching the AUR `zen-browser-bin` build the operator actually
-runs today (confirmed via `pacman -Qi`: v1.21.9b). Investigated and ruled
-out `twilight`/`twilight-official` (the flake's own "recommended for
-reproducibility" channels): reading `package.nix`/`sources.json` in the
-flake's own repo directly confirmed both are Zen's **nightly** channel
-(`1.22t`), newer and less stable than what's running now — `twilight` pulls
-from the flake maintainer's own re-hosted mirror, `twilight-official` pulls
-the identical build straight from `zen-browser/desktop`'s own release,
-currently byte-identical (same sha256) but one hop shorter. Neither is
-"closer" to beta; both are simply a different, newer channel. No
-extension/policy porting — the operator's real profile (bookmarks, logins,
-manually-installed extensions like uBlock Origin/Dark Reader/Obsidian Web
-Clipper) lives in mutable Firefox-style profile state
+`home/zen-browser.nix` originally imported `zen-browser.homeModules.beta` —
+**beta** specifically, matching the AUR `zen-browser-bin` build the operator
+actually ran at the time (confirmed via `pacman -Qi`: v1.21.9b). Investigated
+and ruled out `twilight`/`twilight-official` (the flake's own "recommended
+for reproducibility" channels) at that point: reading `package.nix`/
+`sources.json` in the flake's own repo directly confirmed both are Zen's
+**nightly** channel (`1.22t`), newer and less stable than what was running
+then — `twilight` pulls from the flake maintainer's own re-hosted mirror,
+`twilight-official` pulls the identical build straight from
+`zen-browser/desktop`'s own release, at the time byte-identical (same
+sha256) but one hop shorter. **Later bumped to `twilight-official` at the
+operator's explicit request**, ahead of what `beta` tracks — the two
+channels' builds may no longer be byte-identical to each other by the time
+this lands, since each is refreshed independently upstream; `twilight-official`
+was chosen over plain `twilight` for the same one-hop-shorter reasoning
+already investigated (upstream's own release artifact, not a third-party
+mirror). No extension/policy porting — the operator's real profile
+(bookmarks, logins, manually-installed extensions like uBlock Origin/Dark
+Reader/Obsidian Web Clipper) lives in mutable Firefox-style profile state
 (`~/.config/zen/<profile>/...`), out of scope for Nix the same way browser
 profile data always is in this repo.
 
@@ -538,7 +543,10 @@ exactly; `services.gvfs`'s real D-Bus service files
 (`org.gtk.vfs.{Daemon,UDisks2VolumeMonitor,...}.service`) and `programs.dconf`'s
 `dconf.service` are both present/active; Zen Browser is already the system
 default browser (`xdg-settings get default-web-browser` →
-`zen-beta.desktop`).
+`zen-beta.desktop`). **Note**: this specific verification predates the later
+`beta` → `twilight-official` channel bump above — the binary/desktop-entry
+name is now `zen-twilight`, not `zen-beta`; not yet re-verified live under
+the new channel.
 
 **One real, expected recurrence of an already-documented gotcha, fixed
 live**: after redeploy, `~/.config/vesktop/themes/` didn't yet contain the
