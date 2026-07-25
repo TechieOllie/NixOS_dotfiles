@@ -16,6 +16,13 @@
     ./git.nix
     ./ghostty.nix
     ./yazi.nix
+    ./vscode.nix
+    ./zen-browser.nix
+    ./vesktop.nix
+    ./nautilus.nix
+    ./xdg-user-dirs.nix
+    ./feishin.nix
+    ./obsidian.nix
   ];
 
   home.username = vars.user.name;

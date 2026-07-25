@@ -32,14 +32,27 @@
     # pushed to the cache. Tracking `main` cost a ~20min from-source build
     # of this native Wayland/OpenGL project before this was caught.
     noctalia.url = "github:noctalia-dev/noctalia/cachix";
+
+    # Zen Browser isn't in nixpkgs at all (confirmed via nix eval against
+    # this repo's pinned nixpkgs revision) — this community flake provides
+    # the package + a home-manager module (programs.zen-browser). Follows
+    # this repo's nixpkgs/home-manager, unlike noctalia above: no separate
+    # binary cache to lose by doing so.
+    zen-browser = {
+      url = "github:0xc000022070/zen-browser-flake";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.home-manager.follows = "home-manager";
+    };
   };
 
   outputs =
-    { nixpkgs, home-manager, disko, sops-nix, noctalia-greeter, noctalia, ... }:
+    { nixpkgs, home-manager, disko, sops-nix, noctalia-greeter, noctalia, zen-browser, ... }:
     let
       system = "x86_64-linux";
       installerVars = import ./hosts/installer/variables.nix;
-      mkHost = import ./lib/mkHost.nix { inherit nixpkgs disko sops-nix home-manager noctalia-greeter noctalia; };
+      mkHost = import ./lib/mkHost.nix {
+        inherit nixpkgs disko sops-nix home-manager noctalia-greeter noctalia zen-browser;
+      };
     in
     {
       nixosConfigurations.the-entertaining-nios-vm = mkHost {

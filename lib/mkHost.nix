@@ -1,7 +1,7 @@
 # Extracted once a second real nixosConfigurations entry needed the exact
 # same disko/sops-nix/options/home-manager wiring as the first — see
 # flake.nix for the call sites.
-{ nixpkgs, disko, sops-nix, home-manager, noctalia-greeter, noctalia }:
+{ nixpkgs, disko, sops-nix, home-manager, noctalia-greeter, noctalia, zen-browser }:
 { system, hostPath }:
 let
   vars = import (hostPath + "/variables.nix");
@@ -23,7 +23,10 @@ nixpkgs.lib.nixosSystem {
       # Share the system's pkgs instance instead of evaluating a second one
       # for Home Manager.
       home-manager.useGlobalPkgs = true;
-      home-manager.extraSpecialArgs = { inherit vars noctalia; };
+      # zen-browser has no NixOS module (home-manager only) — passed through
+      # here only, matching noctalia's own treatment. home/zen-browser.nix
+      # imports zen-browser.homeModules.beta itself.
+      home-manager.extraSpecialArgs = { inherit vars noctalia zen-browser; };
       home-manager.users.${vars.user.name} = import ../home;
     }
   ];

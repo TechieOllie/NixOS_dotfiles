@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state of the repository
 
-Phase 1 (Foundation) is done, Phase 2 (Profiles) is in progress, Phase 3 (Desktop environment) is done, Phase 4 (Terminal environment) is done (Zsh, Starship, Lazygit, Git, Ghostty, a bare Neovim package — all landed and verified live), and Phase 5 (Theming) has landed and is mostly verified live on `the-entertaining-nios-vm` — cursor/icon theme/GTK3 modernization/Qt color-scheme all confirmed working (see the roadmap section below for the full writeup, the two accepted trade-offs, and two real bugs found and fixed during verification); the greeter's own cursor still needs its one-time `greeter.toml` reset (same gotcha as any other `greetd.nix` `settings` change) to actually show on an already-booted host. `flake.nix` now has two `nixosConfigurations` entries: `the-entertaining-nios-vm` (a VM, bootstrapped and verified via a full nixos-anywhere install) and `the-entertaining-nios-laptop` (fully wired and eval-clean, but **not yet installed** — see below). Both are built through `lib/mkHost.nix` (`{ system, hostPath }: nixosSystem`, wiring `disko`, `sops-nix`, `modules/options.nix`, the host itself, and `home-manager.nixosModules.home-manager`) rather than inline. `mkHost` was extracted ahead of the guide's usual "wait for a second *bootstrapped* host" trigger — bootstrapped meaning installed on real/virtual hardware via nixos-anywhere, which the laptop still isn't — because the desktop and laptop hosts' imminent bootstrap made the duplication a near-certainty rather than a hypothetical; treat this as a deliberate, explicitly-requested exception, not a precedent for extracting other `lib/` helpers early.
+Phase 1 (Foundation) is done, Phase 2 (Profiles) is in progress, Phase 3 (Desktop environment) is done, Phase 4 (Terminal environment) is done (Zsh, Starship, Lazygit, Git, Ghostty, a bare Neovim package — all landed and verified live), Phase 5 (Theming) has landed and is mostly verified live on `the-entertaining-nios-vm` — cursor/icon theme/GTK3 modernization/Qt color-scheme all confirmed working (see the roadmap section below for the full writeup, the two accepted trade-offs, and two real bugs found and fixed during verification); the greeter's own cursor still needs its one-time `greeter.toml` reset (same gotcha as any other `greetd.nix` `settings` change) to actually show on an already-booted host. Phase 6 (Applications — VS Code, Zen Browser, Vesktop, Nautilus) has landed and is verified live on `the-entertaining-nios-vm` (see the dedicated Phase 6 writeup below); one small self-healing gap remains (Zen Browser's Noctalia theming needs the browser launched once to create a profile before it can apply). `flake.nix` now has two `nixosConfigurations` entries: `the-entertaining-nios-vm` (a VM, bootstrapped and verified via a full nixos-anywhere install) and `the-entertaining-nios-laptop` (fully wired and eval-clean, but **not yet installed** — see below). Both are built through `lib/mkHost.nix` (`{ system, hostPath }: nixosSystem`, wiring `disko`, `sops-nix`, `modules/options.nix`, the host itself, and `home-manager.nixosModules.home-manager`) rather than inline. `mkHost` was extracted ahead of the guide's usual "wait for a second *bootstrapped* host" trigger — bootstrapped meaning installed on real/virtual hardware via nixos-anywhere, which the laptop still isn't — because the desktop and laptop hosts' imminent bootstrap made the duplication a near-certainty rather than a hypothetical; treat this as a deliberate, explicitly-requested exception, not a precedent for extracting other `lib/` helpers early.
 
 `the-entertaining-nios-laptop` is the machine this repo is currently developed on (still running CachyOS, not NixOS yet). It now has everything nixos-anywhere needs except a resolved disk device: real `hardware-configuration.nix` (generated via `nixos-generate-config --dir`, run read-only alongside the live CachyOS install, with the scan's `fileSystems`/`swapDevices` entries dropped since `disko.nix` owns that instead), its own sops age key (`~/.config/sops/age/the-entertaining-nios-laptop.txt`, operator-held, not committed) added as a `.sops.yaml` recipient with its own `creation_rules` entry, an encrypted `secrets/secrets.yaml` (`password-hash`, hashed and encrypted by the user directly so the plaintext never touched the assistant), `secrets.nix` mirroring the VM's, and both wired into `default.nix`'s imports and into `flake.nix`'s `nixosConfigurations`. `nix eval` on its `system.build.toplevel` succeeds. The **only** thing left before an actual install is resolving the placeholder `/dev/CHANGEME` disk device in `disko.nix` (only knowable from an installer environment via `lsblk`) — and then actually running `nixos-anywhere`, which is deliberately deferred since that step wipes the target disk and the user wants to keep CachyOS bootable until the dotfiles are fully functional. `the-entertaining-nios-desktop` is still scaffold-only: no `hardware-configuration.nix`, `secrets.nix`, or `flake.nix` entry yet, since it hasn't been bootstrapped against real hardware either.
 
@@ -28,12 +28,12 @@ Phase 3 (Desktop environment) has started: `modules/desktop/` now has `niri.nix`
   - **A third, related symptom investigated and resolved**: setting a fixed `<resolution x='1366' y='768'/>` hint on the `virtio-vga-gl` video model's libvirt XML (requested to fix the VM's display size) caused noticeable keyboard-input lag after a restart — confirmed by reverting the XML change and restarting clean, which fixed the input lag while leaving the (unrelated, pre-existing) cursor quirk exactly as before. This confirms the two are independent issues: the resolution hint specifically triggers some kind of negotiation/rendering slowdown on this QEMU/virtio-gpu-gl setup, worth avoiding — the VM's resolution is better left to niri's own output negotiation (`home/niri/cfg/display.kdl`) than a libvirt-level hint.
 
 What exists on disk today:
-- `flake.nix` — inputs (`nixpkgs` nixos-unstable, `home-manager`, `disko`, `sops-nix`, `noctalia-greeter`, `noctalia` — the last deliberately not following this repo's nixpkgs, to keep Noctalia's Cachix cache usable), `lib/mkHost.nix`, `nixosConfigurations.the-entertaining-nios-vm` and `nixosConfigurations.the-entertaining-nios-laptop` (both `= mkHost { ... }`), and a `packages.${system}.installer-iso` output (a minimal installer ISO with the operator's SSH key pre-authorized for root, so `nixos-anywhere` can bootstrap new hosts without a manual console step). `installer-iso` reads its SSH key from `hosts/installer/variables.nix` (see below) rather than reaching into any one real host's `variables.nix` — caught during a session audit: the original code literally imported `hosts/the-entertaining-nios-vm/variables.nix` at the flake level for this, which happened to work today (identical `user.sshPublicKey` on every host) but was a real, if latent, VM-specific coupling.
+- `flake.nix` — inputs (`nixpkgs` nixos-unstable, `home-manager`, `disko`, `sops-nix`, `noctalia-greeter`, `noctalia` — the last deliberately not following this repo's nixpkgs, to keep Noctalia's Cachix cache usable — and `zen-browser`, Phase 6, which *does* follow this repo's nixpkgs/home-manager, unlike `noctalia`, since it has no separate binary cache to lose by doing so), `lib/mkHost.nix`, `nixosConfigurations.the-entertaining-nios-vm` and `nixosConfigurations.the-entertaining-nios-laptop` (both `= mkHost { ... }`), and a `packages.${system}.installer-iso` output (a minimal installer ISO with the operator's SSH key pre-authorized for root, so `nixos-anywhere` can bootstrap new hosts without a manual console step). `installer-iso` reads its SSH key from `hosts/installer/variables.nix` (see below) rather than reaching into any one real host's `variables.nix` — caught during a session audit: the original code literally imported `hosts/the-entertaining-nios-vm/variables.nix` at the flake level for this, which happened to work today (identical `user.sshPublicKey` on every host) but was a real, if latent, VM-specific coupling.
 - `hosts/installer/` — **not a real host**, no `nixosConfigurations` entry: just `variables.nix` holding the operator identity (`user.name`/`fullName`/`sshPublicKey`) that `installer-iso` needs, kept separate from every real host's `variables.nix` so the two don't drift or get confused. Deliberately has none of a real host's other files (`features.nix`, `disko.nix`, `hardware-configuration.nix`, `secrets.nix`) — a public SSH key isn't a secret, so sops-nix doesn't apply here. One operator (`ol`) today, administrator of every host; if multiple administrators with different keys are ever needed, extend `user` here rather than inventing a second mechanism.
 - `lib/mkHost.nix` — the host-building helper described above; also threads the `noctalia-greeter` and `noctalia` flake inputs through `specialArgs`/HM `extraSpecialArgs` (not imported directly — see Phase 3 note above) so `modules/desktop/{greetd,noctalia}.nix` and `home/noctalia.nix` can import the actual modules themselves.
 - `home/default.nix` — the Home Manager entry point described above.
 - `modules/options.nix` — the `features` submodule option (currently: `docker`, `steam`, `gamemode`, `snapshots`, `niri`; all default `false`). Neither `bluetooth` nor `sshAgentUnlock` exist as flags — both removed after Phase 3 discussions concluded neither expressed a real per-host difference: no real or planned host would ever want Niri/Noctalia without Bluetooth (the VM doesn't count, being test-only) — Bluetooth is enabled directly by `programs.noctalia.recommendedServices.enable` in `modules/desktop/noctalia.nix` instead — and nothing in the system needs to react to a separate `sshAgentUnlock` boolean when whether a host's `secrets.nix` declares the `ssh-private-key` secret is already the complete signal.
-- `modules/system/` — `boot.nix`, `networking.nix`, `nix.nix`, `ssh.nix`, `users.nix`. `modules/services/` has one module, `snapper.nix` (gated on `config.features.snapshots`). `modules/desktop/` now has four modules, `niri.nix`, `greetd.nix`, `noctalia.nix`, and `theming.nix` (all gated on `config.features.niri`) — `theming.nix` (Phase 5) only installs cursor/icon-theme packages system-wide, for noctalia-greeter's benefit; the actual theming config is Home Manager's (`home/cursor.nix`, `home/gtk.nix`, `home/qt.nix`). No `hardware/` or `programs/` subdirectories yet.
+- `modules/system/` — `boot.nix`, `networking.nix`, `nix.nix`, `ssh.nix`, `users.nix`. `modules/services/` has one module, `snapper.nix` (gated on `config.features.snapshots`). `modules/desktop/` now has six modules, `niri.nix`, `greetd.nix`, `noctalia.nix`, `theming.nix`, `nautilus.nix`, and `unfree.nix` (all gated on `config.features.niri`) — `theming.nix` (Phase 5) only installs cursor/icon-theme packages system-wide, for noctalia-greeter's benefit; the actual theming config is Home Manager's (`home/cursor.nix`, `home/gtk.nix`, `home/qt.nix`). `nautilus.nix` (Phase 6) is a small system-level half of an app whose user config lives in `home/` — installs the package plus `programs.dconf`/`services.gvfs`/`services.tumbler`. `unfree.nix` (Phase 6, originally named `vscode.nix` until Obsidian needed the same treatment) is just `nixpkgs.config.allowUnfreePredicate` scoped to a named list (`vscode`, `obsidian`), since the home-manager modules that actually install those packages share this host's one `pkgs` instance via `useGlobalPkgs` and can't set that themselves. No `hardware/` or `programs/` subdirectories yet.
 - `wallpapers/` — top-level directory (per `ARCHITECTURE.md`'s target layout) holding the operator's full wallpaper collection (~30 images as of this writing, various formats), used by Noctalia's wallpaper-driven theming (`home/noctalia.nix`). Read live from this repo's own clone at `~/.dotfiles/wallpapers` on each host rather than Nix-store-managed — see the wallpaper-directory paragraph below and `docs/live-dotfiles.md`.
 - `profiles/base.nix` — the first (and so far only) profile: bundles the 5 `modules/system/*` modules every host needs regardless of role (not a role itself — see the guide's "Filesystem Choice and Snapshots"-adjacent profile-naming discussion). All three hosts import it instead of the individual modules.
 - `hosts/the-entertaining-nios-vm/` — fully bootstrapped: `default.nix` (now also imports `../../modules/desktop/niri.nix`, `../../modules/desktop/greetd.nix`, `../../modules/desktop/noctalia.nix`, and `../../modules/desktop/theming.nix`), `variables.nix` (`hostName`/`timeZone`/`keyMap`), `features.nix` (`niri = true`, rest `false`), `disko.nix` (single-disk GPT, ESP + ext4 root, no swap), `hardware-configuration.nix`, `secrets.nix` (wires `sops-nix`, `password-hash` marked `neededForUsers`), `secrets/secrets.yaml`.
@@ -219,7 +219,7 @@ Fixed and verified live: `sops-install-secrets` creates a missing parent directo
    - File layout: `modules/system/shell.nix` (new, system-level `programs.zsh.enable`) + `modules/system/users.nix` (adds `pkgs` arg, sets `shell = pkgs.zsh`) for the system half, mirroring the niri system/home split; `home/zsh.nix`, `home/starship.nix`, `home/lazygit.nix`, `home/neovim.nix` each their own file (one responsibility per module, matching the `niri.nix`/`noctalia.nix` precedent) rather than bundled — none of them gated on any `osConfig.features.*` flag, since (per the already-established bluetooth/sshAgentUnlock precedent) every real host wants a terminal environment, so there's no per-host axis of variation for a flag to express.
    - **Verified live on `the-entertaining-nios-vm`**: both hosts' `system.build.toplevel` build cleanly; `config.programs.zsh.enable`, `config.users.users.ol.shell.pname` ("zsh"), and the Home Manager `programs.{zsh,zoxide,starship,lazygit}.enable` all evaluate `true`. After redeploy: login shell is zsh, all seven aliases (`l`/`ll`/`la`/`grep`/`lg`/`q`/`cl`/`nv`) work, `EDITOR`/`VISUAL`/`PATH` (`~/.local/bin`, `~/go/bin`) are correct, `starship.toml` and `lazygit/config.yml` match the ported originals exactly, `oh-my-zsh`/autosuggestions/fast-syntax-highlighting are all sourced in the generated `.zshrc`, and the history-substring-search bindkeys resolve correctly. One test artifact worth noting for future debugging: testing via `ssh ... zsh -i -c` initially showed `bindkey: cannot bind to an empty key sequence` — this was **not a real bug**, just `$TERM` being unset in a bare non-interactive SSH command (so the `zsh/terminfo` module had nothing to look up); setting `TERM=xterm-256color` for the test reproduced a real terminal's environment and resolved cleanly (`kcuu1`/`kcud1` → real escape codes). A real terminal session (Ghostty, or anything inside niri) always has `TERM` set, so this was never an issue for actual use.
 5. **Theming** — icon theme, cursor theme, GTK/Qt modernization, folding in the theming work already landed in Phases 3/4. ← **landed, not yet verified on a live boot**: see the dedicated writeup below.
-6. **Applications** — VS Code, Zen Browser, Vesktop, Nautilus.
+6. **Applications** — VS Code, Zen Browser, Vesktop, Nautilus. ← **landed and verified live on `the-entertaining-nios-vm`**: see the dedicated writeup below.
 7. **Extra features** — Docker, Steam, Proton GE, Tailscale, gaming profile.
 8. **Long-term** — `nix flake check` as the CI gate, `justfile` command runner, doc upkeep, multi-host hardening.
 
@@ -390,6 +390,351 @@ new this phase:
   of qt5ct's platform-theme plugin deliberately answers to *both* key names,
   specifically so one shared env var value works for mixed Qt5/Qt6
   environments. Both values work correctly in practice; no fix needed.
+
+### Phase 6 — Applications
+
+VS Code, Zen Browser, Vesktop, Nautilus. Planned via Plan mode before
+implementation (per the standing planning convention), with real research
+into the operator's existing config on `the-entertaining-nios-laptop`
+(CachyOS) before deciding what to port — same approach as every previous
+phase.
+
+**Zen Browser isn't in nixpkgs at all** (confirmed via `nix eval` against
+this repo's pinned nixpkgs revision) — added as its own flake input,
+`github:0xc000022070/zen-browser-flake` (`inputs.nixpkgs`/`home-manager`
+both `.follows` this repo's, unlike `noctalia` — no separate binary cache to
+lose by doing so), threaded through `lib/mkHost.nix`'s
+`home-manager.extraSpecialArgs` only (it has no NixOS module).
+`home/zen-browser.nix` imports `zen-browser.homeModules.beta` — **beta**
+specifically, matching the AUR `zen-browser-bin` build the operator actually
+runs today (confirmed via `pacman -Qi`: v1.21.9b). Investigated and ruled
+out `twilight`/`twilight-official` (the flake's own "recommended for
+reproducibility" channels): reading `package.nix`/`sources.json` in the
+flake's own repo directly confirmed both are Zen's **nightly** channel
+(`1.22t`), newer and less stable than what's running now — `twilight` pulls
+from the flake maintainer's own re-hosted mirror, `twilight-official` pulls
+the identical build straight from `zen-browser/desktop`'s own release,
+currently byte-identical (same sha256) but one hop shorter. Neither is
+"closer" to beta; both are simply a different, newer channel. No
+extension/policy porting — the operator's real profile (bookmarks, logins,
+manually-installed extensions like uBlock Origin/Dark Reader/Obsidian Web
+Clipper) lives in mutable Firefox-style profile state
+(`~/.config/zen/<profile>/...`), out of scope for Nix the same way browser
+profile data always is in this repo.
+
+**VS Code: a deliberately smaller scope than every other Phase 6 app, a
+real discussed decision.** Investigating what to port turned up two facts
+that changed the plan: the operator has **7 hand-built named VS Code
+profiles** (Docker, ESP-IDF, Flutter, Java, Python, Web Dev, C/C++ —
+confirmed via `~/.config/Code/User/globalStorage/storage.json`'s
+`userDataProfiles`, not just the single Default profile a first pass had
+assumed), and is already actively relying on VS Code's own built-in
+Settings Sync day to day (confirmed via a live
+`settingsSync.ignoredExtensions` key in the operator's real settings.json —
+evidence of active use, not just availability). Discussed directly: keeping
+Settings Sync as the sync mechanism and porting nothing
+(settings/keybindings/extensions/profiles) into Nix was chosen over both
+"port Default only" and "full 7-profile parity" — Settings Sync already
+solves exactly this problem, and replicating profile-level parity across
+all 7 in Nix would be a large lift for something already working, with the
+real cost (Settings Sync living outside `nixos-rebuild switch
+--rollback`'s coverage) accepted knowingly, the same shape of trade-off
+already taken once for zsh's Antidote-to-native-plugins move (Phase 4) —
+just resolved in the *opposite* direction here, since unlike Antidote,
+Settings Sync isn't something this repo would otherwise have to reinvent.
+`home/vscode.nix` therefore only has `home.packages = [ pkgs.vscode ]`, no
+`programs.vscode.*` at all. This did surface one real, unavoidable
+requirement: `pkgs.vscode` is unfree (MS branding/telemetry) and eval
+rejects it without an explicit allow — new `modules/desktop/vscode.nix`
+sets `nixpkgs.config.allowUnfreePredicate` scoped to just `"vscode"` (not a
+blanket `allowUnfree = true`, since no other unfree package is used yet;
+Phase 7's Steam/Proton GE will likely need to broaden this). Has to be a
+NixOS-level module, not something `home/vscode.nix` itself could set —
+`home-manager.useGlobalPkgs = true` (`lib/mkHost.nix`) means home-manager
+shares the one `pkgs` instance already built from the host's own
+`nixpkgs.config` by the time it evaluates.
+
+**Vesktop: config ported, and a real correction to what was first assumed
+about its theme files.** `home/vesktop.nix` ports both
+`~/.config/vesktop/settings.json` and
+`~/.config/vesktop/settings/settings.json` (the Vencord plugin config, ~180
+plugin toggle entries) — copied as real JSON files
+(`home/vesktop-config/{settings,vencord-settings}.json`, loaded via
+`builtins.fromJSON (builtins.readFile ...)`) rather than hand-transcribed to
+Nix attrs, a deliberate deviation from every other ported config in this
+repo (git/starship/lazygit/ghostty are all literal Nix attrs) — justified
+by scale: retyping ~180 plugin entries by hand is a real transcription-risk
+surface a verified file copy avoids entirely. Confirmed via reading
+home-manager's actual `modules/programs/vesktop/mkVesktopLikeModule.nix`
+that `programs.vesktop.settings`/`vencord.settings` write to exactly those
+two real paths, so this is a safe, literal port; the only edit made was
+dropping `vencord-settings.json`'s `cloud.settingsSyncVersion` (a runtime
+last-sync timestamp, not a real preference). **The two theme CSS files
+already on the operator's real machine
+(`~/.config/vesktop/themes/{noctalia,noctalia-material}.theme.css`) were
+initially misread as hand-installed BetterDiscord community themes** (their
+own headers credit `refact0r/midnight-discord` and
+`CapnKitten/Material-Discord` respectively) — corrected after reading
+`noctalia-dev/community-templates/discord/template.toml` directly: its
+`discord_midnight_vesktop`/`discord_material_vesktop` template ids write
+*exactly* those two paths, meaning they're Noctalia's own community
+`"discord"` template output (Noctalia's template just wraps/forks those two
+upstream themes), not manually curated files. `home/vesktop.nix`
+deliberately never declares `programs.vesktop.vencord.themes` for either
+name, leaving that directory owned by Noctalia's template engine — the same
+"separate output file, no conflict" pattern already used for
+ghostty/gtk/qt. `home/noctalia.nix` gains `"discord"` in `community_ids`.
+
+**Vesktop's custom tray/splash assets, added at the operator's request
+after the initial plan.** `~/.config/vesktop/userAssets/{splash,tray,
+trayUnread}` are real, hand-customized binaries (confirmed via `file`: an
+animated GIF splash screen, two 64x64 PNG tray icons) that Vesktop reads by
+fixed filename convention — no settings.json key references them, and no
+home-manager option exists for this at all (confirmed by reading
+`mkVesktopLikeModule.nix`/`vesktop/default.nix` in full). Copied verbatim
+into `home/vesktop-assets/{splash,tray,trayUnread}` (kept extensionless,
+matching Vesktop's own convention) and wired via three individual
+`xdg.configFile` entries. A plain Nix store copy, not `wallpapers/`'s
+live-clone treatment — these are small (~10-107KB), static, rarely-changed
+files, unlike the wallpaper collection's size/edit-frequency profile that
+justified the live-clone approach there.
+
+**Nautilus: new system/home split, mirroring niri's.** No Noctalia template
+exists for Nautilus (confirmed — absent from the community-templates
+catalog); it's a plain GTK4 app, so it already inherits this repo's
+existing `adw-gtk3`/Papirus/cursor theming with nothing new needed there.
+New `modules/desktop/nautilus.nix` (system half, gated on
+`config.features.niri`) installs `pkgs.nautilus` plus three pieces of
+infrastructure **nothing in this repo had enabled before** — niri alone
+never pulled in a dconf-backed GTK app: `programs.dconf.enable` (the dconf
+D-Bus service itself — without it, no GTK app's settings persist outside a
+full GNOME session), `services.gvfs.enable` (trash, network mounts, MTP —
+confirmed via reading `nixos/modules/services/desktops/gvfs.nix` that this
+wires real D-Bus service files, `services.udisks2.enable`, and
+`programs.fuse.enable`, not just a package), `services.tumbler.enable`
+(thumbnails). New `home/nautilus.nix` (user half, self-gates on
+`osConfig.features.niri`) ports the operator's real
+`dconf dump /org/gnome/nautilus/` preferences 1:1 via `dconf.settings`
+(icon-view captions/zoom, hidden-files/date-format/folder-viewer
+preferences, window sizes via `lib.hm.gvariant.mkTuple`) — skips
+`migrated-gtk-settings`, confirmed to be a runtime marker Nautilus itself
+writes on first launch, not a real preference (also confirmed live: it
+reappeared in `dconf dump` on the VM despite never being set by
+`home/nautilus.nix`).
+
+**Verified live on `the-entertaining-nios-vm`** (full deploy, not just
+eval): `nix flake check` and a full `nixos-rebuild switch --target-host`
+both succeeded (the operator ran the actual switch themselves via
+`nix run nixpkgs#nixos-rebuild -- switch --flake .#the-entertaining-nios-vm
+--target-host ol@<vm-ip> --elevate=sudo --ask-elevate-password` — sudo
+elevation on the target is the operator's to run, not something handled by
+the assistant). Confirmed over SSH afterward: `code`/`vesktop`/`nautilus`/
+`zen-beta` all present and launch (`code --version` succeeds; `nautilus
+--version` correctly fails only on "no display", i.e. reaches real GTK
+init); Vesktop's ported `settings.json`/`settings/settings.json` match the
+original exactly; the three custom `userAssets` resolve as real symlinks
+into the Nix store; Nautilus's `dconf.settings` match the original dump
+exactly; `services.gvfs`'s real D-Bus service files
+(`org.gtk.vfs.{Daemon,UDisks2VolumeMonitor,...}.service`) and `programs.dconf`'s
+`dconf.service` are both present/active; Zen Browser is already the system
+default browser (`xdg-settings get default-web-browser` →
+`zen-beta.desktop`).
+
+**One real, expected recurrence of an already-documented gotcha, fixed
+live**: after redeploy, `~/.config/vesktop/themes/` didn't yet contain the
+new discord-theme output, and the VS Code/Zen community templates hadn't
+run either — the exact `~/.local/state/noctalia/settings.toml` sidecar
+issue already documented in the Theming-phase section above (it deep-merges
+*over* `config.toml` with whole-array replacement, so its still-stale
+`community_ids = ["yazi", "papirus-icons"]` silently overrode this phase's
+new `"discord"`/`"vscode"`/`"zen-browser"` additions). Fixed the same
+documented way: patched the sidecar's `community_ids` to match, restarted
+`noctalia.service`. Confirmed fixed: all three Vesktop theme CSS variants
+appeared, the VS Code theme extension's own bundled color-theme JSON
+(`~/.vscode/extensions/noctalia.noctaliatheme-0.0.5/themes/...`) was
+already present (extension already installed via Settings Sync) and
+correctly themed with no conflict, and Zen's cache-dir theme files
+(`~/.cache/noctalia/zen-browser/zen-{userChrome,userContent}.css`)
+regenerated. **One remaining gap, self-healing, not a bug**: Zen's
+`apply.sh` only edits an *existing* Firefox-style profile's
+`userChrome.css`/`user.js` (it globs for `prefs.js` files and does nothing
+if none exist yet) — no profile exists on this freshly-deployed VM since
+Zen Browser has never actually been launched there. This will resolve
+itself the first time the operator opens Zen Browser and Noctalia's next
+template pass runs, the same self-recovering shape already seen once for
+`yazi`'s "not cached yet" warning (Phase 5) — not chased further with a
+forced headless launch over SSH, which proved unreliable for a real GUI
+browser and isn't necessary to consider this phase verified.
+
+**A separate, unrelated discovery made while looking for a way to verify
+this phase**: a `run-nixos-dotfiles` Claude Code skill (an eval/build/check
+driver for this flake, `.claude/skills/run-nixos-dotfiles/`) had already
+been written and pushed on a separate branch/PR
+(`worktree-purrfect-popping-owl`) but not yet merged to `main` — merged
+externally (via GitHub) in the course of this session, independent of the
+Phase 6 work itself. Used for this phase's own verification
+(`driver.sh check`, `driver.sh build the-entertaining-nios-vm`) once
+available.
+
+**Three follow-up fixes, all found via the operator's own live testing after
+the first Phase 6 deploy, not caught by the initial eval/build/SSH-only
+verification pass above** — a reminder that config existing and eval passing
+isn't the same as an app actually rendering/working correctly, the same
+lesson this repo has hit before (Phase 5's qt5ct bugs, the niri/starship
+template conflicts).
+
+- **Nautilus's folder icons weren't themed at all**, reported by the
+  operator after opening the real app. Root cause: `home/gtk.nix` sets
+  `gtk.iconTheme.name = "Papirus-Dark"`, but Noctalia's official
+  `"papirus-icons"` community template only ever recolors the *base*
+  `"Papirus"` theme — confirmed by reading the template's own bundled
+  `papirus-folders` script source: `-t/--theme` defaults to `"Papirus"`,
+  and `apply.sh` never passes `-t`. `"Papirus-Dark"` turned out to be a
+  genuinely separate theme tree (its own `index.theme`:
+  `Inherits=breeze-dark,hicolor` — not `Papirus` at all, despite the name),
+  with its own independent `folder.svg` symlink at every size, never
+  touched by any of the above and permanently stuck at Papirus' default
+  blue. Fixed in `home/gtk.nix`'s existing `seedPapirusIcons` activation
+  script: after seeding the writable, recolorable `Papirus` copy, it now
+  also walks every size Papirus-Dark has a `places/folder.svg` for and
+  symlinks that file at the recolored copy under `Papirus` instead of its
+  own original — GTK's icon lookup checks `$HOME/.local/share/icons`
+  *before* the Nix-store-installed theme, so this partial override is
+  enough; every other Papirus-Dark icon still resolves from the Nix store
+  exactly as before. Considered and rejected first: switching
+  `gtk.iconTheme.name` to plain `"Papirus"` (the simpler fix, but a real,
+  broader visual regression from the "-Dark" variant deliberately chosen in
+  Phase 5, affecting more than just folder icons). **Verified live** (VM,
+  before *and* after the redeploy): `readlink -f` on
+  `~/.local/share/icons/Papirus-Dark/48x48/places/folder.svg` resolves
+  through to the exact same `folder-deeporange.svg` (the wallpaper's
+  current recolor) that `~/.local/share/icons/Papirus/48x48/places/folder.svg`
+  itself resolves to.
+- **Vesktop renamed to "Discord" in Noctalia's launcher/bar, using the
+  operator's own custom launcher icon** — an explicit operator request, not
+  a bug. Checking the operator's real, currently-live AUR `vesktop.desktop`
+  (`/usr/share/applications/vesktop.desktop` on
+  `the-entertaining-nios-laptop`) turned up the exact answer needed: it
+  already has `Name=Discord` and `Icon=` pointing at a `tray.png` that
+  turned out to be byte-identical to the tray icon already ported this
+  phase (`home/vesktop-assets/tray`) — no new asset to source, just a
+  `.png`-extensioned copy of it (`home/vesktop-assets/discord-icon.png`,
+  needed since an absolute-path `Icon=` needs a real image extension to be
+  sniffed correctly; the existing extensionless `tray` file only works
+  because Vesktop itself reads it by fixed filename convention, a different
+  mechanism). New `xdg.desktopEntries.vesktop` in `home/vesktop.nix`
+  overrides nixpkgs' own packaged `vesktop.desktop` — confirmed this works
+  via home-manager's own module doc/source
+  (`modules/misc/xdg/desktop-entries.nix`: installs as a `hiPrio` package
+  providing `share/applications/vesktop.desktop`, same filename as
+  nixpkgs' own, so it wins the profile priority collision). Categories/
+  mimeType/genericName mirror nixpkgs' own entry (so discord:// deep links
+  and menu categorization don't regress); only name/icon actually change.
+  **One real correction made against both existing desktop files, not
+  copied blindly from either**: `StartupWMClass` — the AUR file says
+  `vesktop` (lowercase), nixpkgs' own packaged one says `Vesktop` (capital)
+  — confirmed live which is actually correct by launching the real
+  nixpkgs-built binary under niri and reading its true `app_id` via `niri
+  msg windows`: lowercase `vesktop`, matching the AUR file, not nixpkgs'
+  own (stale/wrong) packaged value. **Verified live** (post-redeploy): the
+  resolved `~/.nix-profile/share/applications/vesktop.desktop` has the
+  correct `Name=Discord`, the correct `Icon=` (the new custom PNG's real
+  store path), and `StartupWMClass=vesktop`.
+- **A real, separate bug found purely as a side effect of the above
+  investigation** (needed to actually launch Vesktop to read its live
+  `app_id`) — **Vesktop couldn't launch under niri at all**, crashing with
+  `Missing X server or $DISPLAY` (ozone falling back to X11, which
+  immediately fails since XWayland is disabled repo-wide). Root cause:
+  nixpkgs' own `vesktop`/`vscode` wrapper scripts only add their
+  `--ozone-platform-hint=auto` flag when `$NIXOS_OZONE_WL` is set (read
+  directly from the wrapper scripts) — nothing in this repo had ever set
+  it. `home/niri/cfg/misc.kdl`'s own `environment {}` block already sets
+  `ELECTRON_OZONE_PLATFORM_HINT`/`XDG_SESSION_TYPE`/etc. and looked like it
+  should already cover this — but confirmed live via `systemctl --user
+  show-environment` on the VM that **none of that KDL environment block
+  actually reaches the systemd `--user` manager's own environment**; only
+  `WAYLAND_DISPLAY`/`XDG_CURRENT_DESKTOP`/`XDG_SESSION_TYPE`/`XDG_SESSION_ID`/
+  `NIRI_SOCKET` do (almost certainly imported by logind/PAM at session
+  start — a different, separate mechanism from niri's own KDL environment
+  block, which apparently only applies to niri's own directly-spawned
+  children, not systemd-user-service-launched apps like anything Noctalia
+  launches via `shell.launch_apps_as_systemd_services`). This means *any*
+  Electron app launched the normal way (Noctalia's launcher, or any
+  systemd user service) never saw those variables either — not a
+  Vesktop-specific bug, a repo-wide gap affecting VS Code too. Fixed with
+  the actual NixOS-standard mechanism instead: new
+  `environment.sessionVariables.NIXOS_OZONE_WL = "1";` in
+  `modules/desktop/niri.nix` (system-level, imported via the standard PAM/
+  systemd session environment path that *does* reach `systemctl --user
+  show-environment`, confirmed by testing). **Verified live**, both before
+  and after the fix: before, `NIXOS_OZONE_WL` absent from `systemctl --user
+  show-environment` and Vesktop crashed on every launch attempt; after
+  redeploy, present, and a live launch produced a real Wayland window
+  (`app_id: "vesktop"`, correctly picked up by the renamed desktop entry
+  above) with no ozone/X11 error. A `MESA: error: vdrm_device_connect
+  failed` message also appeared in Vesktop's log during this testing — not
+  investigated further, matches this repo's existing track record of
+  VM-only GPU/rendering quirks (`virtio-gpu-gl`) unrelated to actual repo
+  config; revisit only if it turns out to matter on real hardware.
+  Separately confirmed, not a bug: Vesktop logs `EROFS: read-only file
+  system` when it tries to write back to its own `settings.json` after any
+  in-app settings change — expected and accepted, the same inherent
+  trade-off every other Nix-declaratively-managed app config in this repo
+  already has (no in-app UI changes persist across a rebuild; the Nix
+  declaration is always the source of truth).
+
+**Two more apps added to Phase 6 at the operator's request, after the
+initial four were already verified live**: Feishin (a Jellyfin/Navidrome/
+Subsonic music client) and Obsidian (markdown notes). Both in nixpkgs
+(`pkgs.feishin`, `pkgs.obsidian`), no new flake input needed.
+
+- **Neither app's real config was ported — a deliberate security/scope
+  call, not an oversight.** Checked the operator's actual config first,
+  same as every other app this phase: Feishin's real config.json
+  (currently a Flatpak install, `~/.var/app/org.jeffvli.feishin`) has a
+  `server` key holding actual Jellyfin/Navidrome/Subsonic connection
+  details — almost certainly a token or password, the exact kind of real
+  credential this repo never commits (same standing discipline as
+  sops-nix for anything that genuinely must be declared). Obsidian's real
+  config (`~/.config/obsidian/obsidian.json`) only ever holds a vault path
+  (`/home/ol/Documents/Notes` on the laptop) — genuinely machine-specific
+  runtime state pointing at a vault that wouldn't exist identically on any
+  other host, not a declarative preference. `home/feishin.nix`/
+  `home/obsidian.nix` are both package-only, matching `home/vscode.nix`'s
+  precedent — the operator sets up the server connection / opens their
+  real vault once via each app's own UI after first launch.
+- **`pkgs.obsidian` is unfree** (a custom, nixpkgs-flagged license, not a
+  standard OSS one — confirmed via `nix eval nixpkgs#obsidian.meta.license`).
+  `modules/desktop/vscode.nix` (Phase 6's earlier VS Code unfree-allow
+  module) was renamed to `modules/desktop/unfree.nix` and its predicate
+  extended to a list (`["vscode" "obsidian"]`) now that it's allow-listing
+  more than one package — a naming fix, not new logic.
+- **Theming still wired in for both**, despite no config porting — real,
+  separate templates confirmed via the community-templates catalog: the
+  official `"feishin"` community template writes a separate
+  `$XDG_CONFIG_HOME/feishin/custom.css` (confirmed already active on the
+  operator's real Flatpak install — a `matugen-template.css`/`custom.css`
+  pair already present there); the official `"obsidian"` community
+  template discovers every local vault (any `.obsidian` directory under
+  `$HOME`, confirmed by reading its own `apply.sh`) and writes/enables its
+  own CSS snippet inside each vault's `snippets/` folder. Neither touches
+  anything this repo manages, so both added cleanly to `home/noctalia.nix`'s
+  `community_ids` with no conflict.
+- **Verified live on `the-entertaining-nios-vm`**: both binaries present
+  and launch; Feishin's `~/.config/feishin/custom.css` was generated by
+  Noctalia (self-recovered from an initial "not cached yet" warning in
+  Noctalia's log, the same pattern already seen once for `yazi` in Phase
+  5); Obsidian auto-created a default vault
+  (`~/Documents/Obsidian Vault/.obsidian`) on first run, and Noctalia's
+  template correctly discovered it and wrote/enabled
+  `snippets/noctalia.css` there, confirmed via that vault's own
+  `appearance.json` (`enabledCssSnippets: ["noctalia"]`). Unlike the
+  earlier Phase 6 deploy, `~/.local/state/noctalia/settings.toml`'s
+  `community_ids` sidecar was *already* correctly in sync with the new
+  additions with no manual patch needed this time — apparently
+  self-corrected on its own between deploys, not something to rely on in
+  general (see the standing sidecar lesson above), but worth noting this
+  particular redeploy didn't need it.
 
 ## Software stack (for context on what modules will eventually cover)
 

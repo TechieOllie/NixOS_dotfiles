@@ -100,9 +100,39 @@ in
             # $HOME/.local/share/icons/Papirus copy itself so that check
             # always finds the directory already present and this fallback
             # never triggers.
+            # "discord" (Phase 6): writes vesktop's noctalia/noctalia-material
+            # theme CSS into ~/.config/vesktop/themes/ — a separate directory
+            # home/vesktop.nix never touches (see that file's own comment),
+            # so no conflict.
+            # "vscode" (Phase 6): writes a color-theme JSON into the
+            # noctalia.noctaliatheme VS Code extension's own bundled
+            # directory (~/.vscode/extensions/...), which only exists once
+            # that extension is installed via Settings Sync (home/vscode.nix
+            # deliberately doesn't manage VS Code config at all — see that
+            # file). Separate output file either way, no conflict.
+            # "zen-browser" (Phase 6): writes userChrome/userContent CSS to a
+            # cache dir, then its own apply.sh appends an @import line into
+            # the actual Firefox-style profile's userChrome.css/userContent.css
+            # and flips two about:config prefs — mutable profile state Nix
+            # never manages (home/zen-browser.nix), so no conflict either.
+            # "feishin" (Phase 6): writes a separate
+            # $XDG_CONFIG_HOME/feishin/custom.css — home/feishin.nix doesn't
+            # manage any Feishin config at all (its real config carries
+            # actual music-server credentials, deliberately never read into
+            # this repo), so no conflict.
+            # "obsidian" (Phase 6): discovers every local vault
+            # (any ".obsidian" dir under $HOME) and writes/enables its own
+            # CSS snippet inside each one's snippets/ folder —
+            # home/obsidian.nix doesn't manage any vault content, so no
+            # conflict.
             community_ids = [
               "yazi"
               "papirus-icons"
+              "discord"
+              "vscode"
+              "zen-browser"
+              "feishin"
+              "obsidian"
             ];
 
             # Custom templates, written and checked into this repo
