@@ -312,7 +312,11 @@ Examples of what Home Manager owns: Ghostty, Zsh, Starship, Git configuration, V
 
 **Home Manager rollback:** because Home Manager is integrated into the NixOS module (`home-manager.nixosModules.home-manager`), its generations are created and rolled back together with the system generation via `nixos-rebuild switch --rollback` — there is no separate Home Manager generation to manage. This is a deliberate reason to prefer NixOS-integrated Home Manager over standalone Home Manager for this repository: one rollback command covers both.
 
-**Autostarting applications: systemd user services, not niri's `spawn-sh-at-startup`.** niri's own docs support a `spawn-sh-at-startup` directive for launching things at compositor start, but this repo prefers `systemd.user.services.<name>` instead, bound to the standard `graphical-session.target` (`Unit.PartOf`/`Unit.After = "graphical-session.target"`, `Install.WantedBy = [ "graphical-session.target" ]`) — the same target niri's own packaged systemd integration (`niri.service`) already binds to and pulls in automatically. This gets proper start/stop lifecycle (services stop when the session ends, rather than leaking a process), `Restart=on-failure`, `journalctl --user` logging, and ordering handled by systemd instead of a hardcoded `sleep N` guessing how long niri takes to be ready. Noctalia Shell already follows this (`programs.noctalia.systemd.enable = true`, paired with `shell.launch_apps_as_systemd_services = true`); apply the same pattern to any future autostarted application (Vesktop, Zen Browser, ...) as its own Home Manager module is written, rather than a shared `cfg/autostart.kdl`.
+**Autostarting applications: systemd user services, not niri's `spawn-sh-at-startup`.** niri's own docs support a `spawn-sh-at-startup` directive for launching things at compositor start, but this repo prefers `systemd.user.services.<name>` instead, bound to the standard `graphical-session.target` (`Unit.PartOf`/`Unit.After = "graphical-session.target"`, `Install.WantedBy = [ "graphical-session.target" ]`) — the same target niri's own packaged systemd integration (`niri.service`) already binds to and pulls in automatically. This gets proper start/stop lifecycle (services stop when the session ends, rather than leaking a process), `Restart=on-failure`, `journalctl --user` logging, and ordering handled by systemd instead of a hardcoded `sleep N` guessing how long niri takes to be ready. Noctalia Shell already follows this (`programs.noctalia.systemd.enable = true`, paired with `shell.launch_apps_as_systemd_services = true`); apply the same pattern to any future autostarted application as its own Home Manager module is written, rather than a shared `cfg/autostart.kdl`. None of Phase 6's applications (Vesktop, Zen Browser, VS Code, Feishin, Obsidian) are autostarted — this only applies once an app actually needs to launch at login.
+
+**Electron apps need `NIXOS_OZONE_WL` set, or they silently try X11 and crash.** nixpkgs' own Electron-based package wrappers (`vesktop`, `vscode`, and any future Electron app) only add their `--ozone-platform-hint=auto` Wayland flag when `$NIXOS_OZONE_WL` is set — without it, Electron falls back to X11, which fails outright here since XWayland is disabled repo-wide. This is set once, system-wide (`environment.sessionVariables.NIXOS_OZONE_WL = "1";`, `modules/desktop/niri.nix`) rather than per-app — confirmed live (Phase 6) that niri's own KDL `environment {}` block does *not* reach the systemd `--user` manager's environment the way this does, so per-app Home Manager `sessionVariables` wouldn't be a reliable substitute. Any future Electron app needs nothing extra for this specifically; it's already covered.
+
+**Some Home-Manager-owned apps still need one narrow system-level touchpoint.** The System vs Home Manager split above (package + session at the system level, user config in Home Manager) describes apps like Niri that have a real system-level *service*. Most Phase 6 applications don't — they're entirely Home Manager's (`home.packages`/`programs.*`, matching the Examples list above), but two needed a single NixOS-level line anyway because of *how* packages are unlocked, not because they need a system service: an unfree package (`pkgs.vscode`, `pkgs.obsidian`) is rejected at eval unless `nixpkgs.config.allowUnfreePredicate` allows it, and that option can only be set where `pkgs` itself is built — home-manager's `useGlobalPkgs = true` (`lib/mkHost.nix`) means it shares one `pkgs` instance already finalized by the time Home Manager evaluates, so the allow-list can't live in the home-manager module that actually installs the package. `modules/desktop/unfree.nix` is a single small module for this one purpose, growing a named list (not `nixpkgs.config.allowUnfree = true` outright) as more unfree packages are actually used — Phase 7's Steam/Proton GE will likely extend it the same way.
 
 **Noctalia theming: three template layers, pick the right one per app.** `home/noctalia.nix`'s `theme.templates` has three distinct mechanisms, not one:
 
@@ -612,7 +616,7 @@ Ghostty, Zsh, Starship, Git, Lazygit, Neovim, Fastfetch, eza, bat, fd, ripgrep, 
 
 ## Applications
 
-Zen Browser, Visual Studio Code (official build), Vesktop, Nautilus.
+Zen Browser, Visual Studio Code (official build), Vesktop, Nautilus, Feishin, Obsidian.
 
 ## Gaming
 
@@ -706,7 +710,7 @@ exact packages/options verified.
 
 ## Phase 6 — Applications
 
-- VS Code, Zen Browser, Vesktop, Nautilus.
+- VS Code, Zen Browser, Vesktop, Nautilus, Feishin, Obsidian.
 
 ## Phase 7 — Extra Features
 
