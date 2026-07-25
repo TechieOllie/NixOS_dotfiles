@@ -744,6 +744,75 @@ Subsonic music client) and Obsidian (markdown notes). Both in nixpkgs
   general (see the standing sidecar lesson above), but worth noting this
   particular redeploy didn't need it.
 
+**Three more Zen Browser fixes, found via the operator's own live use after
+the `twilight-official` channel bump, not caught by build/eval.**
+
+- **The `Mod+Z` niri keybind never worked at all, under any channel** —
+  `home/niri/cfg/keybinds.kdl` had `spawn "zen-browser"`, a binary that
+  never existed in any zen-browser-flake channel (confirmed: the flake only
+  ever produces `zen-beta`/`zen-twilight`). Fixed to
+  `spawn-sh "zen-twilight || zen-beta || zen"` — tries each real binary in
+  turn, so the keybind survives a future channel switch (like the one that
+  just happened) without needing another edit itself.
+- **`home/niri/cfg/rules.kdl`'s two window-rules for Zen (maximize,
+  Picture-in-Picture floating) had almost certainly never matched under any
+  channel either** — `match app-id="zen$"` requires the app-id to *end* in
+  "zen", but the real live app-id (confirmed via `niri msg windows` after
+  launching the actual binary) is `zen-twilight`, which doesn't end in
+  "zen" at all (same would be true for `zen-beta`). Fixed to
+  `app-id=r#"^zen(-\w+)?$"#`, matching `zen`, `zen-beta`, `zen-twilight`,
+  or any future channel name. Verified live: after the fix, a fresh launch
+  showed `is_floating: false` with the window tiled to the full output
+  size, confirming `open-maximized-to-edges` now actually applies.
+- **The Noctalia launcher was showing some unrelated icon for Zen** — the
+  `twilight-official` channel's own packaged `.desktop` entry sets
+  `Icon=zen-twilight-official`, which matches no installed icon file at
+  all (confirmed live: the package only ever ships `zen-twilight.png`, at
+  every `hicolor` size, never a `-official`-suffixed name) — a real bug in
+  the flake's own packaging for this specific channel attribute, not
+  something introduced by this repo. Fixed the same way as Vesktop's
+  launcher override (`home/vesktop.nix`): new `xdg.desktopEntries.zen-twilight`
+  in `home/zen-browser.nix`, replicating the packaged entry's other fields
+  (Exec, Categories, MimeType, Actions, StartupWMClass) with just the
+  `Icon` corrected. Unlike the keybind fix, this one **isn't** channel-agnostic
+  — overriding a desktop entry means matching its exact filename, which
+  differs per channel (`zen-beta.desktop` vs. `zen-twilight.desktop`), so
+  this override (and its attribute name) needs revisiting again if the
+  channel changes.
+- **A live-dotfiles gotcha hit while testing, not a new bug**: after the
+  redeploy, the keybind still didn't work — turned out the fix existed
+  only in this repo's local working tree, not yet pushed to `origin/main`,
+  and niri's KDL config is live-symlinked to a *separate* clone at
+  `~/.dotfiles` on the VM (`docs/live-dotfiles.md`) that only updates via
+  its own `git pull`. Worked around for testing by `scp`-ing the two
+  changed files directly to that clone and reloading niri
+  (`niri msg action load-config-file`) — same technique already used once
+  before for niri config changes — rather than needing a full commit/push/
+  pull cycle just to verify a fix.
+- **A separate, real "bug report" that turned out to be a self-inflicted
+  testing artifact, not a repo issue**: two Zen windows appeared on every
+  launch after the keybind fix. Traced to Zen's own crash-recovery session
+  restore — repeated test launches during this session were all killed via
+  `pkill` rather than closed cleanly, and one of those saved sessions
+  happened to have 2 windows open; Zen kept restoring that saved session on
+  every subsequent launch (confirmed via `browser.startup.couldRestoreSession.count`
+  and the profile's `zen-sessions.jsonlz4`/`sessionstore-backups/`).
+  Clearing those session files and relaunching produced exactly one window.
+  Nothing in the repo's config was at fault.
+- **Confirmed NOT fixable from this repo's config, not a bug either**: the
+  operator's own `smart_auto_hide = true` (set via Noctalia's Settings UI,
+  living in the `~/.local/state/noctalia/settings.toml` sidecar, not
+  anything this repo declares) doesn't free up tiled-window space while the
+  bar is hidden. Confirmed by reading Noctalia's own source directly
+  (`src/shell/bar/bar_reserved_zone.h`): the layer-shell exclusive zone a
+  bar reserves is computed purely from its *static* config (position,
+  `thickness`, `marginEdge` — the last defaulting to `0` and unset here),
+  never from its current runtime shown/hidden state — so toggling
+  auto-hide only affects whether the bar's content renders, not how much
+  space niri reserves for it. This is current upstream Noctalia behavior,
+  not a config gap on our side; the only real fix would be an upstream
+  change to update the exclusive zone dynamically on hide/show.
+
 ## Software stack (for context on what modules will eventually cover)
 
 Niri, greetd, Noctalia Greeter, Noctalia Shell v5 (native theming, GTK/Qt theming templates), Papirus icons, Bibata cursors, adw-gtk3, qt5ct/qt6ct · Ghostty, Zsh, Starship, Git, Lazygit, Fastfetch, eza, bat, fd, ripgrep, fzf, zoxide, yazi, btop · Zen Browser, VS Code, Vesktop, Nautilus · Steam, Proton GE, Gamescope, MangoHud, Gamemode, Millennium · Tailscale · Docker Engine + Compose · PipeWire, Bluetooth, Printing, NetworkManager, Snapper (btrfs snapshots) · nixd, nil, alejandra, statix, deadnix, direnv, just.

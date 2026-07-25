@@ -43,7 +43,7 @@
     }
 
     window-rule { 
-        match app-id="zen$"
+        match app-id=r#"^zen(-\w+)?$"#
         open-maximized-to-edges true
     }
    
@@ -60,7 +60,7 @@
     }
 
     window-rule {
-       match app-id="zen$" title="^Picture-in-Picture$"
+       match app-id=r#"^zen(-\w+)?$"# title="^Picture-in-Picture$"
        open-maximized-to-edges false
        open-floating true
        default-floating-position x=32 y=32 relative-to="bottom-right"

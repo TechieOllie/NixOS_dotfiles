@@ -22,7 +22,12 @@ binds {
     // ─── Applications ───
     Mod+Return                          hotkey-overlay-title="Open Terminal: Alacritty" { spawn "ghostty"; }
     Mod+space                           hotkey-overlay-title="Open App Launcher: noctalia launcher" { spawn-sh "noctalia msg panel-toggle launcher"; }
-    Mod+Z                               hotkey-overlay-title="Open Browser: Zen-Browser" { spawn "zen-browser"; }
+    // spawn "zen-browser" was never a real binary under any channel — the
+    // zen-browser flake only ever produces channel-specific binaries
+    // (zen-beta, zen-twilight, ...). This tries each in turn via spawn-sh
+    // so the keybind survives a channel switch (home/zen-browser.nix)
+    // without needing to be edited too.
+    Mod+Z                               hotkey-overlay-title="Open Browser: Zen-Browser" { spawn-sh "zen-twilight || zen-beta || zen"; }
     Mod+B                               hotkey-overlay-title="Open Note App: Obsidian" { spawn "obsidian"; }
     Mod+ALT+L                           hotkey-overlay-title="Lock Screen: noctalia lock" { spawn-sh "noctalia msg session lock"; }
     Mod+Shift+Q                         hotkey-overlay-title="Session Menu: noctalia session panel" { spawn-sh "noctalia msg panel-toggle session"; }

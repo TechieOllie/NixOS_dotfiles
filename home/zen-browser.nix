@@ -16,6 +16,23 @@
 # home/noctalia.nix) — it mutates that same mutable profile state directly,
 # so there's nothing for Nix to conflict with here either.
 #
+# Icon fix: the twilight-official channel's own packaged .desktop entry
+# (~/.nix-profile/share/applications/zen-twilight.desktop) sets
+# Icon=zen-twilight-official, which matches no installed icon file at
+# all — confirmed live that the package only ever ships zen-twilight.png
+# (every hicolor size), never a "-official"-suffixed name. Since that name
+# resolves to nothing, Noctalia's launcher was falling back to some
+# unrelated icon rather than erroring visibly. Fixed the same way as
+# Vesktop's launcher override (home/vesktop.nix): xdg.desktopEntries
+# installs as a hiPrio package providing share/applications/<name>.desktop,
+# so ours wins over the flake-packaged one — same filename, same fields,
+# just the one real correction (Icon). Unlike the niri keybind above, this
+# can't be made channel-agnostic the same way: overriding a desktop entry
+# means matching its exact filename, which differs per channel
+# (zen-beta.desktop vs. zen-twilight.desktop) — this entry (and its
+# attribute name below) needs updating again if the channel above ever
+# changes.
+#
 # Self-gates on osConfig.features.niri, same convention as home/vscode.nix.
 {
   lib,
@@ -30,6 +47,41 @@
     programs.zen-browser = {
       enable = true;
       setAsDefaultBrowser = true;
+    };
+
+    xdg.desktopEntries.zen-twilight = {
+      name = "Zen Browser (Twilight)";
+      genericName = "Web Browser";
+      exec = "zen-twilight --name zen-twilight %U";
+      icon = "zen-twilight";
+      categories = [
+        "Network"
+        "WebBrowser"
+      ];
+      mimeType = [
+        "text/html"
+        "text/xml"
+        "application/xhtml+xml"
+        "application/vnd.mozilla.xul+xml"
+        "x-scheme-handler/http"
+        "x-scheme-handler/https"
+      ];
+      startupNotify = true;
+      settings.StartupWMClass = "zen-twilight";
+      actions = {
+        new-private-window = {
+          name = "New Private Window";
+          exec = "zen-twilight --private-window %U";
+        };
+        new-window = {
+          name = "New Window";
+          exec = "zen-twilight --new-window %U";
+        };
+        profile-manager-window = {
+          name = "Profile Manager";
+          exec = "zen-twilight --ProfileManager";
+        };
+      };
     };
   };
 }
