@@ -102,6 +102,15 @@ in
           Value = "rgba(0, 0, 0, ${toString (builtins.floor (opacity * 100))}%)";
           Status = "default";
         };
+        "mod.sameerasw.zen_no_shadow" = {
+          # The mod's own multi-layer box-shadow around the webpage view
+          # (chrome.css) is meant to blend invisibly against an opaque
+          # white page — with a transparent backplate it shows up instead
+          # as a stray rim just inside niri's own border. Confirmed via
+          # live testing.
+          Value = true;
+          Status = "default";
+        };
       };
     };
 

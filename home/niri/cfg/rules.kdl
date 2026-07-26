@@ -54,15 +54,25 @@
         // hand, same as misc.kdl's duplicated cursor block.
         opacity 0.80
         // prefer-no-csd (misc.kdl) already asks Zen to drop its own
-        // decorations, and niri's default for CSD-less windows is already
-        // no solid-background border — but niri's own docs specifically
-        // call out that focus rings/borders can show through semi-
-        // transparent windows, so this makes it explicit rather than
-        // relying on the implicit default. Note: prefer-no-csd only takes
-        // effect for windows created after it's set — Zen needs a full
-        // restart (quit, not just close-window) to actually negotiate away
-        // its CSD if it hasn't already.
-        draw-border-with-background false
+        // decorations. draw-border-with-background false was tried first
+        // (to stop niri's focus-ring/border showing as an opaque rectangle
+        // behind the translucent window) but backfired for a CSD-less
+        // window: with no background AND no fill, the ring/border space
+        // renders as a plain transparent gap — confirmed live (a "border"
+        // of literally nothing, distinct from the window content).
+        // Since Zen is maximized-to-edges and fills the whole output
+        // anyway, there's no real need for a focus indicator here — just
+        // disable both outright instead of fighting the fill/no-fill
+        // tradeoff. Note: prefer-no-csd only takes effect for windows
+        // created after it's set — Zen needs a full restart (quit, not
+        // just close-window) to actually negotiate away its CSD if it
+        // hasn't already.
+        focus-ring {
+            off
+        }
+        border {
+            off
+        }
     }
    
     window-rule {
