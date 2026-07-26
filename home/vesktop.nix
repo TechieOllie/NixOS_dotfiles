@@ -7,42 +7,57 @@
 # vencord-settings.json's cloud.settingsSyncVersion (a runtime last-sync
 # timestamp, not a real preference).
 #
-# Transparency: settled on niri's own opacity window-rule
-# (home/niri/cfg/rules.kdl) as the SOLE mechanism, uniformly across the
-# whole window, rather than Vesktop's own VencordSettings.store.transparent
-# (confirmed via reading src/main/mainWindow.ts directly that this
-# unconditionally sets `transparent: true` on the Electron BrowserWindow —
-# unlike the Windows-only transparencyOption vibrancy dropdown, this one
-# has no platform check at all, so it's real, not merely a UI omission).
-# Tried first as a belt-and-suspenders pair (same reasoning as Zen's
-# fallback), paired with the theme's own --remove-bg-layer toggle (see
-# below) to reveal it — but the combination made the *background*
-# (removed by --remove-bg-layer, revealing the real Electron alpha
-# channel) and the *panels* (only ever affected by niri's opacity) get
-# inconsistently different transparency once niri's own multiplier was
-# tuned, since each was driven by a different one of the two mechanisms.
-# Simplified to niri opacity alone (uniform, single source of truth) —
-# transparent reverted to false, --remove-bg-layer left off. Revisit
-# VencordSettings.store.transparent again if niri's opacity alone ever
-# stops being sufficient (e.g. a niri regression) — known live to work as
-# of this writing, just not needed once niri handles the whole effect.
+# Transparency: went through three iterations before landing here, each
+# ruling out a real problem with the previous one rather than guessing —
+# worth keeping the history since the wrong-looking-simpler options are
+# exactly what a future edit would be tempted to retry:
+#   1. niri's own opacity window-rule ALONE (home/niri/cfg/rules.kdl) —
+#      works, but it's a blunt, whole-composited-frame multiplier with no
+#      concept of text vs. background: it dims every pixel equally,
+#      making message text semi-transparent and hard to read. Confirmed
+#      live.
+#   2. VencordSettings.store.transparent (real Electron-level alpha,
+#      confirmed via reading src/main/mainWindow.ts directly — unlike the
+#      Windows-only transparencyOption vibrancy dropdown, this one has no
+#      platform check) + the theme's --remove-bg-layer toggle, WITHOUT
+#      niri opacity. Fixes the text problem (real per-pixel alpha, CSS
+#      background-color changes don't touch text color), but
+#      --remove-bg-layer only strips one specific wrapper element
+#      (.bg__960e4) — every individual panel (chat, sidebar, cards) has
+#      its OWN separate background variable, untouched by that toggle, so
+#      panels stayed fully opaque. Confirmed live.
+#   3. **Landed on**: combine both — real Electron transparency (this
+#      settings.json's `transparent: true`) + --remove-bg-layer (strips
+#      the base wrapper so there's an actual hole for that alpha channel)
+#      + explicit alpha added to the two background variables that
+#      actually matter (--bg-3/--bg-4, see extraQuickCss below), via
+#      color-mix so it still tracks whatever Noctalia's palette currently
+#      resolves to rather than a hardcoded color. No niri opacity at all —
+#      text stays fully opaque since only background-color is touched.
+#
+# --bg-3/--bg-4 identified by reading the theme's @import'd base
+# stylesheet directly (refact0r.github.io/midnight-discord/build/midnight.css):
+# --bg-3 drives --app-frame-background/--chat-background-default/card
+# backgrounds; --bg-4 drives the lowest-level base background
+# (--background-base-low/-lower/-lowest). Both are only ever consumed as
+# background-color, never as a text/foreground color. --bg-1/--bg-2 (button
+# colors) deliberately left alone — solid, legible buttons matter more than
+# consistency here.
 #
 # The active Discord theme (Noctalia's "discord" community template,
-# discord-midnight.css — a fork of refact0r/midnight-discord) has two
-# other built-in toggles kept on regardless of the above (confirmed by
-# reading both the local file and its @import'd base stylesheet,
-# refact0r.github.io/midnight-discord/build/midnight.css, directly):
-# --transparency-tweaks (hides a couple of decorative gradient overlays
-# that look wrong once things are transparent), --panel-blur
-# (backdrop-filter blur on floating elements only — context menus/
-# tooltips/popups, not the sidebar or message area, so text legibility is
-# untouched) — both independent of whichever mechanism is doing the actual
-# see-through work. Since the generated theme file itself is Noctalia's to
-# own (not managed here — see below), these are set via extraQuickCss
-# instead: a genuinely separate output file (settings/quickCss.css,
-# confirmed via reading home-manager's own mkVesktopLikeModule.nix), no
-# conflict with Noctalia's writes, same pattern as ghostty/gtk/qt's
-# separate-file treatment. useQuickCss is already true in the ported
+# discord-midnight.css — a fork of refact0r/midnight-discord) also has two
+# unrelated built-in toggles, independent of whichever transparency
+# mechanism is in use: --transparency-tweaks (hides a couple of decorative
+# gradient overlays that look wrong once things are transparent),
+# --panel-blur (backdrop-filter blur on floating elements only — context
+# menus/tooltips/popups, not the sidebar or message area, so text
+# legibility is untouched there either). Since the generated theme file
+# itself is Noctalia's to own (not managed here — see below), all of this
+# is set via extraQuickCss instead: a genuinely separate output file
+# (settings/quickCss.css, confirmed via reading home-manager's own
+# mkVesktopLikeModule.nix), no conflict with Noctalia's writes, same
+# pattern as ghostty/gtk/qt's separate-file treatment. useQuickCss is
+# already true in the ported
 # vencord-settings.json.
 #
 # Deliberately does NOT set programs.vesktop.vencord.themes for
@@ -93,6 +108,9 @@
   osConfig,
   ...
 }:
+let
+  opacity = import ./transparency.nix;
+in
 lib.mkIf osConfig.features.niri {
   programs.vesktop = {
     enable = true;
@@ -103,6 +121,9 @@ lib.mkIf osConfig.features.niri {
       body {
         --transparency-tweaks: on;
         --panel-blur: on;
+        --remove-bg-layer: on;
+        --bg-3: color-mix(in srgb, var(--bg-3) ${toString (builtins.floor (opacity * 100))}%, transparent);
+        --bg-4: color-mix(in srgb, var(--bg-4) ${toString (builtins.floor (opacity * 100))}%, transparent);
       }
     '';
   };

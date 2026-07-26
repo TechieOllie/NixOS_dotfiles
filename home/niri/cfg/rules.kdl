@@ -98,17 +98,15 @@
     // own docs still respects gaps/struts, so it has real gap space for
     // the ring to draw into, same as Nautilus.
     //
-    // opacity as the sole transparency mechanism, applied uniformly to the
-    // whole window — settled on this after trying it alongside Vesktop's
-    // own Electron-level transparent:true (home/vesktop.nix) and finding
-    // the combination gave background and panels inconsistently different
-    // transparency (each driven by a different one of the two
-    // mechanisms). One source of truth is simpler; revisit
-    // VencordSettings.store.transparent again only if this alone ever
-    // stops being sufficient.
+    // Deliberately NO opacity override here — tried and removed twice (see
+    // home/vesktop.nix's full history): niri's opacity is a whole-frame
+    // multiplier with no concept of text vs. background, so it made
+    // message text semi-transparent and hard to read. Transparency is
+    // handled entirely at the CSS/Electron level instead (real alpha
+    // channel + alpha added to just the background variables that
+    // matter), which leaves text untouched.
     window-rule {
         match app-id="vesktop"
-        opacity 0.80
         draw-border-with-background false
     }
 
