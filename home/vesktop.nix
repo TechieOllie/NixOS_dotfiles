@@ -49,9 +49,22 @@
 # which is wrong for the actual running process).
 #
 # Self-gates on osConfig.features.niri, same convention as home/vscode.nix.
+#
+# Autostart: a systemd.user.services unit bound to graphical-session.target,
+# not Vesktop's own native autostart toggle (src/main/autoStart.ts) — on
+# Linux (non-Flatpak) that just writes a mutable ~/.config/autostart/
+# vesktop.desktop file via a UI action, with no corresponding settings.json
+# key to enable it declaratively. Matches the standing convention already
+# recorded for this repo (ARCHITECTURE.md's "Home Manager" section):
+# autostarted apps get their own systemd.user.services.<name>, not a
+# niri spawn-at-startup line or the app's own mechanism. Launches with the
+# window showing (no --start-minimized), at the operator's request, even
+# though tray/minimizeToTray are both already enabled.
 {
+  config,
   lib,
   osConfig,
+  pkgs,
   ...
 }:
 lib.mkIf osConfig.features.niri {
@@ -59,6 +72,37 @@ lib.mkIf osConfig.features.niri {
     enable = true;
     settings = builtins.fromJSON (builtins.readFile ./vesktop-config/settings.json);
     vencord.settings = builtins.fromJSON (builtins.readFile ./vesktop-config/vencord-settings.json);
+  };
+
+  systemd.user.services.vesktop = {
+    Unit = {
+      Description = "Vesktop";
+      # noctalia.service ordering + the sleep below: the tray icon didn't
+      # show up in Noctalia's bar when this unit only ordered after
+      # graphical-session.target, since that races Vesktop's own SNI tray
+      # registration against Noctalia actually initializing its tray host.
+      # Confirmed via reading home-manager's own tray.target (a bare
+      # `Requires=graphical-session-pre.target`, no real ordering wired
+      # against any tray host, and none of home-manager's own real
+      # tray-consumer modules get an actual guarantee from it either) that
+      # there's no clean systemd-level readiness signal available here —
+      # Noctalia is a plain Type=simple service (upstream, not ours to
+      # add real dbus-ready signaling to), so "started" only means
+      # "process forked," not "tray host initialized." After=noctalia.service
+      # is best-effort ordering; the sleep is the part that actually closes
+      # the race in practice, matching what worked when tested manually.
+      After = [
+        "graphical-session.target"
+        "noctalia.service"
+      ];
+      PartOf = [ "graphical-session.target" ];
+    };
+    Service = {
+      ExecStartPre = "${pkgs.coreutils}/bin/sleep 5";
+      ExecStart = "${config.programs.vesktop.package}/bin/vesktop";
+      Restart = "on-failure";
+    };
+    Install.WantedBy = [ "graphical-session.target" ];
   };
 
   xdg.configFile = {
