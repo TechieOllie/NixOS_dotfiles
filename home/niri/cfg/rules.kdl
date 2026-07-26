@@ -91,7 +91,21 @@
         // then.
         draw-border-with-background false
     }
-   
+
+    // Same treatment as Nautilus (opacity matching transparency.nix,
+    // draw-border-with-background false, focus-ring stays enabled) rather
+    // than Zen's — Vesktop uses plain open-maximized below, not
+    // open-maximized-to-edges, which per niri's own docs still respects
+    // gaps/struts, so it has real gap space for the ring to draw into,
+    // same as Nautilus. Pairs with Vesktop's own VencordSettings.store.transparent
+    // (home/vesktop.nix) as a compositor-level fallback independent of
+    // whether Electron's own transparency renders correctly here.
+    window-rule {
+        match app-id="vesktop"
+        opacity 0.80
+        draw-border-with-background false
+    }
+
     window-rule {
         match app-id="steam$"
         match app-id="obsidian$"

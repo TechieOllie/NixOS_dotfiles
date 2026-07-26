@@ -3,9 +3,43 @@
 # (home/vesktop-config/*.json — copied as real JSON rather than
 # hand-transcribed to Nix attrs, since the Vencord plugin list alone is
 # ~180 entries and a copy-paste-verified JSON file is far less error-prone
-# than retyping that by hand). Only edit made to either file: dropped
-# vencord-settings.json's cloud.settingsSyncVersion (a runtime last-sync
-# timestamp, not a real preference).
+# than retyping that by hand). Edits made to vencord-settings.json: dropped
+# cloud.settingsSyncVersion (a runtime last-sync timestamp, not a real
+# preference); flipped transparent false -> true (see the transparency
+# section below).
+#
+# Transparency: VencordSettings.store.transparent (confirmed by reading
+# Vesktop's own src/main/mainWindow.ts directly) unconditionally sets
+# `transparent: true`/`backgroundColor: "#00000000"` on the Electron
+# BrowserWindow — unlike Vesktop's own transparencyOption (Mica/Acrylic/
+# Tabbed), which is genuinely Windows-only (gated behind
+# VesktopNative.app.supportsWindowsTransparency()), this one has no
+# platform check at all, so it's real, working transparency on Linux too.
+# One known caveat, not fixed here: a live upstream issue
+# (Vencord/Vesktop#1241) reports this being flaky on some Wayland setups
+# (working initially, breaking after a reboot) — kept anyway, with niri's
+# own opacity window-rule (home/niri/cfg/rules.kdl) as a compositor-level
+# fallback that doesn't depend on Electron's own transparency working at
+# all, the same belt-and-suspenders approach already used for Zen.
+#
+# The active Discord theme (Noctalia's "discord" community template,
+# discord-midnight.css — a fork of refact0r/midnight-discord) has three
+# built-in, currently-off toggles for exactly this (confirmed by reading
+# both the local file and its @import'd base stylesheet,
+# refact0r.github.io/midnight-discord/build/midnight.css, directly):
+# --remove-bg-layer (makes Discord's own opaque base background layer
+# transparent, so the real Electron alpha channel shows through instead of
+# Discord painting over it), --transparency-tweaks (hides a couple of
+# decorative gradient overlays that look wrong once things are
+# transparent), --panel-blur (backdrop-filter blur on floating elements
+# only — context menus/tooltips/popups, not the sidebar or message area,
+# so text legibility is untouched). Since the generated theme file itself
+# is Noctalia's to own (not managed here — see below), these are set via
+# extraQuickCss instead: a genuinely separate output file
+# (settings/quickCss.css, confirmed via reading home-manager's own
+# mkVesktopLikeModule.nix), no conflict with Noctalia's writes, same
+# pattern as ghostty/gtk/qt's separate-file treatment. useQuickCss is
+# already true in the ported vencord-settings.json.
 #
 # Deliberately does NOT set programs.vesktop.vencord.themes for
 # "noctalia"/"noctalia-material" — the two theme CSS files already present
@@ -50,6 +84,7 @@
 #
 # Self-gates on osConfig.features.niri, same convention as home/vscode.nix.
 {
+  config,
   lib,
   osConfig,
   ...
@@ -59,7 +94,24 @@ lib.mkIf osConfig.features.niri {
     enable = true;
     settings = builtins.fromJSON (builtins.readFile ./vesktop-config/settings.json);
     vencord.settings = builtins.fromJSON (builtins.readFile ./vesktop-config/vencord-settings.json);
+
+    vencord.extraQuickCss = ''
+      body {
+        --remove-bg-layer: on;
+        --transparency-tweaks: on;
+        --panel-blur: on;
+      }
+    '';
   };
+
+  # extraQuickCss (mkVesktopLikeModule.nix) writes this via home.file with
+  # no force option exposed through the module itself. Vesktop creates an
+  # empty placeholder here on its own first launch whenever useQuickCss is
+  # enabled (which it already was, before extraQuickCss was ever set) — a
+  # real pre-existing file on any host that's already run Vesktop once,
+  # not a transient activation race. Forced here so a fresh
+  # nixos-rebuild switch doesn't fail the first time this lands on a host.
+  home.file."${config.xdg.configHome}/vesktop/settings/quickCss.css".force = true;
 
   xdg.configFile = {
     "vesktop/userAssets/splash".source = ./vesktop-assets/splash;
