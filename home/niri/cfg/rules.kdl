@@ -42,6 +42,25 @@
         default-window-height { fixed 920; }
     }
 
+    // Same opacity treatment as Zen (matching the shared value in
+    // home/transparency.nix) — pure compositor-level effect, no GTK CSS
+    // changes needed. UNLIKE Zen, focus-ring stays enabled here rather than
+    // off: niri's own default-config.kdl explains the focus-ring/border
+    // "solid background rectangle" bleed-through only happens because it
+    // has nowhere else to go for windows with no room around them — Zen is
+    // open-maximized-to-edges (zero gap, fills the whole output, so
+    // draw-border-with-background false left an empty gap with nothing to
+    // render into), but Nautilus is a normal tiled window with real gap
+    // space (layout.kdl's gaps 16) for the ring to draw into. So
+    // draw-border-with-background false here should give a real,
+    // correctly-colored ring in that gap space instead of bleeding through
+    // the translucent content — not the "off" treatment Zen needed.
+    window-rule {
+        match app-id="org.gnome.Nautilus"
+        opacity 0.80
+        draw-border-with-background false
+    }
+
     window-rule {
         match app-id=r#"^zen(-\w+)?$"#
         open-maximized-to-edges true

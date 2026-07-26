@@ -22,6 +22,21 @@ in
           launch_apps_as_systemd_services = true;
         };
 
+        # Fires after every full re-theme pass completes (confirmed via
+        # reading application_services.cpp/template_apply_service.cpp
+        # directly: TemplateApplyService's setAfterApplyCallback, invoked
+        # once builtin+community+user templates have all finished for that
+        # palette resolution — template-independent, unlike the per-user-
+        # template post_hook in theme.templates.user). Needed because GTK
+        # apps only re-scan icon-theme *content* changes (e.g. Papirus'
+        # folder-color symlinks, recolored by the "papirus-icons" community
+        # template) on their own theme-name change signal, not on the
+        # underlying files changing in place — an already-running Nautilus
+        # keeps showing the old wallpaper's folder colors until restarted.
+        # `-q` is Nautilus' own documented quit flag (cleanly stops its
+        # backgrounded D-Bus service); harmless no-op if it isn't running.
+        hooks.colors_changed = [ "nautilus -q" ];
+
         # Bar defaults to background_opacity = 1.0 (fully opaque) — found
         # via live testing that this silently defeats niri's blur window/
         # layer-rules (rules.kdl): a fully-opaque surface has nothing
