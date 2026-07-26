@@ -989,90 +989,60 @@ automatically, and reopening it shows the correctly-recolored folder icons
 with no manual intervention.
 
 **Vesktop given the same transparency treatment, immediately after
-Nautilus — the most complex of the three, since Electron's own Linux
-transparency support turned out real but genuinely undocumented in the
-one place that would've suggested it.** Researched properly before writing
-any changes (per the operator's request, given the added complexity): first
-found that Vesktop's own `transparencyOption` (Mica/Acrylic/Tabbed) is
-Windows-only, gated behind `VesktopNative.app.supportsWindowsTransparency()`
-(confirmed via `src/renderer/components/settings/WindowsTransparencyControls.tsx`
-in the `Vencord/Vesktop` repo, pinned nixpkgs version 1.6.5). Went deeper
-into `src/main/mainWindow.ts` directly rather than stopping there, and
-found a *separate*, platform-agnostic mechanism:
-`VencordSettings.store.transparent` — a Vencord *core* setting (not
-Vesktop's own) that unconditionally sets `transparent: true` /
-`backgroundColor: "#00000000"` on the Electron `BrowserWindow`, with no
-platform check anywhere in that code path. Both `frameless` and
-`transparent` keys already existed in the ported
-`home/vesktop-config/vencord-settings.json` (`frameless: true` already set
-from the original Phase 6 port, `transparent: false`) — flipped to `true`.
-One caveat surfaced by a live upstream search, not fixed here: GitHub issue
-Vencord/Vesktop#1241 reports this being flaky on some Wayland setups
-(works initially, breaks after a reboot) — kept anyway, paired with niri's
-own `opacity` window-rule as a fallback that doesn't depend on it working.
+Nautilus — by far the most iterated of the three, and ultimately settled
+on the simplest of the mechanisms tried, not the most sophisticated.**
+Researched properly before writing any changes (per the operator's
+request): Vesktop's own `transparencyOption` (Mica/Acrylic/Tabbed) is
+Windows-only (`VesktopNative.app.supportsWindowsTransparency()`), but a
+separate, platform-agnostic mechanism exists —
+`VencordSettings.store.transparent` (confirmed via reading
+`src/main/mainWindow.ts` directly, pinned nixpkgs version 1.6.5) sets real
+`transparent: true` on the Electron `BrowserWindow` with no platform
+check. The active Discord theme (Noctalia's "discord" community template,
+`discord-midnight.css`, a fork of `refact0r/midnight-discord`) also has
+built-in CSS toggles for exactly this (`--remove-bg-layer`,
+`--transparency-tweaks`, `--panel-blur`, plus per-panel `--bg-*`
+background variables), settable via `programs.vesktop.vencord.extraQuickCss`
+(a genuinely separate output file from Noctalia's own generated theme, no
+conflict — confirmed via `mkVesktopLikeModule.nix`).
 
-The active Discord theme (Noctalia's official "discord" community
-template, `discord-midnight.css` — a fork of the popular
-`refact0r/midnight-discord`, confirmed as the actually-enabled one via
-`enabledThemes: ["noctalia.theme.css"]` in the ported config) turned out to
-already have three purpose-built, currently-off CSS toggles for exactly
-this scenario — traced past the local file's `@import` into its actual
-consuming stylesheet (`refact0r.github.io/midnight-discord/build/midnight.css`)
-to confirm what each one really does, rather than trusting the theme's own
-inline comments alone: `--remove-bg-layer` (makes Discord's own opaque base
-background layer, `.bg__960e4`, fully transparent, so the real Electron
-alpha channel shows through instead of Discord painting over it),
-`--transparency-tweaks` (hides a couple of decorative gradient overlays
-that look wrong once things are transparent), `--panel-blur` (applies
-`backdrop-filter: blur()` specifically to *floating* elements — context
-menus, tooltips, popups, the emoji picker — confirmed via the actual CSS
-selectors, not the sidebar or message area, so text legibility is
-untouched). Since the generated theme file itself is Noctalia's to own
-(not managed here, same as the existing gtk/qt/ghostty precedent), these
-are set via `programs.vesktop.vencord.extraQuickCss` instead — confirmed
-via reading home-manager's own `mkVesktopLikeModule.nix` directly that this
-writes to a genuinely separate file (`settings/quickCss.css`), no conflict
-with Noctalia's writes. `useQuickCss` was already `true` in the ported
-config, so no further wiring needed there.
+Combining Electron's real transparency with the theme's CSS toggles went
+through several rounds of live testing, each ruling out a real, specific
+problem rather than guessing — worth summarizing since the tempting
+"simpler" options in between are exactly what a future attempt would
+retry:
+- Electron transparency + `--remove-bg-layer` alone, no niri opacity: text
+  stayed legible (CSS background changes don't touch text color), but
+  most primary panels (server list, channel/DM list, chat, member list)
+  stayed fully opaque — `--remove-bg-layer` only strips one specific
+  wrapper element, not each panel's own background variable.
+- Adding alpha to the theme's `--bg-3`/`--bg-4` variables to reach those
+  panels: broke text/icon legibility, because `--bg-4` is *also* reused
+  directly as a text/icon color in several places in the theme's base
+  stylesheet (`--text-0`, `--control-expressive-text-*`, direct
+  `color:`/`fill:` uses) — confirmed by reading every occurrence in the
+  ~2372-line base stylesheet, not just a partial scroll (the first,
+  incomplete check missed this).
+- Overriding the more specific `--background-base-low/-lower/-lowest`
+  variables directly instead (genuinely background-only, verified every
+  reference) fixed the legibility problem and reached most primary panels
+  — but at that point the CSS surface being depended on (a third-party,
+  actively-maintained community theme with hundreds of interdependent
+  custom properties) was judged too fragile to keep building on, and the
+  operator asked to drop the whole CSS/Electron-transparency approach.
 
-**niri addition** (`home/niri/cfg/rules.kdl`): a new window-rule for
-`vesktop` (confirmed lowercase app-id from the original Phase 6 port) with
-`draw-border-with-background false` — Nautilus's treatment, not Zen's,
-since Vesktop uses plain `open-maximized` (the existing shared
-steam/obsidian/vesktop rule) rather than `open-maximized-to-edges`, which
-per niri's own docs still respects gaps/struts — real gap space for the
-focus ring to draw into, same reasoning as Nautilus. Deliberately **no**
-`opacity` override here, unlike Zen/Nautilus — an `opacity 0.80` was tried
-first too, as a fallback for the same reason as Zen's (in case Electron's
-own transparency didn't render), but once confirmed working live, stacking
-niri's own multiplier on top of an already-transparent Electron surface
-compounded into looking far more see-through than Ghostty's single-layer
-`background-opacity` — reported by the operator directly, removed after
-confirming Electron's own transparency alone was sufficient.
-
-**One real deploy failure, fixed properly rather than worked around
-manually.** The first `nixos-rebuild switch` after this change failed:
-`home-manager-ol.service` reported `Existing file
-'/home/ol/.config/vesktop/settings/quickCss.css' would be clobbered`. Root
-cause, confirmed by reading `mkVesktopLikeModule.nix` again: Vesktop
-creates an empty placeholder at that exact path on its own first launch
-whenever `useQuickCss` is enabled — which it already was, well before
-`extraQuickCss` was ever set — so any host that's actually run Vesktop
-once already has a real, Home-Manager-unmanaged file sitting there. Not
-the transient home-manager-activation race the earlier `starship.toml`
-clobber turned out to be (Phase 4) — a genuine first-adoption conflict
-that will recur on any future host. The module's own `extraQuickCss`
-option doesn't expose a `force` knob, so `home/vesktop.nix` adds a
-standalone `home.file."${config.xdg.configHome}/vesktop/settings/quickCss.css".force
-= true` — confirmed this merges cleanly with the module's own `text =
-...` declaration for the same path (different submodule fields, no
-conflict) by checking the built `check-link-targets.sh`'s own
-`forcedPaths` array, which correctly listed `quickCss.css` alongside the
-pre-existing `niri/config.kdl` force override.
-
-**Verified live**: both the Electron-level transparency and the theme's
-panel-blur render correctly under niri — confirmed by the operator
-directly ("the blur and transparency works").
+**Landed on**: niri's own `opacity` window-rule alone — the same
+mechanism as Zen/Nautilus, matching `transparency.nix`, on Vesktop's
+confirmed app-id (`vesktop`, lowercase, from the original Phase 6 port),
+paired with `draw-border-with-background false` (Nautilus's treatment,
+not Zen's — Vesktop uses plain `open-maximized`, which still respects
+gaps/struts, giving real gap space for the focus ring). `home/vesktop.nix`
+reverted entirely to its original Phase 6 form (no `extraQuickCss`, no
+`VencordSettings.store.transparent`) — accepting niri's known tradeoff
+(it dims text along with everything else, since it's a whole-frame
+compositor multiplier with no concept of text vs. background) as simpler
+and more robust than depending on a theme's CSS internals holding steady
+release to release.
 
 ## Software stack (for context on what modules will eventually cover)
 

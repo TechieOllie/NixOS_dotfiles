@@ -92,21 +92,17 @@
         draw-border-with-background false
     }
 
-    // draw-border-with-background false: same treatment as Nautilus
-    // (focus-ring stays enabled) rather than Zen's — Vesktop uses plain
-    // open-maximized below, not open-maximized-to-edges, which per niri's
-    // own docs still respects gaps/struts, so it has real gap space for
-    // the ring to draw into, same as Nautilus.
-    //
-    // Deliberately NO opacity override here — tried and removed twice (see
-    // home/vesktop.nix's full history): niri's opacity is a whole-frame
-    // multiplier with no concept of text vs. background, so it made
-    // message text semi-transparent and hard to read. Transparency is
-    // handled entirely at the CSS/Electron level instead (real alpha
-    // channel + alpha added to just the background variables that
-    // matter), which leaves text untouched.
+    // Same treatment as Nautilus (opacity matching transparency.nix,
+    // draw-border-with-background false, focus-ring stays enabled) rather
+    // than Zen's — Vesktop uses plain open-maximized below, not
+    // open-maximized-to-edges, which per niri's own docs still respects
+    // gaps/struts, so it has real gap space for the ring to draw into,
+    // same as Nautilus. Pairs with Vesktop's own VencordSettings.store.transparent
+    // (home/vesktop.nix) as a compositor-level fallback independent of
+    // whether Electron's own transparency renders correctly here.
     window-rule {
         match app-id="vesktop"
+        opacity 0.80
         draw-border-with-background false
     }
 
