@@ -98,16 +98,17 @@
     // own docs still respects gaps/struts, so it has real gap space for
     // the ring to draw into, same as Nautilus.
     //
-    // Deliberately NO opacity override here (unlike Zen/Nautilus) —
-    // VencordSettings.store.transparent (home/vesktop.nix) already gives
-    // Vesktop a real Electron-level alpha channel, confirmed working live.
-    // An opacity window-rule was tried first as a fallback (same reasoning
-    // as Zen, in case Electron's own transparency didn't render), but
-    // stacking niri's own multiplier on top of an already-transparent
-    // surface compounded into looking far more see-through than Ghostty's
-    // single-layer background-opacity — confirmed live and removed.
+    // opacity as the sole transparency mechanism, applied uniformly to the
+    // whole window — settled on this after trying it alongside Vesktop's
+    // own Electron-level transparent:true (home/vesktop.nix) and finding
+    // the combination gave background and panels inconsistently different
+    // transparency (each driven by a different one of the two
+    // mechanisms). One source of truth is simpler; revisit
+    // VencordSettings.store.transparent again only if this alone ever
+    // stops being sufficient.
     window-rule {
         match app-id="vesktop"
+        opacity 0.80
         draw-border-with-background false
     }
 

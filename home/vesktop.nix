@@ -3,43 +3,47 @@
 # (home/vesktop-config/*.json — copied as real JSON rather than
 # hand-transcribed to Nix attrs, since the Vencord plugin list alone is
 # ~180 entries and a copy-paste-verified JSON file is far less error-prone
-# than retyping that by hand). Edits made to vencord-settings.json: dropped
-# cloud.settingsSyncVersion (a runtime last-sync timestamp, not a real
-# preference); flipped transparent false -> true (see the transparency
-# section below).
+# than retyping that by hand). Only edit made to either file: dropped
+# vencord-settings.json's cloud.settingsSyncVersion (a runtime last-sync
+# timestamp, not a real preference).
 #
-# Transparency: VencordSettings.store.transparent (confirmed by reading
-# Vesktop's own src/main/mainWindow.ts directly) unconditionally sets
-# `transparent: true`/`backgroundColor: "#00000000"` on the Electron
-# BrowserWindow — unlike Vesktop's own transparencyOption (Mica/Acrylic/
-# Tabbed), which is genuinely Windows-only (gated behind
-# VesktopNative.app.supportsWindowsTransparency()), this one has no
-# platform check at all, so it's real, working transparency on Linux too.
-# One known caveat, not fixed here: a live upstream issue
-# (Vencord/Vesktop#1241) reports this being flaky on some Wayland setups
-# (working initially, breaking after a reboot) — kept anyway, with niri's
-# own opacity window-rule (home/niri/cfg/rules.kdl) as a compositor-level
-# fallback that doesn't depend on Electron's own transparency working at
-# all, the same belt-and-suspenders approach already used for Zen.
+# Transparency: settled on niri's own opacity window-rule
+# (home/niri/cfg/rules.kdl) as the SOLE mechanism, uniformly across the
+# whole window, rather than Vesktop's own VencordSettings.store.transparent
+# (confirmed via reading src/main/mainWindow.ts directly that this
+# unconditionally sets `transparent: true` on the Electron BrowserWindow —
+# unlike the Windows-only transparencyOption vibrancy dropdown, this one
+# has no platform check at all, so it's real, not merely a UI omission).
+# Tried first as a belt-and-suspenders pair (same reasoning as Zen's
+# fallback), paired with the theme's own --remove-bg-layer toggle (see
+# below) to reveal it — but the combination made the *background*
+# (removed by --remove-bg-layer, revealing the real Electron alpha
+# channel) and the *panels* (only ever affected by niri's opacity) get
+# inconsistently different transparency once niri's own multiplier was
+# tuned, since each was driven by a different one of the two mechanisms.
+# Simplified to niri opacity alone (uniform, single source of truth) —
+# transparent reverted to false, --remove-bg-layer left off. Revisit
+# VencordSettings.store.transparent again if niri's opacity alone ever
+# stops being sufficient (e.g. a niri regression) — known live to work as
+# of this writing, just not needed once niri handles the whole effect.
 #
 # The active Discord theme (Noctalia's "discord" community template,
-# discord-midnight.css — a fork of refact0r/midnight-discord) has three
-# built-in, currently-off toggles for exactly this (confirmed by reading
-# both the local file and its @import'd base stylesheet,
+# discord-midnight.css — a fork of refact0r/midnight-discord) has two
+# other built-in toggles kept on regardless of the above (confirmed by
+# reading both the local file and its @import'd base stylesheet,
 # refact0r.github.io/midnight-discord/build/midnight.css, directly):
-# --remove-bg-layer (makes Discord's own opaque base background layer
-# transparent, so the real Electron alpha channel shows through instead of
-# Discord painting over it), --transparency-tweaks (hides a couple of
-# decorative gradient overlays that look wrong once things are
-# transparent), --panel-blur (backdrop-filter blur on floating elements
-# only — context menus/tooltips/popups, not the sidebar or message area,
-# so text legibility is untouched). Since the generated theme file itself
-# is Noctalia's to own (not managed here — see below), these are set via
-# extraQuickCss instead: a genuinely separate output file
-# (settings/quickCss.css, confirmed via reading home-manager's own
-# mkVesktopLikeModule.nix), no conflict with Noctalia's writes, same
-# pattern as ghostty/gtk/qt's separate-file treatment. useQuickCss is
-# already true in the ported vencord-settings.json.
+# --transparency-tweaks (hides a couple of decorative gradient overlays
+# that look wrong once things are transparent), --panel-blur
+# (backdrop-filter blur on floating elements only — context menus/
+# tooltips/popups, not the sidebar or message area, so text legibility is
+# untouched) — both independent of whichever mechanism is doing the actual
+# see-through work. Since the generated theme file itself is Noctalia's to
+# own (not managed here — see below), these are set via extraQuickCss
+# instead: a genuinely separate output file (settings/quickCss.css,
+# confirmed via reading home-manager's own mkVesktopLikeModule.nix), no
+# conflict with Noctalia's writes, same pattern as ghostty/gtk/qt's
+# separate-file treatment. useQuickCss is already true in the ported
+# vencord-settings.json.
 #
 # Deliberately does NOT set programs.vesktop.vencord.themes for
 # "noctalia"/"noctalia-material" — the two theme CSS files already present
@@ -97,7 +101,6 @@ lib.mkIf osConfig.features.niri {
 
     vencord.extraQuickCss = ''
       body {
-        --remove-bg-layer: on;
         --transparency-tweaks: on;
         --panel-blur: on;
       }

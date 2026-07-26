@@ -9,7 +9,7 @@
     ],
     "enableReactDevtools": false,
     "frameless": true,
-    "transparent": true,
+    "transparent": false,
     "winCtrlQ": false,
     "disableMinSize": false,
     "winNativeTitleBar": false,
