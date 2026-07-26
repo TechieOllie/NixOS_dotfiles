@@ -73,25 +73,23 @@
         // hand, same as misc.kdl's duplicated cursor block.
         opacity 0.80
         // prefer-no-csd (misc.kdl) already asks Zen to drop its own
-        // decorations. draw-border-with-background false was tried first
-        // (to stop niri's focus-ring/border showing as an opaque rectangle
-        // behind the translucent window) but backfired for a CSD-less
-        // window: with no background AND no fill, the ring/border space
-        // renders as a plain transparent gap — confirmed live (a "border"
-        // of literally nothing, distinct from the window content).
-        // Since Zen is maximized-to-edges and fills the whole output
-        // anyway, there's no real need for a focus indicator here — just
-        // disable both outright instead of fighting the fill/no-fill
-        // tradeoff. Note: prefer-no-csd only takes effect for windows
-        // created after it's set — Zen needs a full restart (quit, not
-        // just close-window) to actually negotiate away its CSD if it
-        // hasn't already.
-        focus-ring {
-            off
-        }
-        border {
-            off
-        }
+        // decorations. Matches Nautilus's fix (below/rules.kdl) rather than
+        // disabling focus-ring/border outright — deliberately, even though
+        // it currently reintroduces the empty-transparent-gap bug this
+        // exact line previously fixed (`focus-ring { off } border { off
+        // }`): niri's own default-config.kdl explains the ring/border
+        // "solid background" bleed-through only happens because it has
+        // nowhere else to render for a window with no surrounding space,
+        // and Zen is currently open-maximized-to-edges (zero gap, fills
+        // the whole output) — there's genuinely nowhere for the ring to go
+        // as long as that stays true. Kept as draw-border-with-background
+        // false anyway, at the operator's explicit request, so this is
+        // already correct the moment open-maximized-to-edges is ever
+        // removed (making Zen a normal tiled window with real gap space,
+        // like Nautilus) — revert to focus-ring/border off if
+        // maximized-to-edges stays and the gap artifact bothers you before
+        // then.
+        draw-border-with-background false
     }
    
     window-rule {

@@ -871,16 +871,26 @@ assumption:**
    opaque white page) showed up as a stray rim once the backplate went
    transparent. Fixed via the mod's own `mod.sameerasw.zen_no_shadow`
    preference, set through the same `policies.Preferences` mechanism.
-3. **`draw-border-with-background false` backfired.** Tried first to stop
-   niri's own focus-ring/border rendering as an opaque rectangle behind the
-   translucent window — but for a CSD-less window (via `prefer-no-csd`,
-   already enabled repo-wide since the original niri port) with no
-   background *and* no fill, the ring/border space rendered as a literal
-   transparent gap, indistinguishable at a glance from "no fix at all."
-   Since Zen is maximized-to-edges and fills the whole output anyway,
-   there's no real need for a focus indicator on it — fixed by disabling
-   `focus-ring`/`border` outright for Zen's window-rule instead of fighting
-   the fill/no-fill tradeoff.
+3. **`draw-border-with-background false` backfired at first, for a reason
+   specific to Zen's own state, not the setting itself.** Tried first to
+   stop niri's own focus-ring/border rendering as an opaque rectangle
+   behind the translucent window — but for a CSD-less window (via
+   `prefer-no-csd`, already enabled repo-wide since the original niri port)
+   with no background *and* no fill, the ring/border space rendered as a
+   literal transparent gap, indistinguishable at a glance from "no fix at
+   all." Initially fixed by disabling `focus-ring`/`border` outright for
+   Zen's window-rule instead. **Root cause found later** (via the identical
+   fix landing cleanly for Nautilus — see the dedicated Nautilus section
+   below): niri's own bundled `default-config.kdl` comments explain the
+   bleed-through only happens because the ring has nowhere else to render
+   for a window with no surrounding space — Zen is `open-maximized-to-edges`
+   (zero gap, fills the whole output), so there's genuinely nowhere for the
+   ring to go as long as that stays true, unlike Nautilus's normal tiled
+   window with real gap space. **Reverted back to `draw-border-with-background
+   false` anyway, at the operator's explicit request**, so Zen's config is
+   already correct the moment `open-maximized-to-edges` is ever removed
+   (making it a normal tiled window) — currently reintroduces the empty-gap
+   artifact as a known, accepted tradeoff until/unless that happens.
 4. **`open-maximized-to-edges` appeared not to work at all, across several
    rounds of live debugging** — for a while looking like a niri/Zen
    incompatibility (the mod's own docs only list KDE/Hyprland as
@@ -914,8 +924,9 @@ assumption:**
 `opacity 0.80` (matching `transparency.nix`, kept in sync by hand — same
 duplication precedent as `misc.kdl`'s cursor block) as a compositor-level
 fallback independent of whether the mod's own CSS-based transparency
-actually renders correctly on niri; `focus-ring { off }` / `border { off }`
-per bug 3 above.
+actually renders correctly on niri; `draw-border-with-background false`
+per bug 3 above (currently shows the empty-gap artifact while
+`open-maximized-to-edges` stays set — accepted, see bug 3).
 
 **Verified live end-to-end** (VM): `about:config` shows all four Nix-set
 prefs correctly; the workspace-background gutter renders as an
@@ -923,6 +934,59 @@ prefs correctly; the workspace-background gutter renders as an
 through at the edges; the box-shadow rim and the focus-ring/border gap are
 both gone; Zen opens genuinely maximized-to-edges and stays that way after
 the `xulstore.json` fix.
+
+**Nautilus given the same transparency treatment, immediately after the Zen
+work above, plus a real GTK-wide icon-theming gap found and fixed along the
+way.** `home/niri/cfg/rules.kdl` gained a new window-rule for
+`org.gnome.Nautilus`: `opacity 0.80` (matching `transparency.nix`, same as
+Zen) and `draw-border-with-background false` — **not** the `focus-ring {
+off }` / `border { off }` treatment Zen needed. The distinction, straight
+from niri's own bundled `default-config.kdl` comments: the focus-ring/border
+"solid background rectangle bleed-through behind semitransparent windows"
+only happens because the ring has nowhere else to render for a window with
+no surrounding space. Zen is `open-maximized-to-edges` (zero gap, fills the
+whole output — confirmed live that `draw-border-with-background false` left
+an empty transparent gap there, nothing for the ring to draw into), but
+Nautilus is a normal tiled window with real gap space (`layout.kdl`'s `gaps
+16`) for the ring to render into instead of bleeding through the translucent
+content. **Verified live**: the focus-ring now shows correctly (a real
+colored ring in the gap, no bleed-through) when Nautilus is focused.
+
+Separately, changing the wallpaper turned up a real, GTK-wide gap: the
+operator reported Nautilus's folder icons staying stuck on the *previous*
+wallpaper's recolor (Papirus' folder-color symlinks, driven by Noctalia's
+`papirus-icons` community template) even though other theming (GTK/Qt
+colors, etc.) updated correctly. Confirmed via live checks that the
+recolor itself was working fine on disk (`~/.local/share/icons/Papirus/48x48/places/folder.svg`
+correctly symlinked to the new color, `Papirus-Dark`'s equivalent correctly
+resolving through to it) — the problem was Nautilus's own already-running
+process holding stale icon-theme state in memory. GTK apps only re-scan
+icon-theme *content* changes on their own theme-*name* change signal (e.g.
+switching from "Papirus-Dark" to something else and back), not on the
+underlying files changing in place while the theme name stays constant —
+confirmed empirically: killing and relaunching Nautilus picked up the
+correct icons immediately, closing the window alone did not. Root-caused,
+not just documented as a one-off, since the operator didn't want to run
+`pkill nautilus` by hand every time they change wallpaper.
+
+Fixed via Noctalia's own `hooks.colors_changed` — a genuinely
+template-independent hook (confirmed by reading `application_services.cpp`/
+`template_apply_service.cpp` in the `noctalia` flake input directly:
+`TemplateApplyService`'s `setAfterApplyCallback`, invoked once *all*
+builtin+community+user templates have finished for a given palette
+resolution — a sibling `[hooks]` TOML section to `[theme]`, not a
+per-template `post_hook` the way `theme.templates.user.<id>` entries have).
+Investigated first whether `community_ids` entries (like `papirus-icons`)
+could carry their own `post_hook` the same way `user` templates do — no:
+confirmed via `config_types.h`/`config_schema.cpp` that `communityIds` is a
+bare `vector<string>`, no per-entry table form parsed at all, unlike
+`userTemplates`' `namedMap` with `pre_hook`/`post_hook`/`post_action`
+fields. `home/noctalia.nix` now sets `hooks.colors_changed = [ "nautilus
+-q" ]` — Nautilus's own documented quit flag (cleanly stops its
+backgrounded D-Bus service, harmless no-op if it isn't running) rather than
+`pkill`. **Verified live**: changing wallpaper now quits Nautilus
+automatically, and reopening it shows the correctly-recolored folder icons
+with no manual intervention.
 
 ## Software stack (for context on what modules will eventually cover)
 
