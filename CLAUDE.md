@@ -813,6 +813,117 @@ the `twilight-official` channel bump, not caught by build/eval.**
   not a config gap on our side; the only real fix would be an upstream
   change to update the exclusive zone dynamically on hide/show.
 
+**Zen Browser transparency (Transparent Zen mod + niri), a later session
+investigating and fixing four separate, independent bugs — not one bug with
+four symptoms.** The operator found two separate community add-ons and asked
+to try them: "Transparent Zen" (a Zen Mod, `zen-browser.app/mods`, UUID
+`642854b5-88b4-4c40-b256-e035532109df`, `github:sameerasw/zen-themes` — makes
+the browser's own webpage backplate transparent) and "Zen Internet" (an
+unrelated WebExtension, `zen-internet` on addons.mozilla.org — injects
+per-site CSS for popular websites' content, orthogonal to the mod, no
+opacity-relevant settings). Both install manually through Zen's own UI (Mods
+store / Firefox Add-ons), matching this repo's existing "no extension/mod
+porting" convention for Zen (`home/zen-browser.nix`'s own comment) — neither
+is Nix-managed.
+
+**Opacity wiring** (`home/zen-browser.nix`): Transparent Zen's own
+transparency toggle (`browser.tabs.allow_transparent_browser` + the
+Linux-specific `zen.widget.linux.transparency`) makes the backplate fully
+see-through with no tint at all — no built-in "how much" slider. To match
+Ghostty/Noctalia's shared `transparency.nix` opacity, the mod's own
+`mod.sameerasw.zen_bg_color_enabled`/`zen_transparency_color` preferences
+give it a custom semi-transparent background color instead. Set via
+`programs.zen-browser.policies.Preferences` (`policies.json`), deliberately
+not `profiles.<name>.settings` (`prefs.js`, the pattern the flake's own
+examples use) — the latter requires declaring a `profiles.<name>` entry,
+handing the whole profile directory to Home Manager to create/manage; this
+repo has never done that for Zen, and the VM already has a real ad hoc
+profile from earlier live testing, with no guarantee a Nix-declared
+"default" profile would line up with it (risking a second, empty profile
+being created instead). `policies.Preferences` is stock home-manager Firefox
+`policies` (confirmed by reading `mkFirefoxModule.nix` directly): applied at
+package-wrap time, fully independent of any `profiles.*` declaration,
+reaching whichever profile is actually in use. `Status = "default"`
+throughout (not `"locked"`) — seeds the starting value but stays a normal,
+user-editable pref, so the mod's own settings panel keeps working for live
+tweaking.
+
+**Four independent bugs found and fixed, each via live testing, not
+assumption:**
+
+1. **Wrong color format silently discarded.** Live devtools inspection
+   (Browser Toolbox — needs both `devtools.chrome.enabled` *and*
+   `devtools.debugger.remote-enabled`, the second easy to miss since only
+   the first is commonly documented, plus a full restart for the debugger
+   server to initialize) on the actual `zen-appcontent-wrapper` element
+   showed `--mod-sameerasw-zen_transparency_color` resolving to all zeros
+   despite the pref being set correctly in `about:config`. Root cause: the
+   mod's preference-to-CSS-variable binding only accepts 8-digit hex
+   (`#RRGGBBAA`, matching its own `"#00000000"` default) for this string
+   pref — the CSS `rgba(0, 0, 0, 80%)` value first tried was accepted as a
+   *valid preference* (about:config showed it fine) but silently zeroed out
+   when bound to CSS. Fixed using `lib.toHexString`/`lib.fixedWidthString`
+   to compute `#000000CC` from the shared `transparency.nix` opacity
+   (0.80 → byte 204 → hex `CC`), so it stays driven by one source of truth
+   rather than a hardcoded hex string.
+2. **The mod's own box-shadow around the webpage view** (a multi-layer
+   `box-shadow` in its `chrome.css`, meant to blend invisibly against an
+   opaque white page) showed up as a stray rim once the backplate went
+   transparent. Fixed via the mod's own `mod.sameerasw.zen_no_shadow`
+   preference, set through the same `policies.Preferences` mechanism.
+3. **`draw-border-with-background false` backfired.** Tried first to stop
+   niri's own focus-ring/border rendering as an opaque rectangle behind the
+   translucent window — but for a CSD-less window (via `prefer-no-csd`,
+   already enabled repo-wide since the original niri port) with no
+   background *and* no fill, the ring/border space rendered as a literal
+   transparent gap, indistinguishable at a glance from "no fix at all."
+   Since Zen is maximized-to-edges and fills the whole output anyway,
+   there's no real need for a focus indicator on it — fixed by disabling
+   `focus-ring`/`border` outright for Zen's window-rule instead of fighting
+   the fill/no-fill tradeoff.
+4. **`open-maximized-to-edges` appeared not to work at all, across several
+   rounds of live debugging** — for a while looking like a niri/Zen
+   incompatibility (the mod's own docs only list KDE/Hyprland as
+   confirmed-working on Linux for its own transparency, and niri's
+   `open-maximized-to-edges` genuinely does require client cooperation per
+   niri's own docs: "windows are aware of their maximized-to-edges status
+   and generally respond by squaring their corners"). Ruled out via
+   `niri msg windows` (needs `NIRI_SOCKET` exported manually over SSH —
+   `systemctl --user show-environment | grep NIRI_SOCKET`, since an ad-hoc
+   SSH shell has no session context for it, the same class of scoping
+   issue as `gcr-ssh-agent`'s `SSH_AUTH_SOCK`): the reported `app_id`
+   (`zen-twilight`) matches the existing regex fine, and the operator
+   confirmed the rule *does* apply correctly outside the VM. The real cause,
+   on the VM specifically: Zen briefly opens maximized (niri's rule firing
+   correctly at window-open, exactly as documented — "applies once when a
+   window first opens"), then snaps back to a smaller remembered size a
+   moment later. Root cause: Zen's own `xulstore.json` (Firefox-family
+   window-chrome-state persistence, tracks `sizemode`/width/height) had a
+   remembered non-maximized geometry from earlier ad hoc live testing on
+   that same profile, predating any of this session's rules — Zen restores
+   it shortly after niri's one-shot open-time rule applies, and niri
+   (correctly) honors the client's own subsequent resize request. Fixed
+   operationally, not via Nix: deleting the relevant entry from
+   `xulstore.json` in the VM's profile. Same *shape* of gotcha this repo has
+   hit repeatedly before (`greeter.toml`, Noctalia's `settings.toml`
+   sidecar) — mutable app state seeded once, silently overriding what's
+   declared, until manually reset; will recur if the window is ever
+   manually resized/un-maximized again.
+
+**niri additions** (`home/niri/cfg/rules.kdl`, Zen's existing window-rule):
+`opacity 0.80` (matching `transparency.nix`, kept in sync by hand — same
+duplication precedent as `misc.kdl`'s cursor block) as a compositor-level
+fallback independent of whether the mod's own CSS-based transparency
+actually renders correctly on niri; `focus-ring { off }` / `border { off }`
+per bug 3 above.
+
+**Verified live end-to-end** (VM): `about:config` shows all four Nix-set
+prefs correctly; the workspace-background gutter renders as an
+80%-opaque black tint (not fully see-through) with niri's blur showing
+through at the edges; the box-shadow rim and the focus-ring/border gap are
+both gone; Zen opens genuinely maximized-to-edges and stays that way after
+the `xulstore.json` fix.
+
 ## Software stack (for context on what modules will eventually cover)
 
 Niri, greetd, Noctalia Greeter, Noctalia Shell v5 (native theming, GTK/Qt theming templates), Papirus icons, Bibata cursors, adw-gtk3, qt5ct/qt6ct · Ghostty, Zsh, Starship, Git, Lazygit, Fastfetch, eza, bat, fd, ripgrep, fzf, zoxide, yazi, btop · Zen Browser, VS Code, Vesktop, Nautilus · Steam, Proton GE, Gamescope, MangoHud, Gamemode, Millennium · Tailscale · Docker Engine + Compose · PipeWire, Bluetooth, Printing, NetworkManager, Snapper (btrfs snapshots) · nixd, nil, alejandra, statix, deadnix, direnv, just.
