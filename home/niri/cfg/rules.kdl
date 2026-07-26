@@ -42,9 +42,27 @@
         default-window-height { fixed 920; }
     }
 
-    window-rule { 
+    window-rule {
         match app-id=r#"^zen(-\w+)?$"#
         open-maximized-to-edges true
+        // Compositor-level opacity, independent of Transparent Zen's own
+        // CSS-based transparency (which needs Zen/Gecko to actually render
+        // an alpha-channel surface — niri isn't in that mod's confirmed-
+        // working list, only KDE/Hyprland are). This applies regardless of
+        // whether that works, so it's the reliable fallback. Value matches
+        // the shared opacity in home/transparency.nix — kept in sync by
+        // hand, same as misc.kdl's duplicated cursor block.
+        opacity 0.80
+        // prefer-no-csd (misc.kdl) already asks Zen to drop its own
+        // decorations, and niri's default for CSD-less windows is already
+        // no solid-background border — but niri's own docs specifically
+        // call out that focus rings/borders can show through semi-
+        // transparent windows, so this makes it explicit rather than
+        // relying on the implicit default. Note: prefer-no-csd only takes
+        // effect for windows created after it's set — Zen needs a full
+        // restart (quit, not just close-window) to actually negotiate away
+        // its CSD if it hasn't already.
+        draw-border-with-background false
     }
    
     window-rule {

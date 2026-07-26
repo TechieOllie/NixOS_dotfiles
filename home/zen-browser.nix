@@ -34,12 +34,43 @@
 # changes.
 #
 # Self-gates on osConfig.features.niri, same convention as home/vscode.nix.
+#
+# Transparent Zen mod opacity: the mod itself (installed manually via Zen's
+# own Mods UI, not Nix-managed — see below) makes the webpage backplate
+# fully see-through with no tint at all; there's no built-in "how much"
+# slider for that. To match the rest of this repo's transparent surfaces
+# (Ghostty, Noctalia's bar — both driven by the shared opacity value in
+# transparency.nix), we give it a custom semi-transparent background color
+# instead via its own mod.sameerasw.zen_bg_color_enabled/zen_transparency_color
+# prefs (confirmed real via the mod's own preferences.json, mod UUID
+# 642854b5-88b4-4c40-b256-e035532109df, github:sameerasw/zen-themes).
+#
+# Set via policies.Preferences (policies.json), not profiles.<name>.settings
+# (prefs.js) — deliberately, not just following the flake's own examples:
+# profiles.*.settings requires declaring a profiles.<name> entry, which
+# hands the whole profile directory over to Home Manager to manage/create.
+# This repo has never done that for Zen (see the "no extension/policy
+# porting" comment above), and the VM already has a real ad hoc profile
+# from earlier live testing with its own session state — there's no
+# guarantee a Nix-declared "default" profile lines up with whatever that
+# one is actually called on disk, risking Home Manager creating and
+# switching to a second, empty profile instead. policies.Preferences is
+# stock home-manager Firefox `policies` (confirmed by reading
+# mkFirefoxModule.nix directly): applied at package-wrap time, fully
+# independent of any profiles.* declaration, so it reaches whichever
+# profile is actually in use with no such risk. Status = "default" (not
+# "locked") throughout: seeds the starting value but leaves it a normal,
+# user-editable pref afterward, so Transparent Zen's own settings panel
+# still works normally for live tweaking.
 {
   lib,
   osConfig,
   zen-browser,
   ...
 }:
+let
+  opacity = import ./transparency.nix;
+in
 {
   imports = [ zen-browser.homeModules.twilight-official ];
 
@@ -47,6 +78,31 @@
     programs.zen-browser = {
       enable = true;
       setAsDefaultBrowser = true;
+
+      policies.Preferences = {
+        "browser.tabs.allow_transparent_browser" = {
+          Value = true;
+          Status = "default";
+        };
+        "zen.widget.linux.transparency" = {
+          Value = true;
+          Status = "default";
+        };
+        "mod.sameerasw.zen_bg_color_enabled" = {
+          Value = true;
+          Status = "default";
+        };
+        "mod.sameerasw.zen_transparency_color" = {
+          # Plain black, matching this repo's globally dark theming (Noctalia
+          # theme.mode = "dark", GTK/Papirus dark variants) — a plain string,
+          # easy to swap to a different hex later. Alpha as a percentage
+          # (valid CSS rgba() syntax) rather than toString opacity directly —
+          # Nix's float toString renders "0.800000", which is valid CSS but
+          # not clean; toString on the pre-multiplied int avoids that.
+          Value = "rgba(0, 0, 0, ${toString (builtins.floor (opacity * 100))}%)";
+          Status = "default";
+        };
+      };
     };
 
     xdg.desktopEntries.zen-twilight = {
