@@ -94,12 +94,14 @@ in
         };
         "mod.sameerasw.zen_transparency_color" = {
           # Plain black, matching this repo's globally dark theming (Noctalia
-          # theme.mode = "dark", GTK/Papirus dark variants) — a plain string,
-          # easy to swap to a different hex later. Alpha as a percentage
-          # (valid CSS rgba() syntax) rather than toString opacity directly —
-          # Nix's float toString renders "0.800000", which is valid CSS but
-          # not clean; toString on the pre-multiplied int avoids that.
-          Value = "rgba(0, 0, 0, ${toString (builtins.floor (opacity * 100))}%)";
+          # theme.mode = "dark", GTK/Papirus dark variants). 8-digit hex
+          # (#RRGGBBAA), NOT CSS rgba()/percentage syntax — confirmed via
+          # live devtools inspection that the mod's preference-to-CSS-variable
+          # binding silently zeroes out anything that isn't hex (its own
+          # default value is "#00000000", the same format), so an rgba()
+          # string was accepted as a valid pref value but never actually
+          # reached the element it themes.
+          Value = "#000000${lib.fixedWidthString 2 "0" (lib.toHexString (builtins.floor (opacity * 255)))}";
           Status = "default";
         };
         "mod.sameerasw.zen_no_shadow" = {
