@@ -1044,6 +1044,42 @@ compositor multiplier with no concept of text vs. background) as simpler
 and more robust than depending on a theme's CSS internals holding steady
 release to release.
 
+**Vesktop autostart, same session.** A `systemd.user.services.vesktop`
+unit bound to `graphical-session.target` — not Vesktop's own native
+autostart toggle (`src/main/autoStart.ts`), which on Linux (non-Flatpak)
+just writes a mutable `~/.config/autostart/vesktop.desktop` file via a UI
+action with no corresponding `settings.json` key, so it isn't something
+Nix can declare cleanly anyway. Matches this repo's standing convention
+for autostarted apps (recorded in `ARCHITECTURE.md`'s "Home Manager"
+section back when `cfg/autostart.kdl` was removed): their own
+`systemd.user.services.<name>`, not a niri `spawn-at-startup` line or an
+app's own mechanism. Launches with the window showing, not minimized to
+tray, per the operator's explicit choice (despite `tray`/`minimizeToTray`
+both already being enabled).
+
+**A real race condition, found and fixed via live testing, not
+assumption.** The tray icon didn't appear in Noctalia's bar when Vesktop
+autostarted this way, despite showing up fine on a manual launch after
+login had fully settled. Investigated whether home-manager's own
+`tray.target` (a stock unit, confirmed present: "Home Manager System
+Tray") would solve this cleanly — it doesn't: reading its actual
+definition (`modules/xsession.nix`/`modules/wayland.nix` in the pinned
+home-manager rev) shows it's just `Requires=graphical-session-pre.target`,
+reached essentially immediately, with no real ordering against any tray
+host wired in. Checked every home-manager module that consumes or
+provides it (waybar, trayer, polybar, stalonetray as hosts; pasystray,
+kdeconnect, cbatticon, and others as consumers) — none of them get an
+actual start-order guarantee from it either, since `Wants=`/`PartOf=`
+relationships don't imply `Before=`/`After=`. Since Noctalia (the actual
+tray host here) is a separate flake's plain `Type=simple` service, not
+something this repo can add real dbus-readiness signaling to, there's no
+clean systemd-level fix available. Settled for the pragmatic one instead:
+`vesktop.service` orders `After = [ "graphical-session.target"
+"noctalia.service" ]` (best-effort, not a guarantee) plus an
+`ExecStartPre = "sleep 5"` — the sleep is what actually closes the race in
+practice. **Verified live**: the operator confirmed the tray icon now
+appears correctly on a fresh boot.
+
 ## Software stack (for context on what modules will eventually cover)
 
 Niri, greetd, Noctalia Greeter, Noctalia Shell v5 (native theming, GTK/Qt theming templates), Papirus icons, Bibata cursors, adw-gtk3, qt5ct/qt6ct · Ghostty, Zsh, Starship, Git, Lazygit, Fastfetch, eza, bat, fd, ripgrep, fzf, zoxide, yazi, btop · Zen Browser, VS Code, Vesktop, Nautilus · Steam, Proton GE, Gamescope, MangoHud, Gamemode, Millennium · Tailscale · Docker Engine + Compose · PipeWire, Bluetooth, Printing, NetworkManager, Snapper (btrfs snapshots) · nixd, nil, alejandra, statix, deadnix, direnv, just.
