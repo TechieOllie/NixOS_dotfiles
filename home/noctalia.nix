@@ -65,10 +65,31 @@ in
             # line + marked block); replaced by our own custom user
             # template below instead, which avoids that conflict by
             # design (see templates.user.starship).
+            #
+            # "niri" (added after a fresh-bootstrap investigation):
+            # confirmed via builtin.toml's own [templates.niri] that this
+            # is what actually writes ~/.config/niri/noctalia.kdl (focus
+            # ring/border/shadow colors) — it was never on this list
+            # despite that file already being consumed by
+            # home/niri.nix's config.kdl (`include "./noctalia.kdl"`,
+            # Phase 3). It had apparently been generated anyway on
+            # already-provisioned hosts (this repo's own history notes
+            # the file existing and updating correctly), which masked the
+            # gap — but a genuinely fresh nixos-anywhere install of the
+            # VM showed niri failing to start at all on its first login
+            # (`failed to read included config from ".../noctalia.kdl":
+            # No such file or directory`) before Noctalia's template pass
+            # had ever run once to create it. Its own apply.sh writes the
+            # output file and is idempotent/self-healing about the
+            # config.kdl include line (matches "noctalia.kdl" with any
+            # leading path, so it recognizes home/niri.nix's existing
+            # `include "./noctalia.kdl"` and never duplicates it) — no
+            # conflict with anything Nix manages.
             builtin_ids = [
               "ghostty"
               "gtk3"
               "gtk4"
+              "niri"
               "qt"
             ];
 
