@@ -75,7 +75,7 @@ driver's own wrapper text.
 (they partition disks / replace the running system) and this repo's own
 docs (`docs/bootstrapping-a-host.md`) already cover that path deliberately.
 It also doesn't boot a VM to click around niri/Noctalia — that GUI only
-renders meaningfully with real GPU accel (see `CLAUDE.md`'s notes on the
+renders meaningfully with real GPU accel (see `docs/decisions.md`'s notes on the
 `virtio-vga-gl` libvirt setup already used for this), which nested/headless
 Nix building in an arbitrary container doesn't give you. `check`/`eval` are
 the correct-altitude smoke test for a config repo: they catch broken Nix

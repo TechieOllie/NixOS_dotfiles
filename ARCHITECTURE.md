@@ -714,8 +714,8 @@ own cursor line) rather than leaving it scattered across those phases.
   research task if rounded Qt corners are wanted badly enough to accept that
   trade-off.
 
-See `CLAUDE.md`'s Phase 5 section for full implementation detail and the
-exact packages/options verified.
+See `docs/decisions.md`'s Phase 5 section for full implementation detail
+and the exact packages/options verified.
 
 ## Phase 6 — Applications
 
