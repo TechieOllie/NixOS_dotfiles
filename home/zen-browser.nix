@@ -152,50 +152,29 @@ in
       };
     };
 
-    # Second instance of the same upstream naming bug as the Icon= fix above,
-    # and a more damaging one. setAsDefaultBrowser = true routes through the
-    # flake's hm-module/default-browser.nix, which derives everything from the
-    # *flake attribute* name — `BROWSER = "zen-${name}"` and mime associations
-    # pointing at `zen-${name}.desktop`. That holds for the `beta` and
-    # `twilight` channels, but not this one: the attribute is
-    # `twilight-official` while the package it builds is plain zen-twilight
-    # (confirmed: its store path contains only bin/zen-twilight and
-    # share/applications/zen-twilight.desktop — no -official anywhere, in any
-    # output). Left alone, BROWSER names a binary that doesn't exist and all
-    # 15 mime associations — x-scheme-handler/https included — resolve to a
-    # .desktop file no package provides, so nothing can open a link.
+    # Second instance of the same upstream naming bug as the Icon= fix above.
+    # setAsDefaultBrowser = true routes through the flake's own
+    # hm-module/default-browser.nix, which derives everything from the *flake
+    # attribute* name — `BROWSER = "zen-${name}"`, plus mime associations
+    # pointing at `zen-${name}.desktop`. Correct for the `beta` and `twilight`
+    # channels; wrong for this one, where the attribute is `twilight-official`
+    # but the package it builds is plain zen-twilight (confirmed: its store
+    # path holds only bin/zen-twilight and share/applications/
+    # zen-twilight.desktop — no -official anywhere, in any output).
     #
-    # The module's associations are lib.mkDefault, so plain assignments below
-    # win on merge; BROWSER is set at normal priority there, hence mkForce.
-    # Revisit alongside the desktop entry above if the channel ever changes:
-    # on `beta` or `twilight` this whole block becomes unnecessary rather than
-    # wrong, since upstream's derivation is correct for those names.
+    # Only BROWSER actually needed fixing. The mime half of the same bug is
+    # inert here: xdg.mimeApps.enable is false, so home-manager writes no
+    # mimeapps.list at all and those associations never reach disk — verified
+    # live on the VM, where the only mimeapps.list is a runtime-written file
+    # containing one Discord handler, and `xdg-settings get
+    # default-web-browser` already resolves to the correct zen-twilight.desktop
+    # via the desktop entry's own MimeType. Overriding them would have been
+    # dead config; enabling xdg.mimeApps to make them live would hand
+    # home-manager a file that currently works as mutable runtime state.
+    #
+    # BROWSER is set at normal priority upstream, hence mkForce. Revisit
+    # alongside the desktop entry above if the channel ever changes: on `beta`
+    # or `twilight` this becomes unnecessary rather than wrong.
     home.sessionVariables.BROWSER = lib.mkForce "zen-twilight";
-
-    xdg.mimeApps =
-      let
-        desktop = "zen-twilight.desktop";
-        associations = lib.genAttrs [
-          "application/x-extension-shtml"
-          "application/x-extension-xhtml"
-          "application/x-extension-html"
-          "application/x-extension-xht"
-          "application/x-extension-htm"
-          "x-scheme-handler/unknown"
-          "x-scheme-handler/mailto"
-          "x-scheme-handler/chrome"
-          "x-scheme-handler/about"
-          "x-scheme-handler/https"
-          "x-scheme-handler/http"
-          "application/xhtml+xml"
-          "application/json"
-          "text/plain"
-          "text/html"
-        ] (_: desktop);
-      in
-      {
-        associations.added = associations;
-        defaultApplications = associations;
-      };
   };
 }
