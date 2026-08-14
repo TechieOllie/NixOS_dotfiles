@@ -151,5 +151,51 @@ in
         };
       };
     };
+
+    # Second instance of the same upstream naming bug as the Icon= fix above,
+    # and a more damaging one. setAsDefaultBrowser = true routes through the
+    # flake's hm-module/default-browser.nix, which derives everything from the
+    # *flake attribute* name — `BROWSER = "zen-${name}"` and mime associations
+    # pointing at `zen-${name}.desktop`. That holds for the `beta` and
+    # `twilight` channels, but not this one: the attribute is
+    # `twilight-official` while the package it builds is plain zen-twilight
+    # (confirmed: its store path contains only bin/zen-twilight and
+    # share/applications/zen-twilight.desktop — no -official anywhere, in any
+    # output). Left alone, BROWSER names a binary that doesn't exist and all
+    # 15 mime associations — x-scheme-handler/https included — resolve to a
+    # .desktop file no package provides, so nothing can open a link.
+    #
+    # The module's associations are lib.mkDefault, so plain assignments below
+    # win on merge; BROWSER is set at normal priority there, hence mkForce.
+    # Revisit alongside the desktop entry above if the channel ever changes:
+    # on `beta` or `twilight` this whole block becomes unnecessary rather than
+    # wrong, since upstream's derivation is correct for those names.
+    home.sessionVariables.BROWSER = lib.mkForce "zen-twilight";
+
+    xdg.mimeApps =
+      let
+        desktop = "zen-twilight.desktop";
+        associations = lib.genAttrs [
+          "application/x-extension-shtml"
+          "application/x-extension-xhtml"
+          "application/x-extension-html"
+          "application/x-extension-xht"
+          "application/x-extension-htm"
+          "x-scheme-handler/unknown"
+          "x-scheme-handler/mailto"
+          "x-scheme-handler/chrome"
+          "x-scheme-handler/about"
+          "x-scheme-handler/https"
+          "x-scheme-handler/http"
+          "application/xhtml+xml"
+          "application/json"
+          "text/plain"
+          "text/html"
+        ] (_: desktop);
+      in
+      {
+        associations.added = associations;
+        defaultApplications = associations;
+      };
   };
 }
