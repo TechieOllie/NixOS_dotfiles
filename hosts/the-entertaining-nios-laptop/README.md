@@ -12,9 +12,12 @@ Left to do before this host can actually be installed:
 
 - [ ] Resolve the real disk device in `disko.nix` (currently the placeholder
       `/dev/CHANGEME` — check via `lsblk` from the installer).
+- [ ] Decide whether this host gets the desktop stack. It currently sets no
+      `features.niri` and imports no `modules/desktop/*`, so installing it
+      as-is yields a machine with no graphical session — deliberate so far,
+      since the desktop stack is developed against the VM only.
 - [ ] Run `nixos-anywhere` against this machine — only once ready to replace
       CachyOS, since that step wipes the target disk.
 
-See `CLAUDE.md`'s "Current state" section for the authoritative, kept-current
-status; this list is a convenience copy for whoever is working in this
-directory.
+See `CLAUDE.md`'s "Hosts" section for the authoritative, kept-current status;
+this list is a convenience copy for whoever is working in this directory.

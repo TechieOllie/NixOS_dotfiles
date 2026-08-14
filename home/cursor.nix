@@ -5,16 +5,19 @@
 # greeter runs outside any user's Home Manager profile) lives in
 # modules/desktop/theming.nix + greetd.nix's own settings.cursor.
 #
-# x11.enable is deliberately omitted — programs.niri sets enableXWayland =
-# false repo-wide (see CLAUDE.md's Phase 3 notes), so there's no X11 cursor
-# consumer to configure here.
+# x11.enable is deliberately omitted — niri runs without XWayland and nothing
+# in this repo enables it (see docs/decisions.md's Phase 3 notes), so there's
+# no X11 cursor consumer to configure here.
 #
 # home/niri/cfg/misc.kdl already sets its own `cursor { xcursor-theme
 # "Bibata-Modern-Classic"; xcursor-size 22; }` block — niri renders its own
 # compositor cursor independently of GTK/Qt env vars, and that file is a
 # static live-symlinked KDL file (docs/live-dotfiles.md) that can't reference
-# this Nix value. The name/size below is therefore intentionally duplicated
-# in two places; keep them in sync by hand if either ever changes.
+# this Nix value. modules/desktop/greetd.nix's settings.cursor carries the
+# same pair again, for the greeter. The name/size below is therefore
+# intentionally duplicated across three places — here, home/niri/cfg/misc.kdl,
+# and modules/desktop/greetd.nix; keep them in sync by hand if either ever
+# changes.
 {
   pkgs,
   lib,

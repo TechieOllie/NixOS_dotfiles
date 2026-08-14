@@ -91,11 +91,11 @@ lib.mkIf osConfig.features.niri {
     # Noctalia's own systemd.enable + launch_apps_as_systemd_services
     # above), not niri's spawn-sh-at-startup: proper start/stop lifecycle,
     # restart-on-failure, journalctl logging, and no sleep-N race-condition
-    # hacks. The file's only remaining content (a vesktop spawn) was
-    # already inert — vesktop isn't packaged by this flake yet (Phase 5) —
-    # so there was nothing left worth keeping the mechanism around for.
-    # When each autostart app (Vesktop, Zen Browser, ...) gets its own
-    # Home Manager module, add it there as
+    # hacks. The file's only remaining content at the time (a vesktop spawn)
+    # was inert, since Vesktop wasn't packaged here yet — so there was
+    # nothing left worth keeping the mechanism around for. Vesktop now
+    # autostarts exactly this way, from home/vesktop.nix. When any further
+    # autostart app gets its own Home Manager module, add it there as
     # `systemd.user.services.<name> = { Unit.PartOf =
     # "graphical-session.target"; Unit.After = "graphical-session.target";
     # Install.WantedBy = [ "graphical-session.target" ]; ...  };` rather

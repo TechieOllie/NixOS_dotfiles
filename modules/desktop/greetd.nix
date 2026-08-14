@@ -15,11 +15,10 @@
     programs.noctalia-greeter = {
       enable = true;
       # Session name matches the Wayland session entry programs.niri.enable
-      # registers; verify with `noctalia-greeter sessions` after first boot.
+      # registers.
       greeter-args = "--session niri";
-      # Resolves the standing cursor-theme TODO (Theming phase) — schema
-      # confirmed by reading the noctalia-greeter flake input's own
-      # nix/nixos-module.nix (its documented example uses this exact shape).
+      # Cursor schema confirmed by reading the noctalia-greeter flake input's
+      # own nix/nixos-module.nix (its documented example uses this shape).
       # modules/desktop/theming.nix installs the bibata-cursors package
       # system-wide so this greeter, which runs outside any user's Home
       # Manager profile, can find it by name. Note: greeter.toml is only

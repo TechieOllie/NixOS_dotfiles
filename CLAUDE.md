@@ -69,7 +69,7 @@ boot-time recovery.
   - `noctalia` deliberately does **not** `.follows` this repo's nixpkgs — following it would disable Noctalia's Cachix cache and force a from-source build of a native Wayland/OpenGL project on every host. The accepted cost is a second nixpkgs copy in the closure. `zen-browser` *does* follow, having no cache to lose.
 - **`lib/mkHost.nix`** — `{ system, hostPath }: nixosSystem`, wiring disko, sops-nix, `modules/options.nix`, the host, and `home-manager.nixosModules.home-manager` (with `useGlobalPkgs`). Threads `noctalia-greeter`/`noctalia`/`zen-browser` through `specialArgs`/`extraSpecialArgs` **without importing them** — the consuming modules import them themselves, so only hosts that want them carry them.
 - **`hosts/installer/`** — not a real host and has no `nixosConfigurations` entry: just `variables.nix` holding the operator identity (`user.name`/`fullName`/`sshPublicKey`) that `installer-iso` needs, kept separate so it can't drift from a real host's. A public SSH key isn't a secret, so sops doesn't apply.
-- **`modules/options.nix`** — the `features` submodule: `docker`, `steam`, `gamemode`, `snapshots`, `niri`, all defaulting `false`. A submodule, not `attrsOf bool`, so a typo'd flag is an eval error rather than a silently inert one.
+- **`modules/options.nix`** — the `features` submodule: `snapshots` and `niri`, both defaulting `false`. A submodule, not `attrsOf bool`, so a typo'd flag is an eval error rather than a silently inert one. `docker`/`steam`/`gamemode` were declared here for a long time without a single module ever reading them, and were removed; re-add each in the same commit as the module that consumes it.
 - **`modules/system/`** — `boot`, `networking`, `nix`, `ssh`, `users`, `shell`, `fonts`, `nix-ld`. All unconditional, all bundled by `profiles/base.nix`.
 - **`modules/services/`** — `snapper` (gated on `features.snapshots`).
 - **`modules/desktop/`** — `niri`, `greetd`, `noctalia`, `theming`, `nautilus`, `unfree`. All gated on `features.niri`.
@@ -138,11 +138,13 @@ Each of these has bitten at least once and will again. Full write-ups in
 | 7 | Extra features — Docker, Steam, Proton GE, Tailscale, gaming profile | not started |
 | 8 | Long-term — `nix flake check` as the CI gate, `justfile`, doc upkeep, multi-host hardening | not started |
 
-Two planned modules named in `ARCHITECTURE.md`'s module tree were abandoned
-and will not be created: `modules/desktop/stylix.nix` (superseded by
-Noctalia's own native theming — adding Stylix would mean two systems fighting
-over the same GTK/Qt/terminal files) and `hardware/bluetooth.nix` (Bluetooth
-comes from `programs.noctalia.recommendedServices.enable`).
+Three once-planned modules were abandoned and will not be created:
+`modules/desktop/stylix.nix` (superseded by Noctalia's own native theming —
+adding Stylix would mean two systems fighting over the same GTK/Qt/terminal
+files), `modules/desktop/portals.nix` (portals come free with `programs.niri`'s
+upstream module), and `hardware/bluetooth.nix` (Bluetooth comes from
+`programs.noctalia.recommendedServices.enable`). `ARCHITECTURE.md` records all
+three; don't re-propose them.
 
 ## Software stack
 

@@ -3,8 +3,8 @@
 # home/starship.nix / home/lazygit.nix precedent. Already on this repo's
 # planned general terminal-tool stack (alongside eza/bat/fd/ripgrep/fzf/
 # zoxide/btop) independent of Neovim — home/neovim.nix's yazi.nvim plugin
-# is one consumer of this, not the reason it's installed. No settings
-# configured yet beyond enabling it; Noctalia themes it live (see
+# is one consumer of this, not the reason it's installed. Package only, no
+# programs.yazi settings at all; Noctalia themes it live (see
 # home/noctalia.nix's community_ids: "yazi" — one cached catalog entry
 # covers both the flavor and tmTheme templates it defines), writing to
 # ~/.config/yazi/flavors/noctalia.yazi/ and activating it in

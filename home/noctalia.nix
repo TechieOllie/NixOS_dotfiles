@@ -53,7 +53,7 @@ in
           wallpaper_scheme = "m3-content";
 
           templates = {
-            # Resolves the earlier "undocumented anywhere upstream" TODO —
+            # These ids are documented nowhere upstream — they were
             # confirmed by reading assets/templates/builtin.toml directly
             # in the noctalia flake input's source (the [catalog.*]
             # entries are the real builtin_ids). "ghostty" keeps

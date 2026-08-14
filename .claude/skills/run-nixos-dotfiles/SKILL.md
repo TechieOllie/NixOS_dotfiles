@@ -20,7 +20,8 @@ this was authored on — `nix (Nix) 2.34.8`, `/nix/var/nix/profiles/default/bin/
 on the PATH). Nothing else — no dependency install step, no separate build
 tool. Confirmed working on plain CachyOS (not NixOS) with just Nix installed;
 the flake itself pulls in `nixpkgs`, `home-manager`, `disko`, `sops-nix`,
-`noctalia-greeter`, `noctalia` as flake inputs, fetched automatically.
+`noctalia-greeter`, `noctalia`, `zen-browser` as flake inputs, fetched
+automatically.
 
 ## Run (agent path)
 

@@ -7,9 +7,11 @@ System-level halves of the desktop stack, each gated behind its own
 a system half and a user half — Niri is the clearest example — only the
 package, session entry, and greetd wiring live here; keybindings, layout, and
 appearance live in `home/` instead. Currently `niri.nix`, `greetd.nix`,
-`noctalia.nix`, and `theming.nix` (all `config.features.niri` — greetd,
-Noctalia Shell, and theming packages only exist to support a graphical niri
-session, and niri is the only compositor this repo offers so far; see
+`noctalia.nix`, `theming.nix`, `nautilus.nix`, and `unfree.nix` (all
+`config.features.niri` — greetd, Noctalia Shell, theming packages, a file
+manager, and the unfree allow-list for desktop applications only exist to
+support a graphical niri session, and niri is the only compositor this repo
+offers so far; see
 `greetd.nix`'s own comment if a second compositor/DE is ever added).
 `theming.nix` (Theming phase) only installs cursor/icon-theme packages
 system-wide, for noctalia-greeter's benefit — everything else (icon theme

@@ -36,16 +36,19 @@ flake checkout it's invoked from, never this clone.
   - `wallpapers/` — Noctalia's wallpaper picker (`home/noctalia.nix`).
   - `home/niri/config.kdl` and the static `home/niri/cfg/*.kdl` files
     (`animation`, `display`, `keybinds`, `layout`, `misc`, `rules`) —
-    niri's config (`home/niri.nix`). Reload niri (`Mod+Shift+/` or
-    restart the compositor) to pick up a change; no `nixos-rebuild
-    switch`. There is no `cfg/autostart.kdl` — this repo autostarts
+    niri's config (`home/niri.nix`). niri watches its config file and
+    reloads on save, so a change takes effect immediately — no keybind and
+    no `nixos-rebuild switch`. (`niri msg action load-config-file` forces
+    it, which is useful when editing the clone over SSH.) There is no `cfg/autostart.kdl` — this repo autostarts
     applications as systemd user services bound to
     `graphical-session.target` (see `home/niri.nix`'s comment on the
     convention) rather than niri's `spawn-sh-at-startup`.
-- **Still store-copied** (needs a rebuild to take effect): anything
-  generated with Nix-side logic that can't be a static file —
-  `home/niri/cfg/input.kdl` (per-host XKB layout lookup) is the one
-  example today.
+- **Still store-copied** (needs a rebuild to take effect): everything else,
+  which is the default — including static assets like
+  `home/noctalia-templates/*.tmpl` and `home/vesktop-{config,assets}/*`.
+  The only file that *couldn't* be live even if wanted is
+  `home/niri/cfg/input.kdl`, which is generated with Nix-side logic (the
+  per-host XKB layout lookup) rather than being a static file at all.
 
 ## Adding a new live file
 

@@ -15,7 +15,7 @@
     # niri's own upstream module, PAM-unlocked at greetd login with no
     # extra config here) picks this up as an ssh-agent identity. A
     # throwaway test key for this host only, not the operator's real key —
-    # see CLAUDE.md's Phase 3 note. Whether a host wants this feature at
+    # see docs/decisions.md's Phase 3 note. Whether a host wants this at
     # all is expressed entirely by whether this block exists in its
     # secrets.nix; no separate features.* flag, since nothing else needs
     # to react to it conditionally.

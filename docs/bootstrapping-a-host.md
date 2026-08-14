@@ -74,7 +74,19 @@ machine boots already able to decrypt its own secrets.
 **This step wipes the target disk.** Never run it against a machine still in
 daily use unless you mean to replace what's currently on it.
 
-## 7. Verify
+## 7. Clone this repo to `~/.dotfiles` on the new host
+
+```bash
+git clone <this repo> ~/.dotfiles
+```
+
+Not optional on any host with `features.niri`: niri's KDL config and
+Noctalia's wallpaper directory are symlinked *live* into this clone rather
+than copied into the Nix store, so without it those symlinks dangle — the
+build still succeeds and the switch still reports success, which is exactly
+what makes this easy to miss. See [`live-dotfiles.md`](./live-dotfiles.md).
+
+## 8. Verify
 
 ```bash
 nixos-rebuild switch --flake .#<name>

@@ -1,6 +1,6 @@
 # Machine-agnostic entry point: every host's Home Manager user points here
-# (see lib/mkHost.nix). Phase 3+ modules (home/niri.nix, home/ghostty.nix,
-# ...) get imported from this file as they're written.
+# (see lib/mkHost.nix). Every home/*.nix module is imported from here; the
+# modules themselves self-gate where they need to (osConfig.features.niri).
 { vars, ... }:
 {
   imports = [

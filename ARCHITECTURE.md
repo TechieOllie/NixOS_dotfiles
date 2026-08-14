@@ -40,7 +40,7 @@ Each part of the repository has exactly one job:
 - **Modules** contain the actual system configuration.
 - **Home Manager** manages the user's personal environment.
 - **Variables** store identity data that differs per machine (hostname, timezone, user).
-- **Features** store capability toggles that differ per machine (Docker on/off, Steam on/off).
+- **Features** store capability toggles that differ per machine (Niri on/off, btrfs snapshots on/off).
 
 Keeping variables and features as two distinct files (rather than one growing `variables.nix`) matters as the repo scales: identity data changes rarely and only makes sense once per machine, while feature flags change often and are meant to be overridden per-host, per-profile, or both. Mixing them turns one file into a second `configuration.nix`.
 
@@ -95,30 +95,43 @@ Every abstraction in `lib/` should be traceable to a specific, already-repeated 
 Responsibilities:
 
 - Declare flake inputs (nixpkgs, home-manager, and any others).
-- Define flake outputs (`nixosConfigurations`).
+- Define flake outputs (`nixosConfigurations`, and any `packages`).
 - Define the list of available hosts.
-- Create the package set (`pkgs`) per host, including overlays.
 - Wire Home Manager into each host's NixOS configuration.
-- Pass shared data (variables, features, `lib` helpers) into modules.
+- Pass shared data (variables, `lib` helpers, flake inputs) into modules.
+
+In practice most of that wiring lives one level down, in `lib/mkHost.nix` —
+`flake.nix` itself is now little more than inputs plus one `mkHost { … }` call
+per host (today: `the-entertaining-nios-vm` and `the-entertaining-nios-laptop`;
+`hosts/the-entertaining-nios-desktop/` exists but is deliberately unwired until
+it's bootstrapped) and the `installer-iso` package. Note there is no per-host
+`pkgs` construction and no overlay: `pkgs` comes from `nixosSystem` itself and
+is shared with Home Manager via `home-manager.useGlobalPkgs = true`.
 
 **Two different mechanisms for two different kinds of data — chosen deliberately, not interchangeably:**
 
 - **`vars` (identity data)** is plain, non-optional data with no notion of "default vs. override" — a hostname either is or isn't "laptop." It's passed as `specialArgs`, a plain function argument available to every module:
 
   ```nix
+  # lib/mkHost.nix (abridged) — flake.nix just calls this per host
   lib.nixosSystem {
-    specialArgs = { inherit vars; };
+    specialArgs = { inherit vars noctalia-greeter noctalia; };
     modules = [
-      ./hosts/${hostName}
+      ../modules/options.nix
+      hostPath
       home-manager.nixosModules.home-manager
-      { home-manager.extraSpecialArgs = { inherit vars; }; }
+      { home-manager.extraSpecialArgs = { inherit vars noctalia zen-browser; }; }
     ];
   };
   ```
 
-  Any module can declare `{ vars, ... }:` to read it.
+  Any module can declare `{ vars, ... }:` to read it. The flake inputs
+  threaded alongside `vars` are passed, never imported here — `mkHost` stays
+  feature-agnostic, and the modules that actually want them
+  (`modules/desktop/{greetd,noctalia}.nix`, `home/{noctalia,zen-browser}.nix`)
+  import them themselves, so a host that doesn't use them doesn't carry them.
 
-- **`features` (capability toggles)** deliberately is *not* passed via `specialArgs`. Toggles need real "profile sets a default, host overrides it" semantics, and `specialArgs` values are just function arguments — the module system's priority mechanism (`lib.mkDefault`, `lib.mkForce`, `lib.mkOverride`) only resolves *declared options*, not plain data handed in this way. So `features` is declared once as a real NixOS option (see **Declaring the `features` Option** below) and every host/profile sets it through normal module config (`features.docker = true;` or `features.docker = lib.mkDefault true;`), which the module system merges by priority as usual. Modules read it as `config.features.x`, not as a function argument.
+- **`features` (capability toggles)** deliberately is *not* passed via `specialArgs`. Toggles need real "profile sets a default, host overrides it" semantics, and `specialArgs` values are just function arguments — the module system's priority mechanism (`lib.mkDefault`, `lib.mkForce`, `lib.mkOverride`) only resolves *declared options*, not plain data handed in this way. So `features` is declared once as a real NixOS option (see **Declaring the `features` Option** below) and every host/profile sets it through normal module config (`features.niri = true;` or `features.niri = lib.mkDefault true;`), which the module system merges by priority as usual. Modules read it as `config.features.x`, not as a function argument.
 
   Home Manager modules don't get `config` for the *NixOS* configuration directly — they read it via the `osConfig` special arg that Home Manager automatically provides when integrated into a NixOS module: `{ osConfig, ... }: osConfig.features.x`.
 
@@ -128,7 +141,7 @@ This is the one and only path each kind of data takes into modules — avoid a s
 
 ## Declaring the `features` Option
 
-Before any host or profile can set `features.docker = true;` or `lib.mkDefault`, `features` must exist as a declared option — otherwise there's nothing for the module system to merge by priority. This is declared once, in a small module every host imports:
+Before any host or profile can set `features.niri = true;` or `lib.mkDefault`, `features` must exist as a declared option — otherwise there's nothing for the module system to merge by priority. This is declared once, in a small module every host imports:
 
 ```nix
 # modules/options.nix
@@ -137,20 +150,15 @@ Before any host or profile can set `features.docker = true;` or `lib.mkDefault`,
   options.features = lib.mkOption {
     type = lib.types.submodule {
       options = {
-        docker = lib.mkOption {
+        snapshots = lib.mkOption {
           type = lib.types.bool;
           default = false;
-          description = "Enable Docker Engine + Compose.";
+          description = "Enable automatic btrfs snapshots (snapper) of / and /home.";
         };
-        steam = lib.mkOption {
+        niri = lib.mkOption {
           type = lib.types.bool;
           default = false;
-          description = "Enable Steam + gaming stack.";
-        };
-        gamemode = lib.mkOption {
-          type = lib.types.bool;
-          default = false;
-          description = "Enable Feral GameMode.";
+          description = "Enable the Niri Wayland compositor (system package + session entry only; user config lives in home/niri.nix).";
         };
       };
     };
@@ -160,9 +168,9 @@ Before any host or profile can set `features.docker = true;` or `lib.mkDefault`,
 }
 ```
 
-**Why a submodule instead of `attrsOf bool`:** `attrsOf bool` accepts any key, which means a typo like `features.dcoker = true;` merges into a new, unused attribute — nothing errors, the feature just silently never turns on. Declaring each toggle as its own option costs one extra block here per feature, but turns that typo into an eval-time "unknown option" error instead of a machine that quietly doesn't have Docker. Add the option in this file in the same commit that first references it in a profile or host.
+**Why a submodule instead of `attrsOf bool`:** `attrsOf bool` accepts any key, which means a typo like `features.nrii = true;` merges into a new, unused attribute — nothing errors, the feature just silently never turns on. Declaring each toggle as its own option costs one extra block here per feature, but turns that typo into an eval-time "unknown option" error instead of a machine that quietly doesn't have a desktop. Add the option in this file in the same commit that first references it in a profile or host.
 
-Every host imports this module (typically via a shared list in `flake.nix` rather than repeating the import per host). With the option declared, `features.x = true;`, `lib.mkDefault`, and `lib.mkForce` all behave exactly as the standard NixOS module system merging rules describe — a profile's `mkDefault` (low priority) is cleanly overridden by a host's plain assignment (normal priority), and any module can read the merged result at `config.features.x`.
+Every host imports this module — in practice via `lib/mkHost.nix`, which puts it in every host's module list, rather than repeating the import per host. With the option declared, `features.x = true;`, `lib.mkDefault`, and `lib.mkForce` all behave exactly as the standard NixOS module system merging rules describe — a profile's `mkDefault` (low priority) is cleanly overridden by a host's plain assignment (normal priority), and any module can read the merged result at `config.features.x`.
 
 ## Hosts
 
@@ -170,16 +178,21 @@ Each physical machine has its own directory:
 
 ```
 hosts/
-    laptop/
-    desktop/
-    server/
-    vm/
+    the-entertaining-nios-vm/        # bootstrapped; the dev/verification host
+    the-entertaining-nios-laptop/    # wired and eval-clean, not yet installed
+    the-entertaining-nios-desktop/   # scaffold only, no nixosConfigurations entry
+    installer/                       # not a host: operator identity for installer-iso
 ```
+
+`hosts/installer/` is the odd one out — it holds only a `variables.nix` with
+the operator's name and SSH public key, which `packages.installer-iso` reads
+so a bootstrap ISO can be built without reaching into a real host's data. A
+public key isn't a secret, so none of the sops machinery applies there.
 
 Example:
 
 ```
-hosts/laptop/
+hosts/the-entertaining-nios-laptop/
     default.nix
     hardware-configuration.nix
     variables.nix
@@ -207,12 +220,23 @@ Profiles describe the *role* a machine plays. A host is the physical machine; a 
 
 ```
 profiles/
-    laptop.nix
-    desktop.nix
-    gaming.nix
-    server.nix
-    workstation.nix
+    base.nix          # exists — see below; the one profile that isn't a role
+    laptop.nix        # planned
+    desktop.nix       # planned
+    gaming.nix        # planned
+    server.nix        # planned
+    workstation.nix   # planned
 ```
+
+Only `base.nix` exists today, and it is deliberately *not* a role: it's the
+universal foundation (boot, nix, networking, users, ssh, shell, fonts, nix-ld)
+every host needs whatever it's for, extracted once a second host's imports
+visibly overlapped with the first. Role profiles stay deferred until two hosts
+actually diverge — the laptop and desktop are still scaffolded identically, so
+there is nothing yet for a `laptop.nix` to say that a `desktop.nix` wouldn't.
+When role profiles do arrive they should import `base.nix` rather than
+duplicate it. Until then, all three hosts import `base.nix` directly, and the
+VM additionally imports its `modules/desktop/*` set by hand.
 
 **What a profile actually contains**: a profile is a plain module that does two things — nothing more:
 
@@ -261,33 +285,45 @@ Modules contain the actual NixOS configuration. Each module has a single respons
 
 ```
 modules/
-    system/
+    system/            # all unconditional, all bundled by profiles/base.nix
         boot.nix
         networking.nix
+        nix.nix
         users.nix
+        ssh.nix
+        shell.nix
+        fonts.nix
+        nix-ld.nix
 
-    hardware/
-        audio.nix
-        graphics.nix
-
-    desktop/
-        niri.nix          # compositor package + session, system-level only
+    desktop/           # all gated on config.features.niri
+        niri.nix           # compositor package + session, system-level only
         greetd.nix
-        noctalia.nix      # Noctalia Shell — native theming, replaces Stylix (see Phase 3)
+        noctalia.nix       # Noctalia Shell — native theming, replaces Stylix (see Phase 3)
         theming.nix        # cursor/icon-theme packages installed system-wide, for the greeter (see Phase 5)
         nautilus.nix       # package + dconf/gvfs/tumbler — same system/Home Manager split as niri (see Phase 6)
         unfree.nix         # nixpkgs.config.allowUnfreePredicate allow-list (see Phase 6, Home Manager section below)
-        portals.nix
 
     services/
-        docker.nix
-        tailscale.nix
-        printing.nix
+        snapper.nix        # gated on config.features.snapshots
+        docker.nix         # planned (Phase 7)
+        tailscale.nix      # planned (Phase 7)
+        printing.nix       # planned (Phase 7)
 
-    programs/
-        steam.nix
-        gaming.nix
+    hardware/          # planned — directory does not exist yet
+        audio.nix          # planned
+        graphics.nix       # planned
+
+    programs/          # planned — directory does not exist yet
+        steam.nix          # planned (Phase 7)
+        gaming.nix         # planned (Phase 7)
 ```
+
+Everything above without a `# planned` marker exists on disk today. Two entries
+that appeared in earlier drafts of this tree will **not** be created:
+`desktop/stylix.nix` (superseded by Noctalia's own native theming — see Phase 3)
+and `desktop/portals.nix` (XDG portals come free with `programs.niri`'s upstream
+module, which already pulls in the portal packages and the gnome-keyring
+integration; there is nothing left for a module of our own to configure).
 
 **System vs. Home Manager split for desktop modules (previously blurred):** where a program has both a system half and a user half — Niri is the clearest example — the split is:
 
@@ -319,7 +355,7 @@ Examples of what Home Manager owns: Ghostty, Zsh, Starship, Git configuration, V
 
 **Per-app window transparency: try the app's own built-in transparency setting first, fall back to niri's `opacity` window-rule.** The order matters, and it's the reverse of what might seem simplest: check for a real, working, native transparency option in the app itself before reaching for a compositor-level workaround — an app's own mechanism can distinguish its background from its own text/icon colors, which a blanket compositor multiplier fundamentally cannot. Only fall back to niri once that's confirmed either not to exist, or too unreliable/fragile to depend on:
 
-- **App's own setting, if one exists and holds up under live testing** — e.g. a Vencord/Vesktop-style `transparent: true` core setting, or a theme's own alpha-aware CSS variables. Tried for Vesktop specifically (`VencordSettings.store.transparent` + the active Discord theme's `--remove-bg-layer`/`--bg-*` toggles) and ultimately abandoned — not because it couldn't work, but because it depended on a third-party theme's internal variable structure (which panel maps to which CSS custom property, and whether that property is *also* reused for text/icon color elsewhere) holding steady release to release, and reasoning about it correctly proved genuinely error-prone in practice — see `CLAUDE.md`'s Phase 6 Vesktop section for the full investigation.
+- **App's own setting, if one exists and holds up under live testing** — e.g. a Vencord/Vesktop-style `transparent: true` core setting, or a theme's own alpha-aware CSS variables. Tried for Vesktop specifically (`VencordSettings.store.transparent` + the active Discord theme's `--remove-bg-layer`/`--bg-*` toggles) and ultimately abandoned — not because it couldn't work, but because it depended on a third-party theme's internal variable structure (which panel maps to which CSS custom property, and whether that property is *also* reused for text/icon color elsewhere) holding steady release to release, and reasoning about it correctly proved genuinely error-prone in practice — see `docs/decisions.md`'s Phase 6 Vesktop section for the full investigation.
 - **niri's `opacity <value>` window-rule** (`home/niri/cfg/rules.kdl`, driven by one shared value in `home/transparency.nix` rather than a per-app guess) — the fallback once the above isn't available or reliable. A compositor-level alpha multiplier applied to the app's entire composited window, independent of whether the app itself has any transparency support at all, so it always works uniformly — at the cost of dimming the whole window, including its own text, equally, since niri has no concept of text vs. background at this level. This is what Zen, Nautilus, and Vesktop all actually use today.
 - **`draw-border-with-background false`** — needed alongside `opacity` regardless of which path above got you there. niri's default focus-ring/border renders as a solid backing behind the window, which shows through a translucent surface. Whether to disable just the background fill (this option) or the ring/border entirely (`focus-ring { off } border { off }`) depends on whether the window actually has gap space around it to draw a ring into: a normal tiled window (Nautilus, Vesktop) does, so `draw-border-with-background false` gives a real ring in that space; a window that's also `open-maximized-to-edges` with zero surrounding gap (Zen) doesn't, so the ring has nowhere to render and needs disabling outright instead.
 
@@ -329,11 +365,11 @@ Examples of what Home Manager owns: Ghostty, Zsh, Starship, Git configuration, V
 
 **Noctalia theming: three template layers, pick the right one per app.** `home/noctalia.nix`'s `theme.templates` has three distinct mechanisms, not one:
 
-- `builtin_ids` — templates shipped with the `noctalia` package itself (ghostty, gtk3, gtk4, qt, niri, starship, ...).
-- `community_ids` — templates fetched at runtime from `github:noctalia-dev/community-templates` (neovim, lazygit, zed, ...).
+- `builtin_ids` — templates shipped with the `noctalia` package itself. In use here: `ghostty`, `gtk3`, `gtk4`, `niri`, `qt`. (A builtin `starship` template also exists but is deliberately *not* used — see below.)
+- `community_ids` — templates fetched at runtime from `github:noctalia-dev/community-templates`. In use here: `yazi`, `papirus-icons`, `discord`, `vscode`, `zen-browser`, `feishin`, `obsidian`. Note each id keys a whole cached catalog *directory*, not a single template: `yazi`'s one entry covers both the flavor and tmTheme templates its `template.toml` defines.
 - `templates.user.<id>` — templates **this repo writes and checks in itself** (`home/noctalia-templates/`), registered with an explicit `input_path`/`output_path`/`post_hook`.
 
-Prefer `builtin_ids`/`community_ids` whenever the official template's own output path is a *separate* file from anything Home Manager manages (e.g. `ghostty/themes/noctalia`, `niri/noctalia.kdl`, `nvim/lua/matugen.lua`) — no conflict, nothing to write. Some official templates instead mutate an *existing* file in place (Starship's builtin template `sed -i`s `starship.toml`; Lazygit's community template `mv`s a rebuilt `config.yml` over the original) — both mechanisms destroy a Home-Manager-managed symlink at that path the same way. For those cases, write a custom `templates.user.<id>` entry instead: since we control the whole template rather than needing to stay compatible with an arbitrary pre-existing file, it can render its *entire* output fresh each time (the same behavior the clean, separate-file official templates already have), sidestepping the conflict by construction. `home/starship.nix` (whole file, no `post_hook` needed) and `home/lazygit.nix` (a separate theme-only file, merged at invocation time via lazygit's own `LG_CONFIG_FILE`) are the reference examples — follow this same triage (does the official template touch a separate file, or mutate an existing one in place?) before wiring up theming for any future app.
+Prefer `builtin_ids`/`community_ids` whenever the official template's own output path is a *separate* file from anything Home Manager manages (e.g. `ghostty/themes/noctalia`, `niri/noctalia.kdl`, `nvim/lua/matugen.lua`) — no conflict, nothing to write. Some official templates instead mutate an *existing* file in place (Starship's builtin template `sed -i`s `starship.toml`; Lazygit's community template `mv`s a rebuilt `config.yml` over the original) — both mechanisms destroy a Home-Manager-managed symlink at that path the same way. For those cases, write a custom `templates.user.<id>` entry instead: since we control the whole template rather than needing to stay compatible with an arbitrary pre-existing file, it can render its *entire* output fresh each time (the same behavior the clean, separate-file official templates already have), sidestepping the conflict by construction. `home/starship.nix` (whole file, no `post_hook` needed) and `home/lazygit.nix` (a separate theme-only file, merged at invocation time via lazygit's own `LG_CONFIG_FILE`) are the reference examples. Neovim is the third user template, and it exists for a different reason again: the official *community* `neovim` template writes the same `~/.config/nvim/lua/matugen.lua` path that the operator's own `neovim_dotfiles` repo does, so the two raced to own one file. Taking it over as a user template gave this repo sole ownership — follow this same triage (does the official template touch a separate file, or mutate an existing one in place?) before wiring up theming for any future app.
 
 ## Variables
 
@@ -360,24 +396,39 @@ Prefer `builtin_ids`/`community_ids` whenever the official template's own output
 `features.nix` holds only **capability toggles** — set as the `features` option (declared once in `modules/options.nix`, see above), expected to be overridden per host, and read via `config.features.x` with `lib.mkIf` inside modules. Being a module itself (not plain data), it sets `features` directly at normal priority, which overrides any `mkDefault` a profile set:
 
 ```nix
-# hosts/laptop/features.nix
+# hosts/the-entertaining-nios-laptop/features.nix
 { ... }:
 {
   features = {
-    docker = true;
-    steam = false;
+    snapshots = true;
   };
 }
 ```
 
+Only two flags exist today — `snapshots` and `niri`. Anything a host doesn't
+name simply keeps the `false` default; there's no need to spell out every
+flag per host.
+
 **Not every capability needs its own flag.** Bluetooth was originally planned as one (`features.bluetooth`, `modules/hardware/bluetooth.nix`), but was dropped once it became clear no host in this repo, real or planned, would ever want a desktop environment (Niri + Noctalia Shell) *without* Bluetooth — the only thing that would have driven a per-host difference. Noctalia's own `programs.noctalia.recommendedServices.enable` now turns Bluetooth on directly (`modules/desktop/noctalia.nix`), rather than through a flag that could never actually differ between hosts. The lesson generalizes: a flag earns its place by expressing a *real* axis of variation between hosts, not just because a capability is optional in the abstract — reserve `features.*` for toggles a host or profile might genuinely set differently.
+
+**`features.niri` is the canonical example of a flag read from both sides.**
+It gates the entire desktop stack, and does so through two different
+mechanisms depending on which side is asking. System modules
+(`modules/desktop/{niri,greetd,noctalia,theming,nautilus,unfree}.nix`) read
+`config.features.niri` and wrap themselves in `lib.mkIf`. Home Manager modules
+can't see NixOS `config` at all, so they self-gate on `osConfig.features.niri`
+instead (`home/niri.nix`, `home/noctalia.nix`, `home/cursor.nix`, ...) — which
+is why `home/default.nix` can import every user module unconditionally and
+still produce an inert result on a host without a desktop. Adding a
+desktop-only Home Manager module means adding that `osConfig` gate; forgetting
+it is the one way to leak desktop config onto a headless host.
 
 Modules consume the merged value, never hardcode it:
 
 ```nix
 { config, lib, ... }:
-lib.mkIf config.features.docker {
-  virtualisation.docker.enable = true;
+lib.mkIf config.features.snapshots {
+  services.snapper.configs = { /* ... */ };
 }
 ```
 
@@ -392,9 +443,13 @@ Splitting `features.nix` out of `variables.nix` keeps each file growing for a si
 ```
 lib/
     mkHost.nix
-    mkUser.nix
-    utils.nix
 ```
+
+`mkHost.nix` is the only helper that exists. It was extracted slightly ahead of
+the "written by hand twice" rule below, as a deliberate and explicitly-requested
+exception, once the desktop and laptop hosts made the duplication a certainty
+rather than a hypothetical — not a precedent for pulling `mkUser.nix`,
+`utils.nix`, or anything else forward on the same reasoning.
 
 Per the over-engineering principle above: a helper only belongs here once the same pattern has already been written by hand at least twice across real hosts. `lib/` holds tools that help build the system; `modules/` holds what the system does. Keeping them separate prevents `flake.nix` from becoming a dumping ground for one-off functions.
 
@@ -509,7 +564,7 @@ Filesystem is a per-host decision made in that host's `disko.nix`, not a repo-wi
 
 **On NVMe specifically**, btrfs's usual downsides (CoW/checksum overhead, compression CPU cost) are negligible — that overhead mattered more on spinning disks or slow SATA SSDs, where it was a meaningful fraction of total I/O time. On NVMe it's effectively free: `compress=zstd` doesn't measurably cost speed, since zstd's default level is cheap CPU, most already-compressed assets (game/media files) are detected and stored raw by btrfs's own heuristic, and reading fewer physical bytes off an already-fast drive costs nothing.
 
-**Subvolume layout** (see `hosts/desktop/disko.nix` for the reference implementation):
+**Subvolume layout** (see `hosts/the-entertaining-nios-desktop/disko.nix` for the reference implementation):
 
 ```
 @               -> /             (root)
@@ -615,13 +670,21 @@ Note that `hosts/*/features.nix` and a profile's default-setting file don't shar
 
 # Part 4 — Software Stack
 
+This is the **target** stack, not an inventory of what's installed. Items are
+marked *planned* where nothing in the repo provides them yet; everything
+unmarked is shipping today. `CLAUDE.md` tracks which phase each belongs to.
+
 ## Desktop
 
 Niri, greetd, Noctalia Greeter, Noctalia Shell v5 (native theming, GTK/Qt theming templates), fonts, icons, wallpapers, Wayland portals.
 
 ## Terminal
 
-Ghostty, Zsh, Starship, Git, Lazygit, Neovim, Fastfetch, eza, bat, fd, ripgrep, fzf, zoxide, yazi, btop.
+Ghostty, Zsh, Starship, Git, Lazygit, Neovim, zoxide, yazi, ripgrep.
+
+*Planned:* Fastfetch, eza, bat, fd, fzf, btop. (`ripgrep` is installed today
+only as a Neovim/Telescope prerequisite via `home/neovim.nix`, not yet as a
+general-purpose tool in its own right.)
 
 ## Applications
 
@@ -645,7 +708,11 @@ PipeWire, Bluetooth, Printing, NetworkManager, Snapper (btrfs snapshots).
 
 ## Development
 
-nixd, nil, alejandra, statix, deadnix, direnv, just.
+*All planned, none installed yet:* nixd, nil, alejandra, statix, deadnix,
+direnv, just. The formatting/lint tools land with Phase 8's `nix flake check`
+gate, and `just` with the command runner described in Part 3 — `flake.nix` has
+no `checks` or `devShells` output today, and there is no `justfile` or
+`.envrc`.
 
 ---
 
@@ -653,20 +720,31 @@ nixd, nil, alejandra, statix, deadnix, direnv, just.
 
 ## Phase 1 — Foundation
 
+**Status: done.** (`CLAUDE.md`'s roadmap table is the authoritative
+per-phase status; the notes here describe scope, not progress.)
+
 - Repository structure.
 - Flake setup: `specialArgs` wiring for `vars`; `modules/options.nix` declaring the `features` option.
 - `variables.nix` / `features.nix` split, each using its correct mechanism.
 - sops-nix wired in from the start.
 - disko + nixos-anywhere wired in from the start, so every host — including the first — is installed declaratively rather than via manual partitioning.
 - Base system modules.
-- First bootable configuration (no profiles yet — a host importing modules directly).
+- First bootable configuration. This originally meant "no profiles yet, a host importing modules directly"; `profiles/base.nix` has since been extracted and all three hosts import it.
 
 ## Phase 2 — Profiles
+
+**Status: in progress.** `profiles/base.nix` landed once the desktop host was
+scaffolded with the same base imports as the VM. What remains is bootstrapping
+the desktop host and installing the laptop — and, eventually, the *role*
+profiles below, which stay deferred because no two hosts have actually diverged
+yet.
 
 - Introduce `profiles/` once at least two hosts exist and their module imports visibly overlap.
 - Extract shared imports and default feature values into the first profile(s) (e.g. `desktop.nix`, `server.nix`).
 
 ## Phase 3 — Desktop Environment
+
+**Status: done, verified live on `the-entertaining-nios-vm`.**
 
 - Niri (system module + Home Manager split as described above).
 - greetd, Noctalia Greeter.
@@ -678,16 +756,21 @@ nixd, nil, alejandra, statix, deadnix, direnv, just.
 
 ## Phase 4 — Terminal Environment
 
+**Status: done, verified live.** Every item below has landed, including the
+Neovim work.
+
 - Ghostty, Zsh, Starship, Git, Lazygit.
 - Shell migration into Home Manager.
-- Full Neovim configuration (plugins, LSP, etc.) — done. Deliberately **not** ported to native Nix, unlike the rest of this phase: the operator's config (lazy.nvim + Mason) is rewritten upstream at `github:TechieOllie/neovim_dotfiles` instead, and `~/.config/nvim` stays an ordinary manually-cloned git checkout, not Home-Manager-managed at all. `home/neovim.nix` only installs base toolchain prerequisites (a C compiler and the `tree-sitter` CLI for parser compilation, `unzip`/`nodejs`/`go`/`php`/`python3` for Mason's own installers, `programs.nix-ld.enable` for running Mason-installed prebuilt dynamically-linked binaries at all). See `CLAUDE.md` for the full reasoning (a native port was drafted in detail first, then reversed once every finding — a breaking upstream API rewrite, a plugin needing vendoring, lost lazy-loading, a Noctalia-template compatibility hack — showed it bought nothing once Mason/lazy.nvim were kept anyway) and the live-verification details.
+- Full Neovim configuration (plugins, LSP, etc.) — done. Deliberately **not** ported to native Nix, unlike the rest of this phase: the operator's config (lazy.nvim + Mason) is rewritten upstream at `github:TechieOllie/neovim_dotfiles` instead, and `~/.config/nvim` stays an ordinary manually-cloned git checkout, not Home-Manager-managed at all. `home/neovim.nix` only installs base toolchain prerequisites (a C compiler and the `tree-sitter` CLI for parser compilation, `unzip`/`nodejs`/`go`/`php`/`python3` for Mason's own installers, `programs.nix-ld.enable` for running Mason-installed prebuilt dynamically-linked binaries at all). See `docs/decisions.md` for the full reasoning (a native port was drafted in detail first, then reversed once every finding — a breaking upstream API rewrite, a plugin needing vendoring, lost lazy-loading, a Noctalia-template compatibility hack — showed it bought nothing once Mason/lazy.nvim were kept anyway) and the live-verification details.
 
 ## Phase 5 — Theming
 
+**Status: done, verified live.**
+
 Icon theme, cursor theme, GTK/Qt modernization — also folds in theming work
 already landed during Phases 3/4 (Noctalia's wallpaper-driven palette, the
-official `ghostty`/`gtk3`/`gtk4`/`qt` color templates, the `neovim`/`yazi`
-community templates, the custom `starship`/`lazygit` user templates, niri's
+official `ghostty`/`gtk3`/`gtk4`/`niri`/`qt` color templates, the `yazi`
+community template, the custom `starship`/`lazygit`/`neovim` user templates, niri's
 own cursor line) rather than leaving it scattered across those phases.
 
 - Cursor: `home.pointerCursor` (Bibata-Modern-Classic) as the single Home
@@ -719,15 +802,26 @@ and the exact packages/options verified.
 
 ## Phase 6 — Applications
 
+**Status: done, verified live.**
+
 - VS Code, Zen Browser, Vesktop, Nautilus, Feishin, Obsidian.
 
 ## Phase 7 — Extra Features
 
+**Status: not started**, except for snapshots, which landed early (see below).
+
 - Docker, Steam, Proton GE, Tailscale.
 - Gaming profile.
-- Btrfs snapshots (snapper) — see **Filesystem Choice and Snapshots** above; the subvolume layout itself is decided per-host at install time (in that host's `disko.nix`), but the `snapper` service module and its `features.snapshots` toggle belong here with the rest of the optional capability modules.
+- Btrfs snapshots (snapper) — **already done**, ahead of the rest of this phase: `modules/services/snapper.nix` and the `features.snapshots` toggle both exist and are enabled on the laptop and desktop hosts. See **Filesystem Choice and Snapshots** above; the subvolume layout itself is decided per-host at install time (in that host's `disko.nix`).
+
+Each of `docker`, `steam`, and `gamemode` was declared as a `features.*` flag
+during Phase 1 and later removed, having gone the whole time without a single
+module reading it — re-add each one in the same commit as the module that
+consumes it, per the atomic import-plus-`mkDefault` rule above.
 
 ## Phase 8 — Long-Term Improvements
+
+**Status: not started.**
 
 - `nix flake check` as unified CI gate (GitHub Actions calling the same command used locally).
 - Command runner (`justfile`) wrapping `switch`, `build`, `rollback`, `update`, `check`, `secrets-rekey` once these are being typed by hand often enough to be worth naming.

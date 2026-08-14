@@ -26,7 +26,8 @@
 # Vesktop's launcher override (home/vesktop.nix): xdg.desktopEntries
 # installs as a hiPrio package providing share/applications/<name>.desktop,
 # so ours wins over the flake-packaged one — same filename, same fields,
-# just the one real correction (Icon). Unlike the niri keybind above, this
+# just the one real correction (Icon). Unlike the niri keybind in
+# home/niri/cfg/keybinds.kdl, which tries each channel's binary in turn, this
 # can't be made channel-agnostic the same way: overriding a desktop entry
 # means matching its exact filename, which differs per channel
 # (zen-beta.desktop vs. zen-twilight.desktop) — this entry (and its

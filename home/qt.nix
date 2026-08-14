@@ -1,8 +1,7 @@
-# Qt platform theme — closes a gap left open since Phase 4: home/zsh.nix and
-# home/niri/cfg/misc.kdl have set QT_QPA_PLATFORMTHEME=qt6ct as a bare env
-# var since then, but the actual qt5ct/qt6ct packages were deliberately never
-# installed (see CLAUDE.md's Phase 4 note). Wired properly here via
-# home-manager's own qt.* module instead.
+# Qt platform theme — closes a gap left open since Phase 4: the bare
+# QT_QPA_PLATFORMTHEME env var was set without the actual qt5ct/qt6ct packages
+# ever being installed (see docs/decisions.md's Phase 4 note). Wired properly
+# here via home-manager's own qt.* module instead.
 #
 # Deliberately color-theming only, no Kvantum, no rounded corners: reading
 # Kvantum's own source confirmed its themes (including kvmarwaita, the
@@ -14,10 +13,15 @@
 # tracking for Qt apps — decided against that trade-off for now; revisit
 # Kvantum + kvmarwaita later as its own research task if wanted.
 #
-# The pre-existing QT_QPA_PLATFORMTHEME env vars in home/zsh.nix and
-# home/niri/cfg/misc.kdl become redundant (this module's platformTheme.name
-# sets the same value) but harmless — left as-is, no need to touch either
-# file for this.
+# This module's platformTheme.name is now the Home Manager session's owner of
+# QT_QPA_PLATFORMTHEME; home/zsh.nix's duplicate of it was removed once this
+# landed. home/niri/cfg/misc.kdl deliberately keeps setting it: that block is
+# niri's own spawn environment, which is what actually wins for apps niri
+# launches directly, and it's a static live-symlinked KDL file that can't read
+# this Nix value. The two spellings differ ("qt6ct" there, "qt5ct" from
+# platformTheme.name = "qtct") but both work — the qt5ct plugin answers to
+# either key, confirmed in its own source (qt5ct.json's "Keys": [ "qt5ct",
+# "qt6ct" ]) and empirically under QT_DEBUG_PLUGINS.
 #
 # Deliberately NOT setting qt.style.name: that sets QT_STYLE_OVERRIDE, which
 # forces one QStyle globally and bypasses qt5ct/qt6ct's own style
