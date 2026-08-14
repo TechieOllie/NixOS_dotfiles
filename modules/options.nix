@@ -3,21 +3,6 @@
   options.features = lib.mkOption {
     type = lib.types.submodule {
       options = {
-        docker = lib.mkOption {
-          type = lib.types.bool;
-          default = false;
-          description = "Enable Docker Engine + Compose.";
-        };
-        steam = lib.mkOption {
-          type = lib.types.bool;
-          default = false;
-          description = "Enable Steam + gaming stack.";
-        };
-        gamemode = lib.mkOption {
-          type = lib.types.bool;
-          default = false;
-          description = "Enable Feral GameMode.";
-        };
         snapshots = lib.mkOption {
           type = lib.types.bool;
           default = false;

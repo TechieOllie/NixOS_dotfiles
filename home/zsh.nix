@@ -95,11 +95,6 @@
     sessionVariables = {
       EDITOR = "nvim";
       VISUAL = "nvim";
-      # Kept from the operator's original setup — harmless, matches real
-      # desktop expectations. The qt6ct *package* is NOT added in this
-      # phase; Qt/GTK theming is already a separate, tracked Phase 3 /
-      # Noctalia TODO, so this is a no-op env var until that lands.
-      QT_QPA_PLATFORMTHEME = "qt6ct";
       # Deliberately dropped, not ported:
       #   - WSL detection branch (not relevant on NixOS)
       #   - hardcoded opencode PATH line (/home/ol/... — operator-machine
