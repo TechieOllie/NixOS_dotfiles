@@ -1092,3 +1092,197 @@ clean systemd-level fix available. Settled for the pragmatic one instead:
 practice. **Verified live**: the operator confirmed the tray icon now
 appears correctly on a fresh boot.
 
+
+---
+
+## Phase 7 — Extra features
+
+### What the gaming stack ended up being, and what was argued out of it
+
+The roadmap line was "Docker, Steam, Proton GE, Tailscale, gaming profile."
+Three of those five changed on contact with the operator's actual
+requirements.
+
+**Proton GE became proton-cachyos.** The operator runs CachyOS on the
+machine this repo is developed from and wanted its Proton fork and its
+gaming kernel rather than the more commonly-packaged GE build. Neither is
+in nixpkgs — verified against this repo's pinned revision, where the only
+attribute matching "cachy" at all is `ananicy-rules-cachyos`. Both come
+from [chaotic-nyx](https://www.nyx.chaotic.cx/)
+(`github:chaotic-cx/nyx/nyxpkgs-unstable`), added as a flake input.
+
+**Millennium was in the software-stack list and had no package.** There is
+no `millennium` attribute in nixpkgs (there's an open packaging request,
+nixpkgs#382086), but upstream ships its own flake at
+`github:SteamClientHomebrew/Millennium?dir=packages/nix`, whose overlay
+exports a `millennium-steam` — upstream's own steam derivation overridden
+with Millennium's bootstrap shim preloaded — which drops straight into
+`programs.steam.package`.
+
+**Neither new input follows this repo's nixpkgs, for two different
+reasons.** chaotic-nyx says so explicitly in its own docs: following
+produces hash mismatches against its prebuilt cache, and for
+`linuxPackages_cachyos` that means compiling a kernel from source.
+Millennium pins a *specific nixpkgs commit* (not a channel) because its Bun
+fixed-output derivation is version-sensitive and breaks when the revision
+moves. The accepted cost is two more nixpkgs copies in the closure and a
+Steam that trails ours by a patch release (`1.0.0.85` vs `1.0.0.87`) — the
+same tradeoff already accepted for `noctalia` in Phase 3.
+
+**What was proposed and dropped.** MangoHud, gamescope, gamemode, Lutris,
+Bottles, goverlay, protontricks, ludusavi, steamtinkerlaunch and vkbasalt
+were all offered and declined in favour of a minimal profile; the operator's
+instruction was "keep the gaming profile minimal." Two are worth recording
+because they'd otherwise be re-proposed:
+
+- **goverlay is actively redundant, not merely optional**: it's a GUI for
+  editing MangoHud's config file, and Home Manager has a `programs.mangohud`
+  module. That's the same "app mutates a file Home Manager owns" collision
+  as the starship/lazygit templates in Phase 5.
+- **protonup-qt / protonplus are deliberately absent.** They are GUI
+  downloaders that write Proton builds into `~/.steam` by hand — precisely
+  the app-owned mutable state this repo's standing gotchas are about.
+  `programs.steam.extraCompatPackages` does the same job declaratively.
+
+**umu-launcher survived the cull for a specific reason.** It isn't a
+launcher; it's the containerised runtime Heroic hands Proton games to.
+Steam runs Proton inside pressure-vessel + the Steam Linux Runtime, whereas
+Heroic on its own runs Proton bare against host libraries — the usual cause
+of "runs under Steam, breaks under Heroic."
+
+### The unfree allow-list was gated on the wrong thing
+
+`modules/desktop/unfree.nix` was gated on `config.features.niri`, on the
+reasoning (recorded in its own header comment) that every unfree package in
+the repo was a GUI app. That stopped being true the moment a host wanted
+`features.gaming` without a compositor: the allow-list would simply not
+apply, and eval would fail with an unfree-license error pointing at nixpkgs
+rather than at the gate. Moved to `modules/system/unfree.nix`, ungated,
+bundled by `profiles/base.nix` — an allow-list entry costs nothing on a host
+that never evaluates the package it names. This was a latent bug, not a
+refactor: no host had yet combined the two flags.
+
+**A second, unrelated unfree entry surfaced during verification**:
+`hardware.xone.enable` pulls `xone-dongle-firmware`, Microsoft's
+redistributable-but-unfree firmware blob for the Xbox Wireless Adapter.
+Nothing in the option name suggests it, and it only appeared as an eval
+failure a long way from `modules/hardware/controllers.nix`.
+
+### Where the desktop's kernel and GPU control live, and why not in the profile
+
+`profiles/gaming.nix` deliberately contains neither
+`boot.kernelPackages = pkgs.linuxPackages_cachyos` nor `services.lact.enable`.
+Both sit in `hosts/the-entertaining-nios-desktop/default.nix`, on the same
+reasoning as the VM's `spice-vdagentd`: they describe *that machine* (a
+Ryzen 5600 + Radeon RX 6600 box that runs games), not the role. A future
+gaming host on different hardware shouldn't inherit a kernel choice from a
+profile. AMD graphics otherwise need nothing declared — amdgpu and Mesa's
+RADV are already the default — so `lact` (fan curves, clocks, undervolting)
+is the only GPU-specific config the machine needs.
+
+`modules/hardware/audio.nix` and `graphics.nix`, both long-planned, were
+never created and shouldn't be: PipeWire arrives with
+`programs.noctalia.recommendedServices.enable` (verified: `services.pipewire.enable`
+is already true on the VM and false on the laptop, exactly tracking that
+module), and the only graphics option the stack needs is
+`hardware.graphics.enable32Bit`, which belongs with the thing that requires
+it.
+
+### Verification, and its honest limit
+
+The gaming stack targets the desktop, which has no `nixosConfigurations`
+entry (no `hardware-configuration.nix`, no secrets — it has never been
+bootstrapped). So it cannot be eval'd where it actually lives. It was
+instead verified by *temporarily* importing `profiles/gaming.nix` on the VM,
+evaluating, and reverting — which confirmed the whole chain resolves:
+`programs.steam.package` → `steam-1.0.0.85` (Millennium's),
+`extraCompatPackages` → `proton-cachyos`, `pkgs.linuxPackages_cachyos.kernel`
+→ `linux-7.1.8`, Heroic present in the user's packages. That is an
+evaluation, not a boot: none of it has run on hardware, and per this repo's
+own standing rule, eval passing is not verification. The first real test is
+the desktop's bootstrap.
+
+---
+
+## Phase 8 — Long-term improvements
+
+### nixfmt instead of alejandra
+
+`ARCHITECTURE.md` recommended `alejandra` for formatting. It was not
+adopted. Every `.nix` file in the repo had been hand-written in RFC 166
+style (spaces inside braces, one attribute per line, expanded function
+arguments) — alejandra's style differs (`{config, lib, ...}:`), so adopting
+it would have reformatted all 40-odd files to gain nothing over the style
+already in use. The check uses `pkgs.nixfmt`, which is what nixpkgs now
+calls the RFC 166 formatter; `nixfmt-rfc-style` still resolves but warns
+that it's an alias. Thirteen files needed reformatting to satisfy it, all
+mechanical.
+
+### The three lint checks, and what they were told to ignore
+
+`nix flake check` now runs `format`, `statix` and `deadnix` as real
+derivations, alongside a per-host `build-<hostname>` closure build derived
+from `self.nixosConfigurations` (so a host can't be added without also being
+checked). Two deliberate exclusions:
+
+- **`hardware-configuration.nix` is excluded from all three.**
+  `nixos-generate-config` writes those files, and this repo's rule is that
+  they're never hand-edited — so making one satisfy a linter would be undone
+  the next time a host is regenerated. Every finding deadnix reported
+  repo-wide was in one of these files.
+- **statix's `empty_pattern` and `repeated_keys` are disabled** in
+  `statix.toml`. The first wants `_:` instead of `{ ... }:` for a module
+  taking no arguments; the second wants `home.username`/`home.stateVersion`
+  collapsed into one `home = { ... }`. Both contradict how this repo's
+  modules are deliberately written (the repeated keys are separated by the
+  comments explaining each), and a check that has to be argued with on every
+  commit stops functioning as a gate. The one genuine statix finding — an
+  assignment better written as `inherit (nixpkgs) lib` in `flake.nix` — was
+  fixed rather than suppressed.
+
+**The checks were negative-tested, not just run.** A deliberately broken
+canary file was added and each check confirmed to actually fail on it
+(unformatted source → `format` fails; an unused `let` binding → `deadnix`
+fails; `cfg = cfg;` → `statix` fails), then removed. A lint check whose
+file-selection expression silently matches nothing passes just as green as
+one that works.
+
+### CI is one command on purpose
+
+`.github/workflows/check.yml` runs `nix flake check` and nothing else.
+Every piece of validation is declared as a flake check, so CI and `just
+check` run identical work by construction and there is no second pipeline to
+drift. The one thing the workflow adds is the noctalia and chaotic-nyx
+substituters: a NixOS host gets those from its own config
+(`modules/desktop/noctalia.nix`, chaotic's own module), but a CI runner has
+no such config, and without them the job would compile a Wayland/OpenGL
+shell and a kernel from source.
+
+Note this makes `nix flake check` genuinely expensive now — it builds two
+full system closures. `just check-fast` (`nix flake check --no-build`) is the
+routine local gate; the repo's own driver (`.claude/skills/run-nixos-dotfiles/driver.sh`)
+already passed `--no-build` for the same reason.
+
+### Role profiles do not import `base.nix`
+
+`profiles/gaming.nix` originally imported `base.nix`, on the strength of
+`ARCHITECTURE.md`'s line that role profiles "should import `base.nix` rather
+than duplicate it." The operator pushed back: keep `base.nix` separate and
+imported by every host directly. That's the rule now, and the old line was
+conflating two different things — what it was actually guarding against is a
+role profile *restating base's module list*, and a profile that simply
+doesn't mention base isn't duplicating anything.
+
+Two reasons it's the better shape, neither of them about evaluation (Nix
+dedupes imports by path, so both arrangements produce an identical system):
+
+- **Symmetry when reading a host.** Under the old arrangement the VM and
+  laptop imported `base.nix` visibly while the desktop did not — you had to
+  open `gaming.nix` to discover the desktop had a bootloader at all. Every
+  host's `default.nix` should read the same way.
+- **Role profiles stay purely additive.** Otherwise every future profile has
+  to answer "does this one include base?", and eventually two of them answer
+  differently.
+
+The counterargument — someone forgets `base.nix` on a new host — is weak: a
+host with no boot, users or nix modules fails loudly at eval, not silently.

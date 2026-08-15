@@ -86,7 +86,34 @@ than copied into the Nix store, so without it those symlinks dangle — the
 build still succeeds and the switch still reports success, which is exactly
 what makes this easy to miss. See [`live-dotfiles.md`](./live-dotfiles.md).
 
-## 8. Verify
+## 8. Post-install steps Nix cannot do for you
+
+Two things stay imperative by nature, because their state lives outside this
+repo entirely. Neither fails loudly — the host will simply be missing the
+capability it looks configured for.
+
+**Join the tailnet** (any host with `features.tailscale`):
+
+```bash
+sudo tailscale up
+```
+
+`services.tailscale.enable` only installs and starts the daemon. Node
+identity lives in `/var/lib/tailscale`, so a rebuilt host is *ready* to join,
+not joined.
+
+**Unlock the SSH agent once** (any host whose `secrets.nix` provisions an SSH
+key), from inside a real graphical session, not an ad-hoc SSH shell:
+
+```bash
+ssh-add ~/.ssh/id_ed25519
+```
+
+After that gnome-keyring caches the passphrase across reboots. See
+`docs/decisions.md` for why `ssh-add -l` is the wrong way to check this
+worked.
+
+## 9. Verify
 
 ```bash
 nixos-rebuild switch --flake .#<name>

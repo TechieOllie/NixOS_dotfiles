@@ -33,8 +33,12 @@ operator's to run.
 Underneath, and for humans:
 
 ```bash
-nix flake check                          # works today: evaluates every nixosConfigurations attribute and package.
-                                         # Formatting/statix/deadnix checks are NOT wired in yet (Phase 8).
+nix flake check                          # the full gate: format + statix + deadnix, every
+                                         # nixosConfigurations attribute and package, AND a real
+                                         # closure build per host. Expensive — see --no-build below.
+nix flake check --no-build               # `just check-fast`, and what driver.sh check runs.
+nix fmt                                  # nixfmt (RFC 166), in place
+nix develop                              # just/nixfmt/statix/deadnix/nixd/nil/sops/age
 nix build .#nixosConfigurations.<host>.config.system.build.toplevel
 nix build .#installer-iso
 nixos-rebuild switch --flake .#<host>
@@ -44,9 +48,12 @@ nixos-anywhere --flake .#<host> root@<installer-ip>
 sops updatekeys hosts/<host>/secrets/secrets.yaml   # re-encrypt after adding a recipient in .sops.yaml
 ```
 
-`nix flake check` is meant to become the *only* command CI runs — wire new
-validation in as a flake check, not a separate script. A `justfile` is
-deferred to Phase 8; don't add one earlier.
+`nix flake check` is the *only* command CI runs (`.github/workflows/check.yml`)
+— wire new validation in as a flake check, not a separate script and not as an
+extra CI step. A `justfile` now exists at the repo root; `just` alone lists the
+recipes. Lint exclusions are deliberate and documented: `statix.toml` disables
+`empty_pattern`/`repeated_keys`, and generated `hardware-configuration.nix`
+files are excluded from all three lints (see `handWrittenNix` in `flake.nix`).
 
 ## Hosts
 
@@ -65,20 +72,24 @@ boot-time recovery.
 
 ## What's on disk
 
-- **`flake.nix`** — composition root only. Inputs: `nixpkgs` (nixos-unstable), `home-manager`, `disko`, `sops-nix`, `noctalia-greeter`, `noctalia`, `zen-browser`. Two `nixosConfigurations` (vm, laptop) built via `lib/mkHost.nix`, plus a `packages.${system}.installer-iso` output.
+- **`flake.nix`** — composition root only. Inputs: `nixpkgs` (nixos-unstable), `home-manager`, `disko`, `sops-nix`, `noctalia-greeter`, `noctalia`, `zen-browser`, `chaotic`, `millennium`. Two `nixosConfigurations` (vm, laptop) built via `lib/mkHost.nix`, plus `packages.${system}.installer-iso`, `formatter`, `devShells` and `checks` (Phase 8).
+  - `chaotic` (CachyOS Proton + gaming kernel) and `millennium` (Millennium-patched Steam) also deliberately don't `.follows` this repo's nixpkgs, for two different upstream-stated reasons — chaotic loses its cache and would compile a kernel from source; Millennium's Bun FOD breaks when its pinned revision moves. Both are Phase 7, both only reach hosts that import `profiles/gaming.nix`.
   - `noctalia` deliberately does **not** `.follows` this repo's nixpkgs — following it would disable Noctalia's Cachix cache and force a from-source build of a native Wayland/OpenGL project on every host. The accepted cost is a second nixpkgs copy in the closure. `zen-browser` *does* follow, having no cache to lose.
-- **`lib/mkHost.nix`** — `{ system, hostPath }: nixosSystem`, wiring disko, sops-nix, `modules/options.nix`, the host, and `home-manager.nixosModules.home-manager` (with `useGlobalPkgs`). Threads `noctalia-greeter`/`noctalia`/`zen-browser` through `specialArgs`/`extraSpecialArgs` **without importing them** — the consuming modules import them themselves, so only hosts that want them carry them.
+- **`lib/mkHost.nix`** — `{ system, hostPath }: nixosSystem`, wiring disko, sops-nix, `modules/options.nix`, the host, and `home-manager.nixosModules.home-manager` (with `useGlobalPkgs`). Threads `noctalia-greeter`/`noctalia`/`zen-browser`/`chaotic`/`millennium` through `specialArgs`/`extraSpecialArgs` **without importing them** — the consuming modules import them themselves, so only hosts that want them carry them.
 - **`hosts/installer/`** — not a real host and has no `nixosConfigurations` entry: just `variables.nix` holding the operator identity (`user.name`/`fullName`/`sshPublicKey`) that `installer-iso` needs, kept separate so it can't drift from a real host's. A public SSH key isn't a secret, so sops doesn't apply.
-- **`modules/options.nix`** — the `features` submodule: `snapshots` and `niri`, both defaulting `false`. A submodule, not `attrsOf bool`, so a typo'd flag is an eval error rather than a silently inert one. `docker`/`steam`/`gamemode` were declared here for a long time without a single module ever reading them, and were removed; re-add each in the same commit as the module that consumes it.
-- **`modules/system/`** — `boot`, `networking`, `nix`, `ssh`, `users`, `shell`, `fonts`, `nix-ld`. All unconditional, all bundled by `profiles/base.nix`.
-- **`modules/services/`** — `snapper` (gated on `features.snapshots`).
-- **`modules/desktop/`** — `niri`, `greetd`, `noctalia`, `theming`, `nautilus`, `unfree`. All gated on `features.niri`.
-- **`profiles/base.nix`** — the only profile so far. The universal foundation every host needs regardless of role, not a role itself.
+- **`modules/options.nix`** — the `features` submodule: `snapshots`, `niri`, `gaming`, `docker`, `tailscale`, `printing`, all defaulting `false`. A submodule, not `attrsOf bool`, so a typo'd flag is an eval error rather than a silently inert one. `docker`/`steam`/`gamemode` were declared here for a long time without a single module ever reading them, and were removed; re-add each in the same commit as the module that consumes it.
+- **`modules/system/`** — `boot`, `networking`, `nix`, `ssh`, `users`, `shell`, `fonts`, `nix-ld`, `unfree`. All unconditional, all bundled by `profiles/base.nix`. `unfree` moved here from `modules/desktop/` in Phase 7: gating an unfree allow-list on `features.niri` meant a gaming host with no compositor couldn't allow Steam.
+- **`modules/services/`** — `snapper` (`features.snapshots`), `docker`, `tailscale`, `printing` (each on its own flag). The latter three are on the laptop and desktop only; the VM runs none of them.
+- **`modules/programs/`** — `steam` (`features.gaming`): Millennium-patched Steam + `proton-cachyos`, imports the `chaotic`/`millennium` flake modules itself.
+- **`modules/hardware/`** — `controllers` (`features.gaming`): the `xone`/`xpadneo` out-of-tree Xbox controller kernel modules.
+- **`modules/desktop/`** — `niri`, `greetd`, `noctalia`, `theming`, `nautilus`. All gated on `features.niri`.
+- **`profiles/`** — `base.nix` (the universal foundation, imported directly by every host) and `gaming.nix` (Phase 7, the first actual role profile: adds the Steam and controller modules, sets `features.gaming = mkDefault true`; desktop only). Role profiles are purely additive and deliberately do **not** import `base.nix` — each host imports it itself, so no host's `default.nix` hides the fact that it has a bootloader. The desktop's CachyOS kernel and `lact` deliberately stay in that host's own `default.nix` — they describe one machine's hardware, not the role.
+- **`justfile`, `statix.toml`, `.github/workflows/check.yml`** — Phase 8. CI runs `nix flake check` and nothing else.
 - **`home/`** — machine-agnostic Home Manager entry point (`default.nix`) plus one file per program. There is no per-host Home Manager entry point.
 - **`wallpapers/`** — the operator's collection (~35 images), read live from each host's own `~/.dotfiles` clone rather than the Nix store.
 - **`.sops.yaml`** — two recipients (vm, laptop), each with its own `creation_rules` entry. The desktop gets one when bootstrapped.
 - Short `README.md` in each structural directory: a stable "what belongs here and why", not a changelog. Add one when a new structural directory appears; update one only when that directory's *purpose* changes.
-- `overlays/`, `pkgs/`, `scripts/`, `assets/`, `modules/hardware/`, `modules/programs/` don't exist yet.
+- `overlays/`, `pkgs/`, `scripts/`, `assets/` don't exist yet. There is no `.envrc`, so direnv does not enter the dev shell automatically.
 
 ## Architecture
 
@@ -93,8 +104,8 @@ one directly below it; a module never knows which host or profile uses it.
   - `features` (capability toggles) needs real default/override merge semantics, so it's a NixOS option. Modules read `config.features.x`; Home Manager modules read the NixOS side via `osConfig.features.x`.
   - Never pass `features` through `specialArgs` "just in case", and never reach into `hosts/` with an ad hoc `import`. One path per kind of data is load-bearing for the whole merge model.
 - **Hosts** describe one machine and stay small: generated `hardware-configuration.nix` (never hand-edited), `variables.nix`, `features.nix` (normal priority, wins over profile defaults), and which profiles they import.
-- **Profiles** describe a *role*: they import the modules that role always needs and set feature defaults with `lib.mkDefault`. Treat "add a module import" and "set its matching `mkDefault`" as one atomic edit — an import without a default is inert code sitting in the closure but switched off. Future role profiles should import `base.nix` rather than duplicate it.
-- **Modules** configure exactly one feature and gate on `config.features.x` via `lib.mkIf`. Where something splits across system and user config (niri is the canonical case), the system half (package, session entry, greetd wiring) lives in `modules/desktop/` and the user half (keybindings, layout, appearance) in `home/`.
+- **Profiles** describe a *role*: they import the modules that role always needs and set feature defaults with `lib.mkDefault`. Treat "add a module import" and "set its matching `mkDefault`" as one atomic edit — an import without a default is inert code sitting in the closure but switched off. Role profiles must never restate base's module list — but they must not import `base.nix` either; every host imports it directly, so a role profile only ever describes what sits *on top of* the baseline.
+- **Modules** configure exactly one feature and gate on `config.features.x` via `lib.mkIf`. One flag can gate several modules (`features.niri` gates all of `modules/desktop/`; `features.gaming` gates `modules/programs/steam.nix`, `modules/hardware/controllers.nix` and `home/heroic.nix`) — one flag per *capability*, not per file. Where something splits across system and user config (niri is the canonical case), the system half (package, session entry, greetd wiring) lives in `modules/desktop/` and the user half (keybindings, layout, appearance) in `home/`.
 - **`lib/`** holds helpers. Further helpers beyond `mkHost.nix` should wait until the same pattern has been hand-written at least twice across real hosts.
 - Prefer readability over cleverness, one responsibility per module, comments explaining *why* not *what*, small commits. Avoid a second source of truth for anything the module system can already merge by priority.
 
@@ -106,7 +117,8 @@ one directly below it; a module never knows which host or profile uses it.
 - **Autostarted apps** get their own `systemd.user.services.<name>` (`PartOf`/`After = "graphical-session.target"`, `WantedBy = [ "graphical-session.target" ]`) in their own Home Manager module — not a shared niri autostart file and not the app's own autostart toggle.
 - **Naming**: lowercase files named for responsibility (`greetd.nix`, `docker.nix`), not implementation. `hosts/*/features.nix` and a profile's role file don't share a naming pattern despite both setting `features.*` — grep for `features =` / `config.features` when auditing, not for filenames.
 - **Plan substantial work before implementing it** (Plan mode), and research the operator's existing real config before deciding what to port. Every phase so far was done this way, and it has repeatedly caught wrong assumptions that eval alone wouldn't.
-- **Eval passing is not verification.** Every phase has produced bugs that only surfaced when an app was actually opened on the VM. Confirm behavior live before calling something done.
+- **Eval passing is not verification.** Every phase has produced bugs that only surfaced when an app was actually opened on the VM. Confirm behavior live before calling something done. Phase 7's entire gaming stack is currently eval-only for exactly this reason — it targets the desktop, which has never been booted.
+- **A lint or check that cannot fail is worse than none.** Verify each new flake check against a deliberately broken canary file before trusting it; a file-selection expression that silently matches nothing passes just as green as one that works.
 
 ## Standing gotchas
 
@@ -135,20 +147,25 @@ Each of these has bitten at least once and will again. Full write-ups in
 | 4 | Terminal — Ghostty, Zsh, Starship, Git, Lazygit | done, verified live |
 | 5 | Theming — cursor, icons, GTK/Qt | done, verified live |
 | 6 | Applications — VS Code, Zen Browser, Vesktop, Nautilus, Feishin, Obsidian | done, verified live |
-| 7 | Extra features — Docker, Steam, Proton GE, Tailscale, gaming profile | not started |
-| 8 | Long-term — `nix flake check` as the CI gate, `justfile`, doc upkeep, multi-host hardening | not started |
+| 7 | Extra features — Docker, Tailscale, printing, gaming profile | done, **eval-only** — the gaming stack targets the desktop, which can't be eval'd where it lives (no `nixosConfigurations` entry); verified by temporarily importing `profiles/gaming.nix` on the VM. Nothing has run on hardware. |
+| 8 | Long-term — `nix flake check` as the CI gate, `justfile`, doc upkeep, multi-host hardening | done except multi-host hardening, which is blocked on hardware (both `/dev/CHANGEME` placeholders; the desktop's missing `hardware-configuration.nix`, age key and flake entry) |
 
-Three once-planned modules were abandoned and will not be created:
+Six once-planned modules were abandoned and will not be created:
 `modules/desktop/stylix.nix` (superseded by Noctalia's own native theming —
 adding Stylix would mean two systems fighting over the same GTK/Qt/terminal
 files), `modules/desktop/portals.nix` (portals come free with `programs.niri`'s
-upstream module), and `hardware/bluetooth.nix` (Bluetooth comes from
-`programs.noctalia.recommendedServices.enable`). `ARCHITECTURE.md` records all
-three; don't re-propose them.
+upstream module), `modules/hardware/bluetooth.nix` and `audio.nix` (Bluetooth
+and PipeWire both come from `programs.noctalia.recommendedServices.enable`),
+`modules/hardware/graphics.nix` (the only option the stack needs is
+`hardware.graphics.enable32Bit`, which lives with the thing requiring it;
+AMD needs nothing else declared), and `modules/programs/gaming.nix` (it would
+have held gamemode/gamescope/MangoHud, all dropped when the operator chose a
+minimal gaming stack). `ARCHITECTURE.md` records all six; don't re-propose
+them.
 
 ## Software stack
 
-Niri, greetd, Noctalia Greeter, Noctalia Shell v5 (native theming, GTK/Qt theming templates), Papirus icons, Bibata cursors, adw-gtk3, qt5ct/qt6ct · Ghostty, Zsh, Starship, Git, Lazygit, Fastfetch, eza, bat, fd, ripgrep, fzf, zoxide, yazi, btop · Zen Browser, VS Code, Vesktop, Nautilus, Feishin, Obsidian · Steam, Proton GE, Gamescope, MangoHud, Gamemode, Millennium · Tailscale · Docker Engine + Compose · PipeWire, Bluetooth, Printing, NetworkManager, Snapper · nixd, nil, alejandra, statix, deadnix, direnv, just.
+Niri, greetd, Noctalia Greeter, Noctalia Shell v5 (native theming, GTK/Qt theming templates), Papirus icons, Bibata cursors, adw-gtk3, qt5ct/qt6ct · Ghostty, Zsh, Starship, Git, Lazygit, Fastfetch, eza, bat, fd, ripgrep, fzf, zoxide, yazi, btop · Zen Browser, VS Code, Vesktop, Nautilus, Feishin, Obsidian · Steam (Millennium-patched), proton-cachyos, Heroic, umu-launcher, xone/xpadneo · Tailscale · Docker Engine + Compose · PipeWire, Bluetooth, Printing (CUPS + Avahi), NetworkManager, Snapper · nixd, nil, nixfmt, statix, deadnix, just, sops, age (all in the dev shell).
 
 Neovim is **not** Home-Manager-managed: `~/.config/nvim` is an ordinary manual
 clone of the operator's separate `github:TechieOllie/neovim_dotfiles` repo,
@@ -157,3 +174,17 @@ prerequisites Mason needs at runtime (`gnumake`, `gcc`, `tree-sitter`,
 `python3`, `nodejs`, `go`, `php`, `unzip`, `ripgrep`) — plus
 `modules/system/nix-ld.nix`, without which Mason's prebuilt manylinux wheels
 can't run at all.
+
+The gaming stack is deliberately minimal, by the operator's explicit choice:
+gamescope, gamemode, MangoHud, Lutris, Bottles, goverlay, protontricks,
+ludusavi, steamtinkerlaunch and vkbasalt were each proposed and declined, and
+Proton GE was replaced by CachyOS's fork. The GUI Proton installers
+(protonup-qt, protonplus) are also absent on purpose — they write Proton
+builds into `~/.steam` by hand, which is the app-owned-mutable-state problem
+above; `programs.steam.extraCompatPackages` does it declaratively instead.
+Read `docs/decisions.md`'s Phase 7 section before re-proposing any of them.
+
+Millennium is **not** in nixpkgs (open packaging request, nixpkgs#382086) and
+neither is CachyOS's Proton or kernel — all three come from third-party
+flakes, which is why `flake.nix` has two inputs that don't follow this repo's
+nixpkgs.

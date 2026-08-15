@@ -221,44 +221,72 @@ Profiles describe the *role* a machine plays. A host is the physical machine; a 
 ```
 profiles/
     base.nix          # exists — see below; the one profile that isn't a role
+    gaming.nix        # exists (Phase 7) — the first actual role profile
     laptop.nix        # planned
     desktop.nix       # planned
-    gaming.nix        # planned
     server.nix        # planned
     workstation.nix   # planned
 ```
 
-Only `base.nix` exists today, and it is deliberately *not* a role: it's the
-universal foundation (boot, nix, networking, users, ssh, shell, fonts, nix-ld)
-every host needs whatever it's for, extracted once a second host's imports
-visibly overlapped with the first. Role profiles stay deferred until two hosts
-actually diverge — the laptop and desktop are still scaffolded identically, so
-there is nothing yet for a `laptop.nix` to say that a `desktop.nix` wouldn't.
-When role profiles do arrive they should import `base.nix` rather than
-duplicate it. Until then, all three hosts import `base.nix` directly, and the
-VM additionally imports its `modules/desktop/*` set by hand.
+`base.nix` is deliberately *not* a role: it's the universal foundation (boot,
+nix, networking, users, ssh, shell, fonts, nix-ld, unfree) every host needs
+whatever it's for, extracted once a second host's imports visibly overlapped
+with the first.
+
+**Every host imports `base.nix` itself; role profiles are purely additive and
+never import it.** A role profile says what a machine has *on top of* the
+baseline, so `gaming.nix` does not import `base.nix` and neither should any
+profile that follows. Two reasons, both about reading the code rather than
+about what it evaluates to (Nix dedupes imports by path, so this is a
+readability rule, not a functional one):
+
+- Every host's `default.nix` shows the same thing — that this machine has a
+  bootloader, users and nix settings — instead of that fact being visible on
+  some hosts and hidden inside a profile on others.
+- Otherwise every future profile has to answer "does this one include base?",
+  and eventually two will answer differently.
+
+This is *not* in tension with "don't duplicate `base.nix`": the rule that
+matters is that a role profile must never restate base's module list.
+Declining to mention base is not restating it. The failure mode of forgetting
+`base.nix` on a new host is a loud eval failure, not a silent one.
+
+`gaming.nix` (Phase 7) is the first real role profile: it adds
+`modules/programs/steam.nix` and `modules/hardware/controllers.nix`, and sets
+`features.gaming = lib.mkDefault true`. Only the desktop imports it.
+Note what it deliberately excludes — that host's CachyOS kernel and its
+`lact` GPU control live in the host's own `default.nix`, because they
+describe one machine's hardware rather than the role; a future gaming host on
+different hardware must not inherit a kernel choice from a profile.
+
+Further role profiles stay deferred until two hosts actually diverge — the
+laptop and desktop are otherwise still scaffolded identically, so there is
+nothing yet for a `laptop.nix` to say that a `desktop.nix` wouldn't. The VM
+additionally imports its `modules/desktop/*` set by hand.
 
 **What a profile actually contains**: a profile is a plain module that does two things — nothing more:
 
-1. Imports the set of modules that role always needs.
+1. Imports the set of modules that role always needs (never `base.nix`, which every host imports itself).
 2. Sets the *default* value of relevant feature flags for that role, using `mkDefault` so a host can still override them.
 
+`profiles/gaming.nix`, the only role profile on disk, is the whole pattern:
+
 ```nix
-# profiles/gaming.nix
+# profiles/gaming.nix — comments trimmed; see the real file
 { lib, ... }:
 {
   imports = [
     ../modules/programs/steam.nix
-    ../modules/programs/gaming.nix
-    ../modules/hardware/graphics.nix
+    ../modules/hardware/controllers.nix
   ];
 
-  features = {
-    steam = lib.mkDefault true;
-    gamemode = lib.mkDefault true;
-  };
+  features.gaming = lib.mkDefault true;
 }
 ```
+
+Note that one flag defaults on here, not one per module: `features.gaming`
+gates both imports above *and* `home/heroic.nix` on the Home Manager side.
+Flags track capabilities, not files — see the module tree above.
 
 Because `features` is a declared option (see **Declaring the `features` Option** above), `lib.mkDefault` here genuinely sets a low-priority default that the module system will merge — it isn't just data sitting in an attrset.
 
@@ -294,6 +322,8 @@ modules/
         shell.nix
         fonts.nix
         nix-ld.nix
+        unfree.nix         # nixpkgs.config.allowUnfreePredicate allow-list — moved here
+                           # from desktop/ in Phase 7, see below
 
     desktop/           # all gated on config.features.niri
         niri.nix           # compositor package + session, system-level only
@@ -301,29 +331,44 @@ modules/
         noctalia.nix       # Noctalia Shell — native theming, replaces Stylix (see Phase 3)
         theming.nix        # cursor/icon-theme packages installed system-wide, for the greeter (see Phase 5)
         nautilus.nix       # package + dconf/gvfs/tumbler — same system/Home Manager split as niri (see Phase 6)
-        unfree.nix         # nixpkgs.config.allowUnfreePredicate allow-list (see Phase 6, Home Manager section below)
 
-    services/
-        snapper.nix        # gated on config.features.snapshots
-        docker.nix         # planned (Phase 7)
-        tailscale.nix      # planned (Phase 7)
-        printing.nix       # planned (Phase 7)
+    services/          # each gated on its own flag
+        snapper.nix        # config.features.snapshots
+        docker.nix         # config.features.docker
+        tailscale.nix      # config.features.tailscale
+        printing.nix       # config.features.printing
 
-    hardware/          # planned — directory does not exist yet
-        audio.nix          # planned
-        graphics.nix       # planned
+    hardware/          # classes of hardware a machine may or may not have
+        controllers.nix    # xone + xpadneo, config.features.gaming
 
-    programs/          # planned — directory does not exist yet
-        steam.nix          # planned (Phase 7)
-        gaming.nix         # planned (Phase 7)
+    programs/          # system-level program modules
+        steam.nix          # Steam/Millennium/proton-cachyos, config.features.gaming
 ```
 
-Everything above without a `# planned` marker exists on disk today. Two entries
-that appeared in earlier drafts of this tree will **not** be created:
-`desktop/stylix.nix` (superseded by Noctalia's own native theming — see Phase 3)
-and `desktop/portals.nix` (XDG portals come free with `programs.niri`'s upstream
-module, which already pulls in the portal packages and the gnome-keyring
-integration; there is nothing left for a module of our own to configure).
+Everything above exists on disk today. Four entries that appeared in earlier
+drafts of this tree will **not** be created:
+
+- `desktop/stylix.nix` — superseded by Noctalia's own native theming (Phase 3).
+- `desktop/portals.nix` — XDG portals come free with `programs.niri`'s upstream
+  module, which already pulls in the portal packages and the gnome-keyring
+  integration.
+- `hardware/audio.nix` — PipeWire arrives with
+  `programs.noctalia.recommendedServices.enable`.
+- `hardware/graphics.nix` — the only graphics option the stack needs is
+  `hardware.graphics.enable32Bit`, which belongs with the thing requiring it
+  (`programs/steam.nix`). AMD graphics need nothing else declared.
+
+`programs/gaming.nix` was also planned, as a second module beside `steam.nix`
+holding gamemode/gamescope/MangoHud. The operator chose a minimal gaming
+stack instead, so there was nothing left for it to contain; Heroic and
+umu-launcher, the only other pieces, are user-level and live in
+`home/heroic.nix`.
+
+**Note that `features.gaming` gates three modules across two directories**
+(`programs/steam.nix`, `hardware/controllers.nix`, `home/heroic.nix`), exactly
+as `features.niri` gates all of `modules/desktop/`. One flag per *capability*,
+not one flag per file — a module owning one responsibility does not imply a
+capability owning one module.
 
 **System vs. Home Manager split for desktop modules (previously blurred):** where a program has both a system half and a user half — Niri is the clearest example — the split is:
 
@@ -361,7 +406,7 @@ Examples of what Home Manager owns: Ghostty, Zsh, Starship, Git configuration, V
 
 **Electron apps need `NIXOS_OZONE_WL` set, or they silently try X11 and crash.** nixpkgs' own Electron-based package wrappers (`vesktop`, `vscode`, and any future Electron app) only add their `--ozone-platform-hint=auto` Wayland flag when `$NIXOS_OZONE_WL` is set — without it, Electron falls back to X11, which fails outright here since XWayland is disabled repo-wide. This is set once, system-wide (`environment.sessionVariables.NIXOS_OZONE_WL = "1";`, `modules/desktop/niri.nix`) rather than per-app — confirmed live (Phase 6) that niri's own KDL `environment {}` block does *not* reach the systemd `--user` manager's environment the way this does, so per-app Home Manager `sessionVariables` wouldn't be a reliable substitute. Any future Electron app needs nothing extra for this specifically; it's already covered.
 
-**Some Home-Manager-owned apps still need one narrow system-level touchpoint.** The System vs Home Manager split above (package + session at the system level, user config in Home Manager) describes apps like Niri that have a real system-level *service*. Most Phase 6 applications don't — they're entirely Home Manager's (`home.packages`/`programs.*`, matching the Examples list above), but two needed a single NixOS-level line anyway because of *how* packages are unlocked, not because they need a system service: an unfree package (`pkgs.vscode`, `pkgs.obsidian`) is rejected at eval unless `nixpkgs.config.allowUnfreePredicate` allows it, and that option can only be set where `pkgs` itself is built — home-manager's `useGlobalPkgs = true` (`lib/mkHost.nix`) means it shares one `pkgs` instance already finalized by the time Home Manager evaluates, so the allow-list can't live in the home-manager module that actually installs the package. `modules/desktop/unfree.nix` is a single small module for this one purpose, growing a named list (not `nixpkgs.config.allowUnfree = true` outright) as more unfree packages are actually used — Phase 7's Steam/Proton GE will likely extend it the same way.
+**Some Home-Manager-owned apps still need one narrow system-level touchpoint.** The System vs Home Manager split above (package + session at the system level, user config in Home Manager) describes apps like Niri that have a real system-level *service*. Most Phase 6 applications don't — they're entirely Home Manager's (`home.packages`/`programs.*`, matching the Examples list above), but two needed a single NixOS-level line anyway because of *how* packages are unlocked, not because they need a system service: an unfree package (`pkgs.vscode`, `pkgs.obsidian`) is rejected at eval unless `nixpkgs.config.allowUnfreePredicate` allows it, and that option can only be set where `pkgs` itself is built — home-manager's `useGlobalPkgs = true` (`lib/mkHost.nix`) means it shares one `pkgs` instance already finalized by the time Home Manager evaluates, so the allow-list can't live in the home-manager module that actually installs the package. `modules/system/unfree.nix` is a single small module for this one purpose, growing a named list (not `nixpkgs.config.allowUnfree = true` outright) as more unfree packages are actually used — Phase 7 extended it with `steam`, `steam-unwrapped` and `xone-dongle-firmware` the same way. It lived in `modules/desktop/` and was gated on `config.features.niri` until Phase 7, when that gate turned out to be a latent bug: a gaming host with no compositor could not allow Steam at all, and failed eval with an unfree-license error pointing at nixpkgs rather than at the gate. It is now ungated and bundled by `profiles/base.nix` — an allow-list entry costs nothing on a host that never evaluates the package it names.
 
 **Noctalia theming: three template layers, pick the right one per app.** `home/noctalia.nix`'s `theme.templates` has three distinct mechanisms, not one:
 
@@ -645,15 +690,20 @@ This is deliberately last in the roadmap, not first — wrapping commands before
 
 ## Validation and CI
 
-**Decision (previously left open):** run formatting and static analysis as `nix flake check` checks, not as a separate ad hoc script, so `nix flake check` is the single command that gates a commit both locally and in CI. Recommended tools, wired in as flake checks:
+**Implemented in Phase 8.** Formatting and static analysis run as `nix flake check` checks, not as a separate ad hoc script, so `nix flake check` is the single command that gates a commit both locally and in CI. The checks in `flake.nix`:
 
-- `alejandra` — formatting
-- `statix` — static analysis / anti-pattern detection
-- `deadnix` — dead code detection
+- `format` — `nixfmt`, i.e. RFC 166 style. **Not `alejandra`**, which earlier drafts of this document recommended: the repo was already hand-written in RFC 166 style, so alejandra would have reformatted every file to gain nothing. (`nixpkgs` now calls this formatter plain `nixfmt`; `nixfmt-rfc-style` is an alias that warns.) Also exposed as `formatter.${system}`, so `nix fmt` formats in place.
+- `statix` — static analysis / anti-pattern detection, configured by `statix.toml`.
+- `deadnix` — dead code detection.
+- `build-<hostname>` — one per entry in `nixosConfigurations`, built by `lib.mapAttrs'` over `self.nixosConfigurations` rather than listed by hand, so a host cannot be added without also being checked.
 
-**Gap to close (previously missing):** formatting and static analysis catch style issues, not evaluation or build failures. `nix flake check` already evaluates every attribute under `nixosConfigurations` by default, which surfaces most eval errors, but a check that goes one step further and builds each host's system closure (`nix build .#nixosConfigurations.<host>.config.system.build.toplevel` for every host in the flake) catches breakage that only shows up once a derivation actually builds — a bad package reference, a broken overlay, a module that evaluates fine but fails to build. Wire this in as its own flake check so a host that can't build is caught in CI, not on the machine mid-`switch`.
+The last of these closes the gap that formatting and static analysis leave: `nix flake check` already *evaluates* every attribute under `nixosConfigurations`, which surfaces most eval errors, but building each host's real system closure catches breakage that only shows up once a derivation actually builds — a bad package reference, a broken overlay, a module that evaluates fine but fails to build. The cost is that a full `nix flake check` is now genuinely expensive; `nix flake check --no-build` (`just check-fast`, and what the repo's own driver script uses) is the routine local gate.
 
-GitHub Actions (Phase 8 of the roadmap) then only needs to run `nix flake check`, rather than reimplementing a separate validation pipeline — CI and local validation stay identical by construction.
+**Two deliberate exclusions**, both recorded in `docs/decisions.md`: generated `hardware-configuration.nix` files are excluded from all three lints (this repo never hand-edits them, so a linter fix would be undone on the next regeneration), and statix's `empty_pattern` and `repeated_keys` lints are disabled in `statix.toml` because they contradict how this repo's modules are deliberately written.
+
+**Test that a check can fail.** Each lint was verified against a deliberately broken canary file before being trusted. A check whose file-selection expression silently matches nothing passes exactly as green as one that works.
+
+`.github/workflows/check.yml` runs `nix flake check` and nothing else, rather than reimplementing a separate validation pipeline — CI and local validation stay identical by construction. Its only addition is the noctalia and chaotic-nyx substituters, which a NixOS host gets from its own config but a CI runner has no way to know about.
 
 ## Naming Conventions
 
@@ -692,7 +742,17 @@ Zen Browser, Visual Studio Code (official build), Vesktop, Nautilus, Feishin, Ob
 
 ## Gaming
 
-Steam, Proton GE, Gamescope, MangoHud, Gamemode, Millennium.
+Steam (patched by Millennium), proton-cachyos, Heroic, umu-launcher, Xbox
+controller drivers (xone + xpadneo). Desktop host only.
+
+Gamescope, MangoHud and Gamemode were in earlier versions of this list and
+were **deliberately dropped** in Phase 7 in favour of a minimal stack — as
+were Lutris, Bottles, goverlay, protontricks, ludusavi, steamtinkerlaunch and
+vkbasalt, all of which were proposed and declined. Proton GE was replaced by
+CachyOS's Proton fork, and the GUI Proton installers (protonup-qt,
+protonplus) are deliberately absent, `programs.steam.extraCompatPackages`
+doing that job declaratively instead. See `docs/decisions.md` before
+re-proposing any of them.
 
 ## Networking
 
@@ -704,15 +764,19 @@ Docker Engine, Docker Compose.
 
 ## Core Services
 
-PipeWire, Bluetooth, Printing, NetworkManager, Snapper (btrfs snapshots).
+PipeWire, Bluetooth, Printing (CUPS + Avahi), NetworkManager, Snapper (btrfs
+snapshots). PipeWire and Bluetooth arrive with
+`programs.noctalia.recommendedServices.enable` rather than from a module of
+this repo's own.
 
 ## Development
 
-*All planned, none installed yet:* nixd, nil, alejandra, statix, deadnix,
-direnv, just. The formatting/lint tools land with Phase 8's `nix flake check`
-gate, and `just` with the command runner described in Part 3 — `flake.nix` has
-no `checks` or `devShells` output today, and there is no `justfile` or
-`.envrc`.
+nixd, nil, nixfmt, statix, deadnix, just, sops and age are provided by
+`devShells.${system}.default` (`nix develop`), added in Phase 8 — a fresh
+clone needs none of them installed globally. `alejandra` was dropped in
+favour of `nixfmt`; see **Validation and CI** above. The `justfile` exists at
+the repo root. There is still no `.envrc`, so direnv doesn't yet enter the
+dev shell automatically.
 
 ---
 
@@ -808,26 +872,35 @@ and the exact packages/options verified.
 
 ## Phase 7 — Extra Features
 
-**Status: not started**, except for snapshots, which landed early (see below).
+**Status: done — eval-verified, not yet run on hardware.**
 
-- Docker, Steam, Proton GE, Tailscale.
-- Gaming profile.
-- Btrfs snapshots (snapper) — **already done**, ahead of the rest of this phase: `modules/services/snapper.nix` and the `features.snapshots` toggle both exist and are enabled on the laptop and desktop hosts. See **Filesystem Choice and Snapshots** above; the subvolume layout itself is decided per-host at install time (in that host's `disko.nix`).
+- Docker, Tailscale, printing: `modules/services/{docker,tailscale,printing}.nix`, gated on `features.docker`/`features.tailscale`/`features.printing`, enabled on the laptop and desktop. The VM deliberately runs none of them.
+- Gaming: `profiles/gaming.nix` + `modules/programs/steam.nix` + `modules/hardware/controllers.nix` + `home/heroic.nix`, all gated on `features.gaming`, desktop only. Steam is Millennium-patched, Proton is CachyOS's fork, and the desktop additionally pins `boot.kernelPackages = pkgs.linuxPackages_cachyos` and enables `services.lact` in its own `default.nix`.
+- Btrfs snapshots (snapper) — landed early, ahead of the rest of this phase: `modules/services/snapper.nix` and the `features.snapshots` toggle, enabled on the laptop and desktop hosts. See **Filesystem Choice and Snapshots** above; the subvolume layout itself is decided per-host at install time (in that host's `disko.nix`).
 
-Each of `docker`, `steam`, and `gamemode` was declared as a `features.*` flag
+Each of `docker`, `steam`, and `gamemode` had been declared as a `features.*` flag
 during Phase 1 and later removed, having gone the whole time without a single
-module reading it — re-add each one in the same commit as the module that
-consumes it, per the atomic import-plus-`mkDefault` rule above.
+module reading it. `docker` returned in this phase alongside the module that
+consumes it, per the atomic import-plus-`mkDefault` rule above; `steam` and
+`gamemode` did not — the capability is one `features.gaming` flag gating three
+modules, not one flag per module.
+
+**The limit of "done" here:** everything the gaming stack configures targets
+the desktop, which has no `nixosConfigurations` entry yet, so it was verified
+by temporarily importing `profiles/gaming.nix` on the VM, evaluating, and
+reverting. That is an evaluation, not a boot. Per this repo's own standing
+rule, eval passing is not verification — the first real test is the desktop's
+bootstrap.
 
 ## Phase 8 — Long-Term Improvements
 
-**Status: not started.**
+**Status: done, except multi-host hardening, which is blocked on hardware.**
 
-- `nix flake check` as unified CI gate (GitHub Actions calling the same command used locally).
-- Command runner (`justfile`) wrapping `switch`, `build`, `rollback`, `update`, `check`, `secrets-rekey` once these are being typed by hand often enough to be worth naming.
-- Configuration polishing.
-- Documentation upkeep.
-- Multi-host support hardening.
+- `nix flake check` as unified CI gate — done. `.github/workflows/check.yml` runs that one command; `flake.nix` carries `checks` (format/statix/deadnix/per-host closure builds), `formatter` and `devShells`. See **Validation and CI** above.
+- Command runner (`justfile`) — done, at the repo root, wrapping `switch`, `build`, `eval`, `rollback`, `update`, `check`, `check-fast`, `fmt`, `iso`, `secrets-rekey` and `install`.
+- Configuration polishing — done: the unfree allow-list moved out from behind the wrong feature gate (see above), and the whole repo was brought under a formatter.
+- Documentation upkeep — done: this file, `CLAUDE.md`, `docs/decisions.md` and every directory README were brought back in line with what's on disk.
+- Multi-host support hardening — **still open, and not a documentation problem.** Both real hosts still carry a `/dev/CHANGEME` placeholder in their `disko.nix`, resolvable only from an installer environment; the desktop additionally lacks a `hardware-configuration.nix`, a sops age key, and a `nixosConfigurations` entry. Nothing in this repo can close those; they need the machines.
 - *Worth considering, not committing to yet:* NixOS's `nixosTest` framework can boot a host's config in a QEMU VM and assert on runtime behavior (does Docker actually start, does greetd actually produce a login) — a step beyond "does it build" that the current CI gate doesn't cover. Heavier to set up and run, so introduce it only if a build-only check has actually let a real regression through.
 - *Worth considering, not committing to yet:* once `hosts/` has several entries, `flake.nix`'s per-host list in `nixosConfigurations` could be generated from `builtins.readDir ./hosts` instead of hand-maintained. Don't do this until adding a host to the list-by-hand has actually become repetitive — doing it earlier is exactly the kind of abstraction-before-the-pattern-repeats this project avoids.
 

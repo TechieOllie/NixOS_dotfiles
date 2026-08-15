@@ -4,7 +4,17 @@ A single-repository, flake-based NixOS configuration — modular and reproducibl
 
 ## Quick start
 
+There is a `justfile` wrapping all of these — run `just` to list the recipes,
+and `nix develop` for the toolchain (just, nixfmt, statix, deadnix, nixd, nil,
+sops, age) without installing anything globally.
+
 ```bash
+# Validate everything: formatting, lints, every host's evaluation *and* its
+# closure build. This is exactly what CI runs.
+nix flake check
+# The fast subset — same checks, no closure builds.
+nix flake check --no-build
+
 # Build a host without switching (safe way to test)
 nix build .#nixosConfigurations.<host>.config.system.build.toplevel
 
@@ -28,6 +38,8 @@ nixos-anywhere --flake .#<host> root@<installer-ip>
 | `modules/` | machine-agnostic NixOS configuration, one feature per file |
 | `home/` | Home Manager (user) configuration |
 | `lib/` | helper functions, introduced only once proven necessary |
+| `justfile` | named recipes for the commands above — thin wrappers, no logic |
+| `statix.toml` | lint configuration for the `statix` flake check |
 
 Each of these has its own short `README.md` with more detail.
 
