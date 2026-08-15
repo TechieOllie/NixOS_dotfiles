@@ -11,7 +11,6 @@
     ../../modules/desktop/noctalia.nix
     ../../modules/desktop/theming.nix
     ../../modules/desktop/nautilus.nix
-    ../../modules/desktop/unfree.nix
   ];
 
   networking.hostName = vars.system.hostName;

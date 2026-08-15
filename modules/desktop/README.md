@@ -7,9 +7,9 @@ System-level halves of the desktop stack, each gated behind its own
 a system half and a user half — Niri is the clearest example — only the
 package, session entry, and greetd wiring live here; keybindings, layout, and
 appearance live in `home/` instead. Currently `niri.nix`, `greetd.nix`,
-`noctalia.nix`, `theming.nix`, `nautilus.nix`, and `unfree.nix` (all
-`config.features.niri` — greetd, Noctalia Shell, theming packages, a file
-manager, and the unfree allow-list for desktop applications only exist to
+`noctalia.nix`, `theming.nix`, and `nautilus.nix` (all
+`config.features.niri` — greetd, Noctalia Shell, theming packages and a file
+manager only exist to
 support a graphical niri session, and niri is the only compositor this repo
 offers so far; see
 `greetd.nix`'s own comment if a second compositor/DE is ever added).
@@ -30,8 +30,13 @@ service by hand — no host in this repo has ever wanted Niri/Noctalia without
 also wanting Bluetooth, so a separate `config.features.bluetooth` flag was
 removed as unused complexity rather than kept "just in case." Stylix was considered and dropped —
 Noctalia Shell already covers GTK/Qt/terminal/app theming natively (see
-`CLAUDE.md`'s Phase 3 note); `stylix.nix` will not be created. Future
-additions: `portals.nix`.
+`CLAUDE.md`'s Phase 3 note); `stylix.nix` will not be created — and neither
+will `portals.nix`, once XDG portals turned out to come free with
+`programs.niri`'s own upstream module.
+
+`unfree.nix` used to live here and moved to `modules/system/` in Phase 7:
+gating an unfree allow-list on `features.niri` broke the moment a gaming host
+wanted Steam without a compositor. See that directory's README.
 
 `theming.nix` was added in the Theming phase — see `CLAUDE.md` for the full
 rationale (icon theme, cursor theme, GTK modernization, and why Qt

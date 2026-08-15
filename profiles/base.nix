@@ -13,5 +13,6 @@
     ../modules/system/shell.nix
     ../modules/system/fonts.nix
     ../modules/system/nix-ld.nix
+    ../modules/system/unfree.nix
   ];
 }
