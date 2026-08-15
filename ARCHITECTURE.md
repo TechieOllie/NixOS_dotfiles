@@ -705,6 +705,8 @@ The last of these closes the gap that formatting and static analysis leave: `nix
 
 `.github/workflows/check.yml` runs `nix flake check` and nothing else, rather than reimplementing a separate validation pipeline — CI and local validation stay identical by construction. Its only addition is the noctalia and chaotic-nyx substituters, which a NixOS host gets from its own config but a CI runner has no way to know about.
 
+**Lock-file maintenance is a second workflow, not a second gate.** `.github/workflows/update.yml` bumps the `zen-browser` input on a daily schedule, runs the same `nix flake check` against the result, and pushes `flake.lock` to `main` only if that check passes — so the maintenance job can go red but `main` cannot go red because of it. It exists because a rolling input's source rots in place: upstream replaces the tarball behind an already-locked revision, and the resulting fixed-output hash mismatch then fails on the next push regardless of what that push changed. Keeping the window to a day means the failure surfaces on a scheduled run instead. It updates only that one input by name, because every other input is pinned by revision and narHash and cannot rot; when nixpkgs itself moves is a decision about what the machines run, and stays manual (`just update`).
+
 ## Naming Conventions
 
 Files use lowercase names describing responsibility, not implementation:
@@ -896,7 +898,7 @@ bootstrap.
 
 **Status: done, except multi-host hardening, which is blocked on hardware.**
 
-- `nix flake check` as unified CI gate — done. `.github/workflows/check.yml` runs that one command; `flake.nix` carries `checks` (format/statix/deadnix/per-host closure builds), `formatter` and `devShells`. See **Validation and CI** above.
+- `nix flake check` as unified CI gate — done. `.github/workflows/check.yml` runs that one command; `flake.nix` carries `checks` (format/statix/deadnix/per-host closure builds), `formatter` and `devShells`. `.github/workflows/update.yml` was added afterwards, the first time a rolling input's source rotted and failed an unrelated push. See **Validation and CI** above.
 - Command runner (`justfile`) — done, at the repo root, wrapping `switch`, `build`, `eval`, `rollback`, `update`, `check`, `check-fast`, `fmt`, `iso`, `secrets-rekey` and `install`.
 - Configuration polishing — done: the unfree allow-list moved out from behind the wrong feature gate (see above), and the whole repo was brought under a formatter.
 - Documentation upkeep — done: this file, `CLAUDE.md`, `docs/decisions.md` and every directory README were brought back in line with what's on disk.

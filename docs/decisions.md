@@ -1286,3 +1286,75 @@ dedupes imports by path, so both arrangements produce an identical system):
 
 The counterargument — someone forgets `base.nix` on a new host — is weak: a
 host with no boot, users or nix modules fails loudly at eval, not silently.
+
+## Post-Phase 8 — the zen-browser lock rot
+
+### A rolling input broke CI on a commit that only touched documentation
+
+The first red CI run this repo has had. The failing commit
+(`4fde3ee`, a docs-only change) had nothing to do with the failure:
+
+```
+error: hash mismatch in fixed-output derivation '…-source.drv':
+         specified: sha256-/a2mzPZM8dmbJxh9QEh0w2Xu1BmnO61eSbsL3skYweY=
+            got:    sha256-XpBySYOCijbYMa6Vatploi9+q4LQceVVUDi9rCnnNVg=
+error: 1 dependencies of derivation '…-zen-twilight-bin-unwrapped-1.22t.drv' failed to build
+```
+
+`home/zen-browser.nix` imports `zen-browser.homeModules.twilight-official`,
+which tracks Zen's nightly. Upstream replaced the tarball behind the exact
+revision `flake.lock` had pinned since 2026-08-04, so the fixed-output
+derivation that fetches it started failing eleven days later. Zen is in
+`home-manager-path`, which is in both host closures, so the rest of the log
+was cascade — the two "failed to build" host derivations were collateral, not
+two separate problems. Fixed by `nix flake update zen-browser`.
+
+The important property: **this fails on a timer, not on a change.** Nothing in
+the repo caused it and nothing in the repo would have prevented it. Left
+alone it recurs every time the lock sits untouched for a week or so.
+
+### `--no-build` is structurally blind to this
+
+`.claude/skills/run-nixos-dotfiles/driver.sh check`, `just check-fast` and
+`nix flake check --no-build` all passed against the broken lock, before and
+after. They evaluate; they never fetch, so a fixed-output hash mismatch
+cannot surface. The eval-only gate remains the right routine local check —
+but a lock-file bump is exactly the change it cannot speak to, and needs a
+full `nix flake check` before pushing.
+
+### What was chosen, and what was ruled out
+
+**Chosen: `.github/workflows/update.yml`**, a daily scheduled bump of the
+`zen-browser` input that runs the full `nix flake check` and pushes
+`flake.lock` only if it passes. This doesn't make the breakage impossible —
+upstream can still break — it relocates it: the red run becomes a scheduled
+maintenance job instead of the operator's next unrelated push, and the
+one-day window is short enough that the tarball rarely rots at all. Pushing
+straight to `main` from CI is consistent with the repo's solo, no-PR flow,
+and is safe in the specific sense that the lock is only ever pushed after it
+has been checked. GITHUB_TOKEN pushes don't trigger workflows, so this does
+not loop back into `check.yml`.
+
+It updates **only that input, by name**. Every other input is pinned by
+revision and narHash and cannot rot in place; the rot needs a derivation that
+fetches from a mutable URL. Bumping nixpkgs is a different kind of decision —
+it changes what the machines run — and stays manual (`just update`).
+
+Ruled out:
+
+- **Switching to the `beta` channel** (`zen-browser.homeModules.beta`), whose
+  releases are versioned and whose tarballs are stable. This would eliminate
+  the failure class outright rather than merely shortening its window, and is
+  the correct fix if the nightly ever stops being worth it. Not taken: the
+  operator moved to `twilight-official` deliberately (see the comment block
+  at the top of `home/zen-browser.nix`), and the tradeoff there hasn't
+  changed.
+- **A `pre-push` git hook running `just check`.** It converts a red CI into a
+  red terminal, which is worth something, but it doesn't prevent the bump
+  from being needed and it puts a multi-minute closure build in front of
+  every push. The scheduled workflow addresses the cause; this would only
+  soften a symptom.
+- **Making CI tolerate the failure** (retry, `--keep-going`, pinning around
+  it). A broken lock genuinely is broken — a host would fail the same way on
+  `nixos-rebuild`. CI going red here is correct behaviour, and the fix is to
+  make it go red somewhere less disruptive.
