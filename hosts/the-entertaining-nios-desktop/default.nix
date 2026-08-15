@@ -1,4 +1,4 @@
-{ vars, ... }:
+{ pkgs, vars, ... }:
 {
   imports = [
     ./features.nix
@@ -10,12 +10,33 @@
     # nixosConfigurations either — see the-entertaining-nios-vm for the
     # pattern once both exist.
     ../../profiles/base.nix
+    ../../profiles/gaming.nix
     ../../modules/services/snapper.nix
+    ../../modules/services/docker.nix
+    ../../modules/services/tailscale.nix
+    ../../modules/services/printing.nix
   ];
 
   networking.hostName = vars.system.hostName;
   time.timeZone = vars.system.timeZone;
   console.keyMap = vars.system.keyMap;
+
+  # CachyOS's gaming kernel. Host-level rather than a module, on the same
+  # reasoning as the VM's spice-vdagentd: this is a choice about *this*
+  # machine (the one that runs games), not a capability another host would
+  # opt into — and profiles/gaming.nix deliberately doesn't impose a
+  # kernel on every future gaming host. The attribute comes from the
+  # chaotic-nyx overlay, which modules/programs/steam.nix brings in via
+  # profiles/gaming.nix; the same flake's binary cache is what keeps this
+  # from being a from-source kernel build.
+  boot.kernelPackages = pkgs.linuxPackages_cachyos;
+
+  # Fan curves, clock and power limits for the Radeon RX 6600. amdgpu
+  # itself needs nothing declared — the kernel driver and Mesa's RADV are
+  # already the default — so this is the only GPU-specific config the
+  # machine needs. Host-level for the same reason as the kernel above: it
+  # describes this machine's hardware, not a reusable capability.
+  services.lact.enable = true;
 
   # Provisional: the latest released stable at scaffold time. Reconfirm
   # against the actually-released version when this host is bootstrapped for

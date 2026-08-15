@@ -14,11 +14,10 @@ Subdirectories, split by category rather than by host:
   README).
 - `services/` — optional background services (see its own README).
 - `desktop/` — system-level halves of the desktop stack (see its own README).
-- `hardware/`, `programs/` — not created yet. Applications have since landed
-  without either: user-level ones live in `home/`, and the few needing a
-  system half (Nautilus, the unfree allow-list) went to `desktop/`. Create
-  these only for something that genuinely fits neither — audio or graphics
-  handling, or a system-level program module.
+- `hardware/` — classes of hardware a machine may or may not have; created in
+  Phase 7 for Xbox controller drivers (see its own README).
+- `programs/` — system-level program modules; created in Phase 7 for Steam
+  (see its own README).
 
 For anything split between system and user config (Niri is the canonical
 example), the system half lives here; the user half lives in `home/`.

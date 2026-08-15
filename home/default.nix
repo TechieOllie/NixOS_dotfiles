@@ -23,6 +23,7 @@
     ./xdg-user-dirs.nix
     ./feishin.nix
     ./obsidian.nix
+    ./heroic.nix
   ];
 
   home.username = vars.user.name;

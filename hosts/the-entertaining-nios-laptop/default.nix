@@ -7,6 +7,9 @@
     ./secrets.nix
     ../../profiles/base.nix
     ../../modules/services/snapper.nix
+    ../../modules/services/docker.nix
+    ../../modules/services/tailscale.nix
+    ../../modules/services/printing.nix
   ];
 
   networking.hostName = vars.system.hostName;

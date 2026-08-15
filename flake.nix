@@ -43,16 +43,81 @@
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.home-manager.follows = "home-manager";
     };
+
+    # CachyOS's Proton fork and gaming kernel (Phase 7). Neither exists in
+    # nixpkgs — confirmed against this repo's pinned revision, where the
+    # only "cachy" attribute is `ananicy-rules-cachyos`. Deliberately does
+    # **not** follow this repo's nixpkgs, on upstream's own instruction:
+    # following it produces hash mismatches against their prebuilt cache,
+    # which for `linuxPackages_cachyos` means compiling a kernel from
+    # source. Same tradeoff already accepted for `noctalia` above. The
+    # substituter is wired in by `chaotic.nixosModules.default` itself, so
+    # unlike noctalia there's no nix.settings block of our own to keep in
+    # sync.
+    chaotic.url = "github:chaotic-cx/nyx/nyxpkgs-unstable";
+
+    # Millennium (Steam client mod framework) is likewise absent from
+    # nixpkgs — there's an open packaging request, and upstream ships this
+    # flake instead. It pins its own nixpkgs on purpose (its Bun
+    # fixed-output derivation is version-sensitive and breaks when the
+    # revision moves), so following ours is not an option either. The cost
+    # is a third nixpkgs in the closure and a Steam that trails ours by a
+    # patch release.
+    millennium = {
+      url = "github:SteamClientHomebrew/Millennium?dir=packages/nix";
+    };
   };
 
   outputs =
-    { nixpkgs, home-manager, disko, sops-nix, noctalia-greeter, noctalia, zen-browser, ... }:
+    {
+      self,
+      nixpkgs,
+      home-manager,
+      disko,
+      sops-nix,
+      noctalia-greeter,
+      noctalia,
+      zen-browser,
+      chaotic,
+      millennium,
+      ...
+    }:
     let
       system = "x86_64-linux";
+      inherit (nixpkgs) lib;
+      pkgs = nixpkgs.legacyPackages.${system};
       installerVars = import ./hosts/installer/variables.nix;
       mkHost = import ./lib/mkHost.nix {
-        inherit nixpkgs disko sops-nix home-manager noctalia-greeter noctalia zen-browser;
+        inherit
+          nixpkgs
+          disko
+          sops-nix
+          home-manager
+          noctalia-greeter
+          noctalia
+          zen-browser
+          chaotic
+          millennium
+          ;
       };
+
+      # A repo-wide lint/format check as a derivation, so `nix flake check`
+      # is the one command that gates a commit both locally and in CI
+      # (ARCHITECTURE.md, "Validation and CI") rather than a second script
+      # CI would have to reimplement.
+      mkLint =
+        name: deps: script:
+        pkgs.runCommandLocal "check-${name}" { nativeBuildInputs = deps; } ''
+          cd ${self}
+          ${script}
+          touch $out
+        '';
+
+      # Every hand-written .nix file. hardware-configuration.nix is excluded
+      # throughout: nixos-generate-config writes it, so making it satisfy a
+      # formatter or a linter would be undone the next time a host is
+      # regenerated. (statix reads the same exclusion from statix.toml.)
+      handWrittenNix = "$(find . -name '*.nix' -not -name 'hardware-configuration.nix')";
     in
     {
       nixosConfigurations.the-entertaining-nios-vm = mkHost {
@@ -80,5 +145,44 @@
             }
           ];
         }).config.system.build.isoImage;
+
+      # `nix fmt`. This is the RFC 166 style formerly packaged as
+      # nixfmt-rfc-style, which nixpkgs has since made plain `nixfmt` (the
+      # old attribute is now an alias that warns). Chosen over
+      # ARCHITECTURE.md's original alejandra suggestion because the repo was
+      # already hand-written in this style — adopting alejandra would have
+      # reformatted every .nix file to gain nothing. See docs/decisions.md.
+      formatter.${system} = pkgs.nixfmt;
+
+      # `nix develop` — the tools this repo is maintained with, so a fresh
+      # clone needs nothing installed globally. direnv (already part of the
+      # terminal stack) picks this up automatically.
+      devShells.${system}.default = pkgs.mkShell {
+        packages = with pkgs; [
+          just
+          nixfmt
+          statix
+          deadnix
+          nixd
+          nil
+          sops
+          age
+        ];
+      };
+
+      checks.${system} = {
+        format = mkLint "format" [ pkgs.nixfmt ] "nixfmt --check ${handWrittenNix}";
+        statix = mkLint "statix" [ pkgs.statix ] "statix check .";
+        deadnix = mkLint "deadnix" [ pkgs.deadnix ] "deadnix --fail ${handWrittenNix}";
+      }
+      # `nix flake check` already *evaluates* every nixosConfigurations
+      # entry; these go one step further and build each host's real system
+      # closure, which is what catches a module that evaluates fine but
+      # fails to build. Derived from self.nixosConfigurations rather than
+      # listed by hand, so a new host can't be added without also being
+      # checked.
+      // lib.mapAttrs' (
+        name: host: lib.nameValuePair "build-${name}" host.config.system.build.toplevel
+      ) self.nixosConfigurations;
     };
 }

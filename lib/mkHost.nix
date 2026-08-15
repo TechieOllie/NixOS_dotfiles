@@ -1,7 +1,17 @@
 # Extracted once a second real nixosConfigurations entry needed the exact
 # same disko/sops-nix/options/home-manager wiring as the first — see
 # flake.nix for the call sites.
-{ nixpkgs, disko, sops-nix, home-manager, noctalia-greeter, noctalia, zen-browser }:
+{
+  nixpkgs,
+  disko,
+  sops-nix,
+  home-manager,
+  noctalia-greeter,
+  noctalia,
+  zen-browser,
+  chaotic,
+  millennium,
+}:
 { system, hostPath }:
 let
   vars = import (hostPath + "/variables.nix");
@@ -12,7 +22,18 @@ nixpkgs.lib.nixosSystem {
   # disko/sops-nix they're desktop-specific and opt-in, so their nixosModules
   # are imported by modules/desktop/{greetd,noctalia}.nix themselves (the
   # files that actually use them), keeping mkHost feature-agnostic.
-  specialArgs = { inherit vars noctalia-greeter noctalia; };
+  # chaotic/millennium get the identical treatment for the gaming stack:
+  # modules/programs/steam.nix imports them, so a host that isn't a gaming
+  # host never pulls either into its closure.
+  specialArgs = {
+    inherit
+      vars
+      noctalia-greeter
+      noctalia
+      chaotic
+      millennium
+      ;
+  };
   modules = [
     disko.nixosModules.disko
     sops-nix.nixosModules.sops
