@@ -13,7 +13,12 @@
 #     (confirmed: none of these work with a plain nautilus package alone).
 #   - services.tumbler.enable: thumbnail generation for images/videos in
 #     the file view.
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 lib.mkIf config.features.niri {
   environment.systemPackages = [ pkgs.nautilus ];
 

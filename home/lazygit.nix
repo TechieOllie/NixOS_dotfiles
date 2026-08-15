@@ -26,6 +26,5 @@
   # "/lazygit/config.yml" (missing the home directory entirely) and
   # breaking lazygit's config lookup both standalone and from Neovim's
   # lazygit.nvim plugin.
-  home.sessionVariables.LG_CONFIG_FILE =
-    "${config.xdg.configHome}/lazygit/config.yml,${config.xdg.configHome}/lazygit/themes/noctalia.yml";
+  home.sessionVariables.LG_CONFIG_FILE = "${config.xdg.configHome}/lazygit/config.yml,${config.xdg.configHome}/lazygit/themes/noctalia.yml";
 }

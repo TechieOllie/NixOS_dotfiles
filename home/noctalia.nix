@@ -2,7 +2,13 @@
 # (package, Bluetooth/UPower/power-profiles wiring, Cachix substituter)
 # lives in modules/desktop/noctalia.nix. Self-gates on osConfig.features.niri
 # the same way home/niri.nix does.
-{ lib, osConfig, vars, noctalia, ... }:
+{
+  lib,
+  osConfig,
+  vars,
+  noctalia,
+  ...
+}:
 let
   opacity = import ./transparency.nix;
 in

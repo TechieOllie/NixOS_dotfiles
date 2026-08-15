@@ -1,7 +1,12 @@
 # Gated on config.features.niri like greetd.nix — Noctalia Shell is a
 # niri-companion bar/shell, not useful without a compositor, and niri is
 # the only one this repo offers so far.
-{ config, lib, noctalia, ... }:
+{
+  config,
+  lib,
+  noctalia,
+  ...
+}:
 {
   imports = [ noctalia.nixosModules.default ];
 

@@ -1,0 +1,33 @@
+# CI is deliberately a single command. Everything this workflow validates —
+# formatting, statix, deadnix, host evaluation, host closure builds — is
+# declared as a flake check in flake.nix, so `nix flake check` here and
+# `just check` locally run exactly the same thing. Add new validation as a
+# flake check, never as an extra step in this file.
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  flake-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            # Noctalia and chaotic-nyx are substituted from their own
+            # caches. A NixOS host gets these from its own config
+            # (modules/desktop/noctalia.nix, chaotic's module), but CI has
+            # no such config — without them, this job would build a
+            # Wayland/OpenGL shell and a kernel from source.
+            extra-substituters = https://noctalia.cachix.org https://nyx-cache.chaotic.cx
+            extra-trusted-public-keys = noctalia.cachix.org-1:pCOR47nnMEo5thcxNDtzWpOxNFQsBRglJzxWPp3dkU4= nyx-cache.chaotic.cx:dJxTrgMC3V3cFfyIiBQDQorG6k1LsqurH/srpMSq7qk=
+
+      - name: nix flake check
+        run: nix flake check --print-build-logs

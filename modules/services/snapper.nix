@@ -1,4 +1,9 @@
-{ config, lib, vars, ... }:
+{
+  config,
+  lib,
+  vars,
+  ...
+}:
 lib.mkIf config.features.snapshots {
   services.snapper = {
     snapshotInterval = "hourly";

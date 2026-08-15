@@ -2,7 +2,12 @@
 # exists to launch a graphical session, and niri is currently the only one
 # this repo offers. Split this onto its own feature (or key it off "is any
 # GUI compositor enabled") if a second compositor/DE is ever added.
-{ config, lib, noctalia-greeter, ... }:
+{
+  config,
+  lib,
+  noctalia-greeter,
+  ...
+}:
 {
   # Only pulled in for hosts that import this file, unlike disko/sops-nix
   # which every host needs — keeps mkHost itself feature-agnostic.
@@ -33,7 +38,7 @@
           size = 22;
         };
         keyboard = {
-            layout = "fr";
+          layout = "fr";
         };
       };
     };

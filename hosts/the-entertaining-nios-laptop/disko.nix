@@ -40,11 +40,17 @@
               subvolumes = {
                 "@" = {
                   mountpoint = "/";
-                  mountOptions = [ "compress=zstd" "noatime" ];
+                  mountOptions = [
+                    "compress=zstd"
+                    "noatime"
+                  ];
                 };
                 "@home" = {
                   mountpoint = "/home";
-                  mountOptions = [ "compress=zstd" "noatime" ];
+                  mountOptions = [
+                    "compress=zstd"
+                    "noatime"
+                  ];
                 };
                 "@nix" = {
                   # Nix store churns constantly; keep it out of root's
@@ -52,18 +58,27 @@
                   # meaningful (a rollback of / shouldn't also roll back
                   # /nix, which NixOS generations already manage).
                   mountpoint = "/nix";
-                  mountOptions = [ "compress=zstd" "noatime" ];
+                  mountOptions = [
+                    "compress=zstd"
+                    "noatime"
+                  ];
                 };
                 "@snapshots" = {
                   # Snapper convention: a subvolume's snapshots live in a
                   # ".snapshots" subvolume nested under that subvolume's
                   # own mountpoint.
                   mountpoint = "/.snapshots";
-                  mountOptions = [ "compress=zstd" "noatime" ];
+                  mountOptions = [
+                    "compress=zstd"
+                    "noatime"
+                  ];
                 };
                 "@home_snapshots" = {
                   mountpoint = "/home/.snapshots";
-                  mountOptions = [ "compress=zstd" "noatime" ];
+                  mountOptions = [
+                    "compress=zstd"
+                    "noatime"
+                  ];
                 };
               };
             };

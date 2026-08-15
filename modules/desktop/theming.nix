@@ -5,7 +5,12 @@
 # installed system-wide too so greetd.nix's settings.cursor can reference
 # Bibata-Modern-Classic by name, and so a system-wide Papirus icon set exists
 # for the greeter itself.
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 {
   config = lib.mkIf config.features.niri {
     environment.systemPackages = [

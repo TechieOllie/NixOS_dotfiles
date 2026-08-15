@@ -1,0 +1,20 @@
+# statix configuration for the `statix` flake check (Phase 8).
+#
+# Generated files are not ours to satisfy: nixos-generate-config writes
+# hardware-configuration.nix, and re-running it would undo any change made
+# to please a linter.
+ignore = ["hardware-configuration.nix"]
+
+# Two lints are disabled deliberately, not because they're wrong in general
+# but because they contradict how NixOS modules are conventionally written —
+# and a check that has to be argued with every commit stops being a gate.
+#
+# empty_pattern: wants `_:` instead of `{ ... }:` for a module taking no
+#   arguments. Every module in this repo starts with an attrset pattern, and
+#   `{ ... }:` keeps that shape when a module later grows its first argument.
+#
+# repeated_keys: wants `home.username`/`home.stateVersion` collapsed into a
+#   single `home = { ... }`. Those assignments are deliberately separated by
+#   the comments explaining each one, which is the readability this repo
+#   optimises for over terseness.
+disabled = ["empty_pattern", "repeated_keys"]
