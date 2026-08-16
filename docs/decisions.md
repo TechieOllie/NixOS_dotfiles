@@ -1469,6 +1469,151 @@ automatic. Rendering, "does this look right", and anything visual still
 needs eyes on the VM's display. The point is only to remove the friction
 that made the live check expensive enough to skip.
 
+## Post-Phase 8 — Zen was never actually the default browser
+
+`home/zen-browser.nix` has set `programs.zen-browser.setAsDefaultBrowser =
+true` since Phase 6, and checking it appeared to confirm it worked:
+`xdg-settings get default-web-browser` on the VM answered
+`zen-beta.desktop`, and `BROWSER` was `zen-beta` in the session environment.
+Both were true. Neither was the setting doing anything.
+
+The flake's `hm-module/default-browser.nix` writes fifteen
+`xdg.mimeApps.defaultApplications` entries (http, https, text/html,
+mailto, ...) pointing at `zen-${name}.desktop`, plus
+`home.sessionVariables.BROWSER`. What it never does is set
+`xdg.mimeApps.enable`, and home-manager's `xdg.mimeApps` module writes no
+`mimeapps.list` at all while disabled. Nothing in this repo enabled it
+either, so every one of those associations was computed and thrown away.
+Confirmed by evaluating the option directly: `defaultApplications` held all
+fifteen correct entries while `enable` was `false`.
+
+What made it look correct:
+
+- `BROWSER` is real, but most GUI applications ignore it and call
+  `xdg-open`, which reads `mimeapps.list`.
+- With no explicit association, xdg falls back to scanning
+  `mimeinfo.cache`, and Zen was the only registered `x-scheme-handler/http`
+  handler on the VM, so it won by default. That is an accident of what
+  else is installed, not a setting — a second browser would have silently
+  taken over, and the ordering was never guaranteed on a fresh host.
+- The `~/.config/mimeapps.list` that did exist on the VM was written at
+  runtime by Vesktop and `xdg-settings` (mode 0644, not a store symlink),
+  and contained only `x-scheme-handler/discord`. The same app-owned-mutable-
+  state shape as Noctalia's settings sidecar and Zen's own profile.
+
+**Resolved** with `home/xdg-mime-apps.nix`: `xdg.mimeApps.enable = true`,
+plus a restated `x-scheme-handler/discord = vesktop.desktop` (taking over
+the file discards whatever was only recorded there at runtime;
+`home/vesktop.nix`'s desktop entry advertises the scheme via `MimeType=`,
+which makes Vesktop *a* handler, not the default), plus
+`xdg.configFile."mimeapps.list".force = true`.
+
+Three choices worth recording:
+
+- **A separate module, not a line in `home/zen-browser.nix`.** `enable` is
+  not a browser setting — it's the switch deciding whether *any* module's
+  mime associations reach disk. Buried in one app's module it is a landmine
+  for the next one. Follows `home/xdg-user-dirs.nix`, which exists for the
+  same reason on the other half of XDG.
+- **`force`, not a documented manual `rm`.** Home-manager's mime-apps module
+  sets only `.source`, not `force` (checked in
+  `modules/misc/xdg/mime-apps.nix` at the pinned revision), so a first
+  activation over the pre-existing unmanaged file would abort with "existing
+  file would be clobbered". Forcing keeps a rebuild convergent on every host
+  with no hand step.
+- **Zen's fifteen associations are not restated.** They arrive at
+  `lib.mkDefault` from the flake, so they merge in and stay overridable.
+  One of them is `text/plain = zen-beta.desktop`, which now actually
+  applies — a `.txt` opened from Nautilus will open in the browser. Left as
+  upstream has it, because there is no GUI text editor in this repo's stack
+  to point it at instead (Neovim is terminal-only and deliberately not
+  home-manager-managed). Override in `home/xdg-mime-apps.nix` if that
+  changes.
+
+Ruled out: setting `xdg.mimeApps.enable` inside `home/zen-browser.nix`
+(scoping problem above); calling `xdg-settings set default-web-browser` from
+an activation script (imperative, and writes the same mutable file this now
+owns declaratively).
+
+Verified live, not just by eval — the failure mode here was precisely one
+eval cannot see. The closure was built locally, `nix copy`'d to the VM and
+activated with `switch-to-configuration test` (avoiding the VM's
+`~/.dotfiles` clone, which carries an unrelated uncommitted edit).
+Activation completed with no clobber error; `~/.config/mimeapps.list` became
+a store symlink; `xdg-mime query default` answered `zen-beta.desktop` for
+http and https and `vesktop.desktop` for discord; and
+`xdg-open https://example.com` actually opened a `zen-beta` window titled
+"Example Domain — Zen Browser" in niri.
+
+## Post-Phase 8 — Neovim as the default text editor
+
+Follows directly from the `mimeapps.list` work above, which left
+`text/plain = zen-beta.desktop` (upstream zen-browser's own default),
+i.e. a `.txt` opened from Nautilus would open in the browser.
+
+Two halves, and neither was in the state it looked to be in.
+
+**`EDITOR`/`VISUAL` were already `nvim`, but only in zsh.** They were set
+via `programs.zsh.sessionVariables` in `home/zsh.nix`, which exports into
+interactive zsh and nothing else — a bash shell, a `sh -c` in a script, or
+any tool shelling out to `$EDITOR` outside zsh saw them unset. Moved to
+`home.sessionVariables` in `home/neovim.nix`, which reaches every shell via
+`hm-session-vars.sh`. Verified on the VM: before the change `bash -lc 'echo
+$EDITOR'` was empty, after it reports `nvim`, as does `sh`. Placed in
+`home/neovim.nix` rather than left in `home/zsh.nix` because `EDITOR=nvim`
+is a fact about Neovim, not about a shell. `home/git.nix` sets no
+`core.editor`, so git picks this up with nothing to conflict.
+
+**The GUI half needed a new desktop entry, not just an association.**
+Neovim's packaged `nvim.desktop` is `Terminal=true`, which defers "find a
+terminal to run this in" to the launcher — and in a bare niri session there
+is nothing to defer to. glib picks a terminal from a hardcoded list (xterm,
+gnome-terminal, konsole, …) that Ghostty is not on.
+
+This was confirmed live *before* designing around it, and the failure is
+worth recording because it is silent and actively misleading: at the time,
+`xdg-mime query default text/plain` already answered `nvim.desktop` (by the
+same `mimeinfo.cache` fallback accident described in the previous entry),
+and `xdg-open /tmp/probe.txt` opened **Zen Browser**. It also left an
+orphaned `nvim /tmp/probe.txt` running with no terminal attached — so glib
+did try, got a process with no tty, and fell onward to the browser.
+
+**Resolved** with `xdg.desktopEntries.nvim` in `home/neovim.nix`:
+`Exec=ghostty -e nvim %F`, `Terminal=false`. Reuses the `nvim` entry id so
+it shadows the package's own copy rather than putting a second, nearly
+identical "Neovim" in the launcher — home-manager gives its generated entry
+priority over the package's within the profile (verified: the active
+`~/.nix-profile/share/applications/nvim.desktop` is the generated one).
+Same override-an-existing-entry pattern already used by `home/vesktop.nix`.
+`-e` is last in `Exec` because Ghostty treats everything after it as the
+command to run.
+
+The mime types were **checked, not guessed** — each was read off
+`xdg-mime query filetype` against a real file on the VM. Worth doing: `.nix`
+and `.conf` have no type of their own and are plain `text/plain`, while
+`.toml`/`.yaml` are `application/toml`/`application/yaml` rather than the
+`text/x-*` names one would assume. `text/html` is deliberately left with the
+browser.
+
+**Associations moved to live with each application.** `home/xdg-mime-apps.nix`
+had briefly carried Vesktop's `x-scheme-handler/discord` entry; that moved
+into `home/vesktop.nix`, so the rule is now uniform — that module owns the
+*file* (`enable`, `force`), and each app declares its own associations in
+its own module, the way the zen-browser flake's hm-module already did.
+A central list would have to be kept in sync with every module that has a
+desktop entry.
+
+Verified live on the VM (built locally, `nix copy`'d, registered with
+`nix-env -p /nix/var/nix/profiles/system --set` and activated with
+`switch-to-configuration switch` — a real switch this time, not `test`, so
+it survives reboot; the previous entry's `test` activation had already been
+reverted by a reboot, which is exactly how the `Terminal=true` behaviour
+came to be observed in the first place). `xdg-mime query default` answers
+`nvim.desktop` for text/plain, application/json and text/markdown, still
+`zen-beta.desktop` for https and `vesktop.desktop` for discord; and
+`xdg-open /tmp/probe.txt` opened a Ghostty window running
+`ghostty -e nvim /tmp/probe.txt`, with nvim actually editing the file.
+
 ## Making blur and transparency actually render
 
 ### The complaint, and what was actually wrong
@@ -1582,3 +1727,4 @@ on — at the cost above.
 Every claim here was checked on the VM against screenshots, not against
 eval. `nix flake check` cannot see any of it: all four problems were
 configuration that evaluated perfectly and rendered wrong.
+

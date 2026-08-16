@@ -92,19 +92,21 @@
       # `here="explorer.exe ."` dropped: WSL-only, not relevant on NixOS.
     };
 
-    sessionVariables = {
-      EDITOR = "nvim";
-      VISUAL = "nvim";
-      # Deliberately dropped, not ported:
-      #   - WSL detection branch (not relevant on NixOS)
-      #   - hardcoded opencode PATH line (/home/ol/... — operator-machine
-      #     -specific, not portable)
-      #   - NVM_DIR export + nvm sourcing (out of Phase 4 scope)
-      #   - `register-python-argcomplete pipx` eval (out of Phase 4 scope,
-      #     and unguarded — would error at shell start without pipx)
-      #   - explicit SSH_AUTH_SOCK override (redundant with Phase 3's
-      #     gcr-ssh-agent auto-export)
-    };
+    # No sessionVariables. EDITOR/VISUAL were the only two and moved to
+    # home/neovim.nix's home.sessionVariables — they're a fact about Neovim
+    # rather than about this shell, and programs.zsh.sessionVariables only
+    # ever exported them into interactive zsh.
+    #
+    # Also deliberately dropped from the operator's original .zshrc, not
+    # ported:
+    #   - WSL detection branch (not relevant on NixOS)
+    #   - hardcoded opencode PATH line (/home/ol/... — operator-machine
+    #     -specific, not portable)
+    #   - NVM_DIR export + nvm sourcing (out of Phase 4 scope)
+    #   - `register-python-argcomplete pipx` eval (out of Phase 4 scope,
+    #     and unguarded — would error at shell start without pipx)
+    #   - explicit SSH_AUTH_SOCK override (redundant with Phase 3's
+    #     gcr-ssh-agent auto-export)
   };
 
   # Not a programs.zsh option — home.sessionPath is the general Home

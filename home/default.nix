@@ -21,6 +21,7 @@
     ./vesktop.nix
     ./nautilus.nix
     ./xdg-user-dirs.nix
+    ./xdg-mime-apps.nix
     ./feishin.nix
     ./obsidian.nix
     ./heroic.nix

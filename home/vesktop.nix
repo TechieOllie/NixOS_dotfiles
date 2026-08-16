@@ -111,6 +111,13 @@ lib.mkIf osConfig.features.niri {
     "vesktop/userAssets/trayUnread".source = ./vesktop-assets/trayUnread;
   };
 
+  # `mimeType` on the desktop entry below only advertises that Vesktop can
+  # handle discord: links — it makes Vesktop *a* handler, not the default
+  # one. Vesktop used to write this association into ~/.config/mimeapps.list
+  # itself at runtime; home/xdg-mime-apps.nix now owns that file, so it has
+  # to be declared or it's lost. Both halves are needed.
+  xdg.mimeApps.defaultApplications."x-scheme-handler/discord" = "vesktop.desktop";
+
   xdg.desktopEntries.vesktop = {
     name = "Discord";
     genericName = "Internet Messenger";
