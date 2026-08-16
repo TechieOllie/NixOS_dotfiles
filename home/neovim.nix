@@ -18,7 +18,38 @@
 # (github:TechieOllie/neovim_dotfiles) and treated as a live, externally
 # -sourced directory, the same way it already was before this repo
 # touched Neovim at all.
-{ pkgs, ... }:
+{ pkgs, lib, ... }:
+let
+  # The file types Neovim should own. Everything here is a format the
+  # operator edits as source or config, and every name was verified against
+  # this repo's own shared-mime-info by running `xdg-mime query filetype`
+  # on a real file of each kind — guessing them is how you get an entry
+  # that silently never matches (.nix and .conf, for instance, are both
+  # plain `text/plain`, not a type of their own).
+  #
+  # text/html is deliberately absent: that one belongs to the browser.
+  editableTypes = [
+    "text/plain" # also .nix, .conf, and most dotfiles
+    "text/markdown"
+    "text/csv"
+    "text/x-log"
+    "application/json"
+    "application/toml"
+    "application/yaml"
+    "application/xml"
+    "application/x-shellscript"
+    "text/x-python"
+    "text/x-makefile"
+    "text/x-c"
+    "text/x-csrc"
+    "text/x-chdr"
+    "text/x-c++"
+    "text/x-c++src"
+    "text/x-c++hdr"
+    "text/x-java"
+    "text/x-tex"
+  ];
+in
 {
   # git and yazi are deliberately NOT listed here even though
   # lazy.nvim/Mason need them (git for lazy.nvim's own bootstrap clone;
@@ -61,4 +92,57 @@
     php # phpactor and php-cs-fixer are themselves PHP applications --
     # confirmed live: "exec: php: not found" without this.
   ];
+
+  # ── Default text editor ─────────────────────────────────────────────────
+
+  # The CLI half. Lives here rather than in home/zsh.nix (where it used to)
+  # because EDITOR is a fact about Neovim, not about one shell -- and
+  # programs.zsh.sessionVariables only exports into interactive zsh, so a
+  # bash shell, a script, or anything else invoking $EDITOR saw nothing set
+  # at all. home.sessionVariables reaches every shell through
+  # hm-session-vars.sh.
+  home.sessionVariables = {
+    EDITOR = "nvim";
+    VISUAL = "nvim";
+  };
+
+  # The GUI half. Neovim's own packaged nvim.desktop is `Terminal=true`,
+  # which delegates "find a terminal to run this in" to whatever does the
+  # launching -- and in a bare niri session nothing does. glib looks for a
+  # terminal from a hardcoded list (xterm, gnome-terminal, konsole, ...);
+  # Ghostty isn't on it and there's no desktop environment to answer for
+  # it. Confirmed live before writing this, and the failure is silent
+  # rather than an error: `xdg-open somefile.txt` with text/plain already
+  # resolving to nvim.desktop opened *Zen Browser*.
+  #
+  # So spawn the terminal explicitly instead of asking for one. This
+  # deliberately reuses the `nvim` entry id, shadowing the package's own
+  # copy (xdg.desktopEntries writes into ~/.local/share/applications, which
+  # takes precedence over the profile's share/applications) rather than
+  # adding a second, near-identical "Neovim" beside it in the launcher.
+  # Same override-an-existing-entry pattern as home/vesktop.nix.
+  xdg.desktopEntries.nvim = {
+    name = "Neovim";
+    genericName = "Text Editor";
+    comment = "Edit text files";
+    # -e must come last: Ghostty treats everything after it as the command.
+    exec = "ghostty -e nvim %F";
+    icon = "nvim";
+    terminal = false;
+    categories = [
+      "Utility"
+      "TextEditor"
+      "Development"
+    ];
+    mimeType = editableTypes;
+    settings.StartupNotify = "false";
+  };
+
+  # Advertising the types above only makes Neovim *a* handler for them.
+  # Being the default is a separate statement, and it's this one that makes
+  # a .txt from Nautilus open in an editor instead of falling to the
+  # browser (application/json and text/plain are both in the zen-browser
+  # flake's own list, at mkDefault, so these override cleanly). Needs
+  # home/xdg-mime-apps.nix to be enabled to reach disk at all.
+  xdg.mimeApps.defaultApplications = lib.genAttrs editableTypes (_: "nvim.desktop");
 }

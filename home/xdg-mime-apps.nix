@@ -46,22 +46,16 @@
 # Self-gates on osConfig.features.niri, same convention as
 # home/xdg-user-dirs.nix — default applications only matter where there are
 # GUI applications to launch.
+#
+# This module owns the *file*; each application owns its own *associations*
+# and declares them in its own module — Zen's arrive from the zen-browser
+# flake's hm-module (at `lib.mkDefault`, so they stay overridable),
+# Neovim's from home/neovim.nix, Vesktop's from home/vesktop.nix. Nothing
+# app-specific belongs here, or this turns back into the central list that
+# every module has to be kept in sync with.
 { lib, osConfig, ... }:
 lib.mkIf osConfig.features.niri {
-  xdg.mimeApps = {
-    enable = true;
-
-    # Zen's own fifteen associations arrive from the flake's hm-module at
-    # `lib.mkDefault`, so they need no restating here and stay overridable.
-    # Only what this repo adds on top belongs below.
-    defaultApplications = {
-      # Declared to survive this module taking the file over: Vesktop had
-      # registered it at runtime, and home/vesktop.nix's desktop entry only
-      # advertises the scheme (MimeType=), which makes Vesktop *a* handler,
-      # not the default one.
-      "x-scheme-handler/discord" = "vesktop.desktop";
-    };
-  };
+  xdg.mimeApps.enable = true;
 
   # See the note above: home-manager won't overwrite the pre-existing
   # unmanaged file on its own. Only ~/.config/mimeapps.list needs this — the

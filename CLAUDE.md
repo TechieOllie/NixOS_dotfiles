@@ -138,6 +138,7 @@ Each of these has bitten at least once and will again. Full write-ups in
 - **`home.sessionVariables` values are not shell-expanded.** They're written into a script as-is, so `"$XDG_CONFIG_HOME/..."` silently resolves to a broken path. Use `${config.xdg.configHome}`.
 - **"Existing file … would be clobbered" during activation**: retry the switch once before assuming the config is wrong. It has occurred as a one-off home-manager activation-ordering race.
 - **An ad-hoc SSH shell has no session context.** `NIRI_SOCKET`, `SSH_AUTH_SOCK`, and friends are scoped to the graphical session's own systemd user manager; export them manually (`systemctl --user show-environment`) when driving a live session over SSH. On the VM this is packaged as the `in-session` wrapper (`ssh ol@<vm> in-session niri msg windows`); on a real host it's still manual.
+- **`Terminal=true` in a `.desktop` entry does nothing in this session.** There's no desktop environment to answer "which terminal?", and glib picks from a hardcoded list (xterm, gnome-terminal, konsole, …) that Ghostty isn't on. It fails *silently and misleadingly*: `xdg-open somefile.txt`, with `text/plain` resolving to Neovim's own `Terminal=true` entry, opened Zen Browser and left an orphaned headless `nvim` behind. Any terminal program that needs a desktop entry must spawn the terminal itself — `home/neovim.nix` overrides the `nvim` entry with `Exec=ghostty -e nvim %F` and `Terminal=false`.
 - **A Home Manager sub-module accepts settings while disabled, and silently discards them.** `xdg.mimeApps.defaultApplications` populated to fifteen correct entries by the zen-browser flake, with `xdg.mimeApps.enable = false`, produced no `mimeapps.list` and no warning — Zen was only the default browser by accident, because it was the sole `x-scheme-handler/http` entry in `mimeinfo.cache`. `home/xdg-mime-apps.nix` now owns that switch. When a third-party HM module offers a "set as default"-style flag, check whether the option group it writes into is actually enabled; eval can't tell you, since discarded settings evaluate fine.
 - **`useGlobalPkgs` means Home Manager can't set `nixpkgs.config`.** Unfree allowances must go in `modules/desktop/unfree.nix` at the NixOS level.
 - **A rolling input's source rots in place, and `--no-build` can't see it.** No input does this any more — `home/zen-browser.nix` moved off Zen's `twilight` nightly to the `beta` channel precisely because of it — but the shape is worth recognising before adding an input. A rolling source means upstream replaces the tarball behind an already-locked revision every few days, and the fixed-output source derivation then starts failing with a hash mismatch on whatever commit happens to be pushed next, with no relation to what that commit changed. `nix flake check --no-build` (so `just check-fast`, so `driver.sh check`) passes throughout, since it never fetches. Prefer an input with immutable release artifacts; run the *full* `nix flake check` after any `nix flake update` before pushing.
@@ -179,7 +180,10 @@ kept on lazy.nvim/Mason. `home/neovim.nix` only provides the toolchain
 prerequisites Mason needs at runtime (`gnumake`, `gcc`, `tree-sitter`,
 `python3`, `nodejs`, `go`, `php`, `unzip`, `ripgrep`) — plus
 `modules/system/nix-ld.nix`, without which Mason's prebuilt manylinux wheels
-can't run at all.
+can't run at all. It is also the system's default text editor, in both
+senses: `EDITOR`/`VISUAL` (`home.sessionVariables`, so every shell rather
+than just interactive zsh) and the `text/plain`-and-friends mime defaults,
+via an overridden `nvim` desktop entry that launches it inside Ghostty.
 
 The gaming stack is deliberately minimal, by the operator's explicit choice:
 gamescope, gamemode, MangoHud, Lutris, Bottles, goverlay, protontricks,

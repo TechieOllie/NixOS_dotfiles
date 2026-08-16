@@ -1544,3 +1544,72 @@ a store symlink; `xdg-mime query default` answered `zen-beta.desktop` for
 http and https and `vesktop.desktop` for discord; and
 `xdg-open https://example.com` actually opened a `zen-beta` window titled
 "Example Domain — Zen Browser" in niri.
+
+## Post-Phase 8 — Neovim as the default text editor
+
+Follows directly from the `mimeapps.list` work above, which left
+`text/plain = zen-beta.desktop` (upstream zen-browser's own default),
+i.e. a `.txt` opened from Nautilus would open in the browser.
+
+Two halves, and neither was in the state it looked to be in.
+
+**`EDITOR`/`VISUAL` were already `nvim`, but only in zsh.** They were set
+via `programs.zsh.sessionVariables` in `home/zsh.nix`, which exports into
+interactive zsh and nothing else — a bash shell, a `sh -c` in a script, or
+any tool shelling out to `$EDITOR` outside zsh saw them unset. Moved to
+`home.sessionVariables` in `home/neovim.nix`, which reaches every shell via
+`hm-session-vars.sh`. Verified on the VM: before the change `bash -lc 'echo
+$EDITOR'` was empty, after it reports `nvim`, as does `sh`. Placed in
+`home/neovim.nix` rather than left in `home/zsh.nix` because `EDITOR=nvim`
+is a fact about Neovim, not about a shell. `home/git.nix` sets no
+`core.editor`, so git picks this up with nothing to conflict.
+
+**The GUI half needed a new desktop entry, not just an association.**
+Neovim's packaged `nvim.desktop` is `Terminal=true`, which defers "find a
+terminal to run this in" to the launcher — and in a bare niri session there
+is nothing to defer to. glib picks a terminal from a hardcoded list (xterm,
+gnome-terminal, konsole, …) that Ghostty is not on.
+
+This was confirmed live *before* designing around it, and the failure is
+worth recording because it is silent and actively misleading: at the time,
+`xdg-mime query default text/plain` already answered `nvim.desktop` (by the
+same `mimeinfo.cache` fallback accident described in the previous entry),
+and `xdg-open /tmp/probe.txt` opened **Zen Browser**. It also left an
+orphaned `nvim /tmp/probe.txt` running with no terminal attached — so glib
+did try, got a process with no tty, and fell onward to the browser.
+
+**Resolved** with `xdg.desktopEntries.nvim` in `home/neovim.nix`:
+`Exec=ghostty -e nvim %F`, `Terminal=false`. Reuses the `nvim` entry id so
+it shadows the package's own copy rather than putting a second, nearly
+identical "Neovim" in the launcher — home-manager gives its generated entry
+priority over the package's within the profile (verified: the active
+`~/.nix-profile/share/applications/nvim.desktop` is the generated one).
+Same override-an-existing-entry pattern already used by `home/vesktop.nix`.
+`-e` is last in `Exec` because Ghostty treats everything after it as the
+command to run.
+
+The mime types were **checked, not guessed** — each was read off
+`xdg-mime query filetype` against a real file on the VM. Worth doing: `.nix`
+and `.conf` have no type of their own and are plain `text/plain`, while
+`.toml`/`.yaml` are `application/toml`/`application/yaml` rather than the
+`text/x-*` names one would assume. `text/html` is deliberately left with the
+browser.
+
+**Associations moved to live with each application.** `home/xdg-mime-apps.nix`
+had briefly carried Vesktop's `x-scheme-handler/discord` entry; that moved
+into `home/vesktop.nix`, so the rule is now uniform — that module owns the
+*file* (`enable`, `force`), and each app declares its own associations in
+its own module, the way the zen-browser flake's hm-module already did.
+A central list would have to be kept in sync with every module that has a
+desktop entry.
+
+Verified live on the VM (built locally, `nix copy`'d, registered with
+`nix-env -p /nix/var/nix/profiles/system --set` and activated with
+`switch-to-configuration switch` — a real switch this time, not `test`, so
+it survives reboot; the previous entry's `test` activation had already been
+reverted by a reboot, which is exactly how the `Terminal=true` behaviour
+came to be observed in the first place). `xdg-mime query default` answers
+`nvim.desktop` for text/plain, application/json and text/markdown, still
+`zen-beta.desktop` for https and `vesktop.desktop` for discord; and
+`xdg-open /tmp/probe.txt` opened a Ghostty window running
+`ghostty -e nvim /tmp/probe.txt`, with nvim actually editing the file.
