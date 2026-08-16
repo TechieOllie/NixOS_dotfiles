@@ -50,6 +50,35 @@ flake checkout it's invoked from, never this clone.
   `home/niri/cfg/input.kdl`, which is generated with Nix-side logic (the
   per-host XKB layout lookup) rather than being a static file at all.
 
+## Checking whether a file is actually live
+
+**`ls -l` will tell you it isn't, and `ls -l` is wrong.** A live file's
+symlink goes through the store on its way out of it, in three hops:
+
+```
+~/.config/niri/cfg/keybinds.kdl
+  → /nix/store/…-home-manager-files/.config/niri/cfg/keybinds.kdl
+    → /nix/store/…-hm_keybinds.kdl        # itself a symlink, not a copy
+      → /home/ol/.dotfiles/home/niri/cfg/keybinds.kdl
+```
+
+`mkOutOfStoreSymlink` puts a *symlink* in the store rather than the file's
+contents, so the first hop of a live file and the first hop of a
+store-copied one look identical. Follow the whole chain instead:
+
+```bash
+readlink -f ~/.config/niri/cfg/keybinds.kdl   # ends in ~/.dotfiles → live
+```
+
+The end-to-end check, when the link chain still isn't convincing, is to
+write through it:
+
+```bash
+echo "// probe" >> ~/.dotfiles/home/niri/cfg/keybinds.kdl
+tail -1 ~/.config/niri/cfg/keybinds.kdl       # shows the probe → live
+git -C ~/.dotfiles checkout -- home/niri/cfg/keybinds.kdl
+```
+
 ## Adding a new live file
 
 1. Add the file under this repo (e.g. `home/niri/cfg/whatever.kdl`).
