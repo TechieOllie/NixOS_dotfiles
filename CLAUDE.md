@@ -48,12 +48,13 @@ nixos-anywhere --flake .#<host> root@<installer-ip>
 sops updatekeys hosts/<host>/secrets/secrets.yaml   # re-encrypt after adding a recipient in .sops.yaml
 ```
 
-`nix flake check` is the *only* command CI *validates* with
-(`.github/workflows/check.yml`) — wire new validation in as a flake check, not
-a separate script and not as an extra CI step. The one other workflow,
-`update.yml`, is maintenance rather than validation: it bumps the
-`zen-browser` input daily and pushes the lock only if a full `nix flake check`
-passes against it. A `justfile` now exists at the repo root; `just` alone lists the
+`nix flake check` is the *only* command CI runs, and
+`.github/workflows/check.yml` is the *only* workflow — wire new validation in
+as a flake check, not a separate script and not as an extra CI step. (A second
+workflow, `update.yml`, briefly bumped the `zen-browser` lock daily; it was
+removed when Zen moved from the rolling `twilight` channel to `beta`, which
+doesn't rot. Nothing in CI writes to the repo any more.) A `justfile` now
+exists at the repo root; `just` alone lists the
 recipes. Lint exclusions are deliberate and documented: `statix.toml` disables
 `empty_pattern`/`repeated_keys`, and generated `hardware-configuration.nix`
 files are excluded from all three lints (see `handWrittenNix` in `flake.nix`).
@@ -87,7 +88,7 @@ boot-time recovery.
 - **`modules/hardware/`** — `controllers` (`features.gaming`): the `xone`/`xpadneo` out-of-tree Xbox controller kernel modules.
 - **`modules/desktop/`** — `niri`, `greetd`, `noctalia`, `theming`, `nautilus`. All gated on `features.niri`.
 - **`profiles/`** — `base.nix` (the universal foundation, imported directly by every host) and `gaming.nix` (Phase 7, the first actual role profile: adds the Steam and controller modules, sets `features.gaming = mkDefault true`; desktop only). Role profiles are purely additive and deliberately do **not** import `base.nix` — each host imports it itself, so no host's `default.nix` hides the fact that it has a bootloader. The desktop's CachyOS kernel and `lact` deliberately stay in that host's own `default.nix` — they describe one machine's hardware, not the role.
-- **`justfile`, `statix.toml`, `.github/workflows/check.yml`** — Phase 8. CI validates with `nix flake check` and nothing else. `.github/workflows/update.yml` is the one other workflow: a daily `zen-browser` lock bump, gated on that same check (see the gotcha on rolling inputs below).
+- **`justfile`, `statix.toml`, `.github/workflows/check.yml`** — Phase 8. CI validates with `nix flake check` and nothing else, and `check.yml` is the only workflow.
 - **`home/`** — machine-agnostic Home Manager entry point (`default.nix`) plus one file per program. There is no per-host Home Manager entry point.
 - **`wallpapers/`** — the operator's collection (~35 images), read live from each host's own `~/.dotfiles` clone rather than the Nix store.
 - **`.sops.yaml`** — two recipients (vm, laptop), each with its own `creation_rules` entry. The desktop gets one when bootstrapped.
@@ -138,7 +139,7 @@ Each of these has bitten at least once and will again. Full write-ups in
 - **"Existing file … would be clobbered" during activation**: retry the switch once before assuming the config is wrong. It has occurred as a one-off home-manager activation-ordering race.
 - **An ad-hoc SSH shell has no session context.** `NIRI_SOCKET`, `SSH_AUTH_SOCK`, and friends are scoped to the graphical session's own systemd user manager; export them manually (`systemctl --user show-environment`) when driving a live session over SSH.
 - **`useGlobalPkgs` means Home Manager can't set `nixpkgs.config`.** Unfree allowances must go in `modules/desktop/unfree.nix` at the NixOS level.
-- **A rolling input's source rots in place, and `--no-build` can't see it.** `zen-browser`'s `twilight` channel tracks Zen's nightly, so upstream replaces the tarball behind an already-locked revision every few days and the fixed-output source derivation starts failing with a hash mismatch — on whatever commit happens to be pushed next, with no relation to what that commit changed. `nix flake check --no-build` (so `just check-fast`, so `driver.sh check`) passes throughout, since it never fetches. `.github/workflows/update.yml` now bumps that input daily to keep the window short; run the *full* `nix flake check` after any `nix flake update` before pushing.
+- **A rolling input's source rots in place, and `--no-build` can't see it.** No input does this any more — `home/zen-browser.nix` moved off Zen's `twilight` nightly to the `beta` channel precisely because of it — but the shape is worth recognising before adding an input. A rolling source means upstream replaces the tarball behind an already-locked revision every few days, and the fixed-output source derivation then starts failing with a hash mismatch on whatever commit happens to be pushed next, with no relation to what that commit changed. `nix flake check --no-build` (so `just check-fast`, so `driver.sh check`) passes throughout, since it never fetches. Prefer an input with immutable release artifacts; run the *full* `nix flake check` after any `nix flake update` before pushing.
 - **The VM has its own rendering quirks** (cursor duplication/orientation, occasional MESA errors) traced to `virtio-gpu-gl`/SPICE, not this repo. Don't chase them as config bugs; garbled text is usually virt-manager's View → Scale Display.
 
 ## Roadmap

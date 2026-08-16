@@ -1,11 +1,14 @@
 # Zen Browser isn't in nixpkgs at all (confirmed via nix eval against this
 # repo's pinned nixpkgs) — packaged via the community zen-browser flake
-# input instead (see flake.nix/lib/mkHost.nix). Originally set to beta,
-# matching the AUR zen-browser-bin build the operator ran at the time;
-# bumped to twilight-official (upstream zen-browser/desktop's own release
-# artifact for the twilight nightly channel, not the flake maintainer's
-# re-hosted mirror — see the flake's own package.nix/sources.json) at the
-# operator's explicit request, ahead of what beta tracks.
+# input instead (see flake.nix/lib/mkHost.nix). Channel: `beta`, Zen's own
+# versioned release channel. It was briefly on `twilight-official` (the
+# nightly), which is a *rolling* source: upstream replaces the tarball behind
+# an already-locked revision every few days, so the fixed-output source
+# derivation starts failing with a hash mismatch on whatever commit happens
+# to be pushed next, unrelated to what that commit changed. That cost a
+# scheduled CI job whose only purpose was to bump this one input daily.
+# `beta` publishes immutable per-release artifacts, so a locked revision
+# stays buildable and the lock only moves when the operator moves it.
 #
 # No extension/policy porting: the operator's real profile (bookmarks,
 # logins, manually-installed extensions like uBlock Origin/Dark Reader/
@@ -16,23 +19,15 @@
 # home/noctalia.nix) — it mutates that same mutable profile state directly,
 # so there's nothing for Nix to conflict with here either.
 #
-# Icon fix: the twilight-official channel's own packaged .desktop entry
-# (~/.nix-profile/share/applications/zen-twilight.desktop) sets
-# Icon=zen-twilight-official, which matches no installed icon file at
-# all — confirmed live that the package only ever ships zen-twilight.png
-# (every hicolor size), never a "-official"-suffixed name. Since that name
-# resolves to nothing, Noctalia's launcher was falling back to some
-# unrelated icon rather than erroring visibly. Fixed the same way as
-# Vesktop's launcher override (home/vesktop.nix): xdg.desktopEntries
-# installs as a hiPrio package providing share/applications/<name>.desktop,
-# so ours wins over the flake-packaged one — same filename, same fields,
-# just the one real correction (Icon). Unlike the niri keybind in
-# home/niri/cfg/keybinds.kdl, which tries each channel's binary in turn, this
-# can't be made channel-agnostic the same way: overriding a desktop entry
-# means matching its exact filename, which differs per channel
-# (zen-beta.desktop vs. zen-twilight.desktop) — this entry (and its
-# attribute name below) needs updating again if the channel above ever
-# changes.
+# No desktop-entry override here, unlike home/vesktop.nix. This channel's
+# own packaged entry (share/applications/zen-beta.desktop) is internally
+# consistent — Icon=zen-browser, and the package really does ship
+# zen-browser.png at every hicolor size (verified against the built store
+# path). That was *not* true of twilight-official, whose entry pointed at a
+# zen-twilight-official icon the package never shipped and which therefore
+# needed a hiPrio xdg.desktopEntries copy to correct; that override is gone
+# with the channel. If the channel ever changes again, re-check the built
+# package's own .desktop and icon names before assuming they line up.
 #
 # Self-gates on osConfig.features.niri, same convention as home/vscode.nix.
 #
@@ -73,7 +68,7 @@ let
   opacity = import ./transparency.nix;
 in
 {
-  imports = [ zen-browser.homeModules.twilight-official ];
+  imports = [ zen-browser.homeModules.beta ];
 
   config = lib.mkIf osConfig.features.niri {
     programs.zen-browser = {
@@ -117,64 +112,15 @@ in
       };
     };
 
-    xdg.desktopEntries.zen-twilight = {
-      name = "Zen Browser (Twilight)";
-      genericName = "Web Browser";
-      exec = "zen-twilight --name zen-twilight %U";
-      icon = "zen-twilight";
-      categories = [
-        "Network"
-        "WebBrowser"
-      ];
-      mimeType = [
-        "text/html"
-        "text/xml"
-        "application/xhtml+xml"
-        "application/vnd.mozilla.xul+xml"
-        "x-scheme-handler/http"
-        "x-scheme-handler/https"
-      ];
-      startupNotify = true;
-      settings.StartupWMClass = "zen-twilight";
-      actions = {
-        new-private-window = {
-          name = "New Private Window";
-          exec = "zen-twilight --private-window %U";
-        };
-        new-window = {
-          name = "New Window";
-          exec = "zen-twilight --new-window %U";
-        };
-        profile-manager-window = {
-          name = "Profile Manager";
-          exec = "zen-twilight --ProfileManager";
-        };
-      };
-    };
-
-    # Second instance of the same upstream naming bug as the Icon= fix above.
-    # setAsDefaultBrowser = true routes through the flake's own
-    # hm-module/default-browser.nix, which derives everything from the *flake
-    # attribute* name — `BROWSER = "zen-${name}"`, plus mime associations
-    # pointing at `zen-${name}.desktop`. Correct for the `beta` and `twilight`
-    # channels; wrong for this one, where the attribute is `twilight-official`
-    # but the package it builds is plain zen-twilight (confirmed: its store
-    # path holds only bin/zen-twilight and share/applications/
-    # zen-twilight.desktop — no -official anywhere, in any output).
-    #
-    # Only BROWSER actually needed fixing. The mime half of the same bug is
-    # inert here: xdg.mimeApps.enable is false, so home-manager writes no
-    # mimeapps.list at all and those associations never reach disk — verified
-    # live on the VM, where the only mimeapps.list is a runtime-written file
-    # containing one Discord handler, and `xdg-settings get
-    # default-web-browser` already resolves to the correct zen-twilight.desktop
-    # via the desktop entry's own MimeType. Overriding them would have been
-    # dead config; enabling xdg.mimeApps to make them live would hand
-    # home-manager a file that currently works as mutable runtime state.
-    #
-    # BROWSER is set at normal priority upstream, hence mkForce. Revisit
-    # alongside the desktop entry above if the channel ever changes: on `beta`
-    # or `twilight` this becomes unnecessary rather than wrong.
-    home.sessionVariables.BROWSER = lib.mkForce "zen-twilight";
+    # No BROWSER override needed on this channel. setAsDefaultBrowser = true
+    # routes through the flake's own hm-module/default-browser.nix, which
+    # derives everything from the *flake attribute* name — `BROWSER =
+    # "zen-${name}"`, plus mime associations pointing at `zen-${name}.desktop`.
+    # On `beta` the attribute and the package agree (bin/zen-beta,
+    # share/applications/zen-beta.desktop), so upstream's own values are
+    # already correct; the mkForce that corrected them under
+    # `twilight-official` is gone with the channel. The mime half was inert
+    # either way: xdg.mimeApps.enable is false, so home-manager writes no
+    # mimeapps.list at all and those associations never reach disk.
   };
 }

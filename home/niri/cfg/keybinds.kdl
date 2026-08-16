@@ -26,7 +26,7 @@ binds {
     // (zen-beta, zen-twilight, ...). This tries each in turn via spawn-sh
     // so the keybind survives a channel switch (home/zen-browser.nix)
     // without needing to be edited too.
-    Mod+Z                               hotkey-overlay-title="Open Browser: Zen-Browser" { spawn-sh "zen-twilight || zen-beta || zen"; }
+    Mod+Z                               hotkey-overlay-title="Open Browser: Zen-Browser" { spawn-sh "zen-beta || zen-twilight || zen"; }
     Mod+B                               hotkey-overlay-title="Open Note App: Obsidian" { spawn "obsidian"; }
     Mod+ALT+L                           hotkey-overlay-title="Lock Screen: noctalia lock" { spawn-sh "noctalia msg session lock"; }
     Mod+Shift+Q                         hotkey-overlay-title="Session Menu: noctalia session panel" { spawn-sh "noctalia msg panel-toggle session"; }

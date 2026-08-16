@@ -1358,3 +1358,54 @@ Ruled out:
   it). A broken lock genuinely is broken — a host would fail the same way on
   `nixos-rebuild`. CI going red here is correct behaviour, and the fix is to
   make it go red somewhere less disruptive.
+
+## Post-Phase 8 — moving Zen to `beta` and deleting the update workflow
+
+### The reversal
+
+`.github/workflows/update.yml` lived for one day. It was deleted, and
+`home/zen-browser.nix` now imports `zen-browser.homeModules.beta` — the
+option explicitly considered and *not* taken above, at the operator's
+direction.
+
+The reasoning that ruled `beta` out was that the move to
+`twilight-official` had been deliberate and its tradeoff hadn't changed. It
+had: the cost of the nightly was not yet visible when that channel was
+chosen, and it turned out to be a scheduled CI job that writes to `main`,
+plus a lock that must be re-checked with a full (closure-building) `nix flake
+check` on a schedule the operator doesn't control. Being a few days ahead of
+`beta` is not worth standing infrastructure. `beta` publishes immutable
+per-release artifacts, so a locked revision stays buildable indefinitely and
+the whole failure class disappears rather than being relocated — which the
+entry above already identified as the difference between the two options.
+
+With it gone, **every input is again pinned by revision and narHash with no
+fetch-from-a-mutable-URL derivation among them**, and nothing in CI writes to
+the repository.
+
+### Two twilight-only workarounds went with the channel
+
+Both were corrections for upstream naming bugs specific to the
+`twilight-official` attribute, and both are wrong to keep on `beta`:
+
+- **`xdg.desktopEntries.zen-twilight`** existed because that channel's
+  packaged entry set `Icon=zen-twilight-official`, an icon the package never
+  shipped. Verified against the built `beta` store path that its entry is
+  self-consistent: `Icon=zen-browser`, `Exec=zen-beta`,
+  `StartupWMClass=zen-beta`, and `share/icons/hicolor/*/apps/zen-browser.png`
+  really is present. Nothing to correct, so the override is gone.
+- **`home.sessionVariables.BROWSER = lib.mkForce "zen-twilight"`** existed
+  because the flake's `default-browser.nix` derives `BROWSER = "zen-${name}"`
+  from the *attribute* name, which was `twilight-official` while the binary
+  was `zen-twilight`. On `beta` the attribute and the binary agree, so
+  upstream's own value is already right.
+
+`home/niri/cfg/keybinds.kdl`'s `spawn-sh "zen-beta || zen-twilight || zen"`
+needed no structural change — it was written channel-agnostic for exactly
+this reason — only a reorder so the live channel is tried first instead of
+after a guaranteed miss.
+
+The general rule this leaves: **when a channel changes, re-read the built
+package's own `.desktop` and icon names rather than carrying its predecessor's
+fixes forward.** A workaround for a bug that no longer exists is
+indistinguishable from configuration until something breaks.
