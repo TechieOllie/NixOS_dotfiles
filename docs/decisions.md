@@ -1468,3 +1468,79 @@ It makes the mechanics non-interactive; it does not make verification
 automatic. Rendering, "does this look right", and anything visual still
 needs eyes on the VM's display. The point is only to remove the friction
 that made the live check expensive enough to skip.
+
+## Post-Phase 8 — Zen was never actually the default browser
+
+`home/zen-browser.nix` has set `programs.zen-browser.setAsDefaultBrowser =
+true` since Phase 6, and checking it appeared to confirm it worked:
+`xdg-settings get default-web-browser` on the VM answered
+`zen-beta.desktop`, and `BROWSER` was `zen-beta` in the session environment.
+Both were true. Neither was the setting doing anything.
+
+The flake's `hm-module/default-browser.nix` writes fifteen
+`xdg.mimeApps.defaultApplications` entries (http, https, text/html,
+mailto, ...) pointing at `zen-${name}.desktop`, plus
+`home.sessionVariables.BROWSER`. What it never does is set
+`xdg.mimeApps.enable`, and home-manager's `xdg.mimeApps` module writes no
+`mimeapps.list` at all while disabled. Nothing in this repo enabled it
+either, so every one of those associations was computed and thrown away.
+Confirmed by evaluating the option directly: `defaultApplications` held all
+fifteen correct entries while `enable` was `false`.
+
+What made it look correct:
+
+- `BROWSER` is real, but most GUI applications ignore it and call
+  `xdg-open`, which reads `mimeapps.list`.
+- With no explicit association, xdg falls back to scanning
+  `mimeinfo.cache`, and Zen was the only registered `x-scheme-handler/http`
+  handler on the VM, so it won by default. That is an accident of what
+  else is installed, not a setting — a second browser would have silently
+  taken over, and the ordering was never guaranteed on a fresh host.
+- The `~/.config/mimeapps.list` that did exist on the VM was written at
+  runtime by Vesktop and `xdg-settings` (mode 0644, not a store symlink),
+  and contained only `x-scheme-handler/discord`. The same app-owned-mutable-
+  state shape as Noctalia's settings sidecar and Zen's own profile.
+
+**Resolved** with `home/xdg-mime-apps.nix`: `xdg.mimeApps.enable = true`,
+plus a restated `x-scheme-handler/discord = vesktop.desktop` (taking over
+the file discards whatever was only recorded there at runtime;
+`home/vesktop.nix`'s desktop entry advertises the scheme via `MimeType=`,
+which makes Vesktop *a* handler, not the default), plus
+`xdg.configFile."mimeapps.list".force = true`.
+
+Three choices worth recording:
+
+- **A separate module, not a line in `home/zen-browser.nix`.** `enable` is
+  not a browser setting — it's the switch deciding whether *any* module's
+  mime associations reach disk. Buried in one app's module it is a landmine
+  for the next one. Follows `home/xdg-user-dirs.nix`, which exists for the
+  same reason on the other half of XDG.
+- **`force`, not a documented manual `rm`.** Home-manager's mime-apps module
+  sets only `.source`, not `force` (checked in
+  `modules/misc/xdg/mime-apps.nix` at the pinned revision), so a first
+  activation over the pre-existing unmanaged file would abort with "existing
+  file would be clobbered". Forcing keeps a rebuild convergent on every host
+  with no hand step.
+- **Zen's fifteen associations are not restated.** They arrive at
+  `lib.mkDefault` from the flake, so they merge in and stay overridable.
+  One of them is `text/plain = zen-beta.desktop`, which now actually
+  applies — a `.txt` opened from Nautilus will open in the browser. Left as
+  upstream has it, because there is no GUI text editor in this repo's stack
+  to point it at instead (Neovim is terminal-only and deliberately not
+  home-manager-managed). Override in `home/xdg-mime-apps.nix` if that
+  changes.
+
+Ruled out: setting `xdg.mimeApps.enable` inside `home/zen-browser.nix`
+(scoping problem above); calling `xdg-settings set default-web-browser` from
+an activation script (imperative, and writes the same mutable file this now
+owns declaratively).
+
+Verified live, not just by eval — the failure mode here was precisely one
+eval cannot see. The closure was built locally, `nix copy`'d to the VM and
+activated with `switch-to-configuration test` (avoiding the VM's
+`~/.dotfiles` clone, which carries an unrelated uncommitted edit).
+Activation completed with no clobber error; `~/.config/mimeapps.list` became
+a store symlink; `xdg-mime query default` answered `zen-beta.desktop` for
+http and https and `vesktop.desktop` for discord; and
+`xdg-open https://example.com` actually opened a `zen-beta` window titled
+"Example Domain — Zen Browser" in niri.

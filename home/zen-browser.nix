@@ -119,8 +119,11 @@ in
     # On `beta` the attribute and the package agree (bin/zen-beta,
     # share/applications/zen-beta.desktop), so upstream's own values are
     # already correct; the mkForce that corrected them under
-    # `twilight-official` is gone with the channel. The mime half was inert
-    # either way: xdg.mimeApps.enable is false, so home-manager writes no
-    # mimeapps.list at all and those associations never reach disk.
+    # `twilight-official` is gone with the channel.
+    #
+    # The mime half of that only reaches disk because home/xdg-mime-apps.nix
+    # sets xdg.mimeApps.enable — upstream populates defaultApplications but
+    # never enables the module, and home-manager writes no mimeapps.list
+    # without it. Don't drop that module assuming this one is self-contained.
   };
 }
