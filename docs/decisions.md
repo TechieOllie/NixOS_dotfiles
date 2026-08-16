@@ -1468,3 +1468,117 @@ It makes the mechanics non-interactive; it does not make verification
 automatic. Rendering, "does this look right", and anything visual still
 needs eyes on the VM's display. The point is only to remove the friction
 that made the live check expensive enough to skip.
+
+## Making blur and transparency actually render
+
+### The complaint, and what was actually wrong
+
+"Theming and blur + transparency aren't functional." Theming turned out to
+be fine — every template output was present and wallpaper-derived
+(`qt6ct/colors/noctalia.conf`, both `gtk-*/noctalia.css`,
+`ghostty/themes/noctalia`), and the palette tracked the wallpaper
+correctly. Transparency was partly working. Blur was not working anywhere
+it was supposed to, for two independent reasons, neither of which produces
+an error message anywhere.
+
+This was found by driving the VM over SSH and *looking* — `grim` through
+the `in-session` wrapper (`docs/testing-on-the-vm.md`), screenshots pulled
+back and inspected. `niri validate` passed the whole time, Noctalia's log
+was clean, and every config file said what it was supposed to say.
+
+### Reason one: niri's `opacity` window-rule cannot show blur
+
+The decisive experiment was one screenshot with Ghostty and Vesktop tiled
+side by side over the same wallpaper. Ghostty's backdrop was visibly
+smeared; Vesktop's stars were pin-sharp — same compositor, same wallpaper,
+same `background-effect { blur true }` window-rule matching both.
+
+The difference is where the transparency comes from:
+
+- **Ghostty** sets `background-opacity 0.80` itself, so its surface reaches
+  the compositor with a real alpha channel. niri draws the blurred backdrop
+  behind it and it shows through. This works.
+- **Vesktop, Zen and Nautilus** get their transparency from niri's own
+  `opacity 0.80` window-rule, which fades the entire already-composited
+  window over whatever is actually behind it on screen. There is nothing
+  translucent about the window's *background* for a blurred backdrop to
+  appear through, so the real wallpaper shows through unblurred instead.
+
+So `opacity` buys transparency and never blur. Both were tried against
+`xray true`/`xray false` and with the wallpaper in and out of the backdrop
+(`place-within-backdrop`); none of those variables changed it, which is
+what ruled out every other explanation. This is now recorded in
+`ARCHITECTURE.md`'s per-app transparency section, because the repo's own
+comments had asserted the opposite in three places — including the
+justification for the shared `0.80` in `home/transparency.nix`, which was
+written as "enough for blur to actually read as blur" for windows that
+could never have shown blur at any value.
+
+### Reason two: Noctalia's panels were fully opaque, by default
+
+Every Noctalia panel — launcher, control center, clipboard, session,
+wallpaper picker — rendered as a flat opaque rectangle. The cause is a
+single setting that had never been set: `shell.panel.transparency_mode`,
+which defaults to `"solid"`. Setting it to `"glass"` (the other value is
+`"soft"`) makes the panels translucent, and the wallpaper is then visibly
+blurred through them. `bar.default.background_opacity` was already set and
+was already working — confirmed separately by driving it to `0.15` and
+watching the bar nearly vanish.
+
+**Finding the config path took four wrong guesses and is worth recording.**
+Noctalia's settings schema files this option under `panels`
+(`settings.schema.panels.transparency-mode`) and its *values* under `shell`
+(`settings.options.shell.panel-transparency.glass`). Neither is the config
+path, which is `[shell.panel]`. `[panels]`, `[shell]`, `[panel]`, `[ui]`
+and a dozen other candidates were all rejected.
+
+What made this tractable is that Noctalia reports unknown config at
+startup, in two distinguishable forms:
+
+```
+[WRN] [config] panels: unknown section
+[WRN] [config] shell.transparency_mode: unknown setting
+```
+
+Writing candidate sections with a deliberate junk key in each, then reading
+which ones came back as "unknown section" versus "unknown setting",
+enumerates the real section list directly. The junk key mattered: an
+early reading of "no warning, therefore accepted" was simply wrong — the
+warning existed and had been missed — and a canary key is what caught it.
+The general lesson is this repo's existing one about checks that cannot
+fail, applied to a config file: **confirm the mechanism reports failure
+before trusting its silence.**
+
+### Reason three, minor: the layer-rule never enabled blur
+
+`rules.kdl`'s Noctalia layer-rule set only `xray false`, with a comment
+describing blur as "applied broadly then tuned down" for these surfaces.
+The broad `blur true` it referred to is in a `window-rule`, which does not
+apply to layer-shell surfaces at all — so the bar, panels, notifications,
+dock and OSD had no niri-side blur enabled in the first place. Now set
+explicitly.
+
+### `xray false` was removed everywhere
+
+The config forced `xray false` on every surface. Removing it is
+pixel-identical — verified by diffing screenshots taken with and without
+(`compare -metric AE` over the bar strip: 16 pixels of difference across
+the whole region, all of it the clock). It is not free, though: niri's own
+docs mark non-xray effects **experimental**, with the documented
+limitations that they disappear during window open/close animations and
+while dragging a tiled window, and they are much more expensive — non-xray
+blur recomputes whenever a window moves or anything underneath changes,
+while xray blurs the wallpaper once and reuses it.
+
+The reason there is no visual trade-off is specific to this setup: the
+wallpaper sits in niri's backdrop (`place-within-backdrop true`), so for
+these surfaces there is nothing below them *except* the wallpaper, and
+xray and non-xray sample the same pixels. If a future config wants blur
+that picks up other windows underneath, `xray false` is what turns that
+on — at the cost above.
+
+### Verification note
+
+Every claim here was checked on the VM against screenshots, not against
+eval. `nix flake check` cannot see any of it: all four problems were
+configuration that evaluated perfectly and rendered wrong.

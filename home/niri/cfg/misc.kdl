@@ -29,9 +29,23 @@
     }
 
     // Global blur tuning (Noctalia v5 compositor-settings docs), paired
-    // with the per-surface blur/xray window-rule and layer-rules in
-    // rules.kdl. Requires niri 26.04+ (this repo's pinned nixpkgs ships
-    // exactly that version).
+    // with the per-surface blur window-rule and layer-rules in rules.kdl.
+    // Requires niri 26.04+ (this repo's pinned nixpkgs ships exactly that
+    // version).
+    //
+    // xray is deliberately left at its default (niri turns it on
+    // automatically wherever blur is active) rather than being forced off,
+    // which is what rules.kdl used to do everywhere. Two reasons, in
+    // order: niri's own docs mark non-xray effects *experimental* with
+    // known limitations (they vanish during open/close animations and
+    // while dragging a tiled window), and xray is far cheaper — it blurs
+    // the wallpaper once and reuses it, instead of recomputing per window
+    // on every move and every content change underneath. The look is not
+    // a trade-off here: with the wallpaper in the backdrop
+    // (place-within-backdrop, rules.kdl) there is nothing below a surface
+    // *except* the wallpaper, so both modes sample the same thing.
+    // Confirmed by pixel-diffing screenshots taken with and without
+    // `xray false` — identical.
     blur {
         passes 2
         offset 3.0

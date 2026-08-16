@@ -8,21 +8,36 @@
         place-within-backdrop true
     }
 
-    // Noctalia v5 compositor-settings docs: blur, applied broadly then
-    // tuned down for Noctalia's own surfaces (bar/notification/dock/panel/
-    // attached-panel/osd) so they don't look see-through, plus the window
-    // switcher specifically. https://docs.noctalia.dev/v5/compositor-settings/niri
+    // Blur, enabled broadly for windows and explicitly for Noctalia's own
+    // layer surfaces. https://docs.noctalia.dev/v5/compositor-settings/niri
+    //
+    // IMPORTANT, and the thing that made blur look completely broken for
+    // months: this only ever becomes *visible* on a surface that is
+    // genuinely semi-transparent on the client side — an app that renders
+    // its own background with an alpha channel (Ghostty's
+    // background-opacity, Noctalia's bar background_opacity and its
+    // shell.panel.transparency_mode = "glass"). niri's own `opacity`
+    // window-rule below is NOT that: it fades the whole already-composited
+    // window over whatever is actually behind it, so the wallpaper shows
+    // through sharp and the blur never appears. Verified live by
+    // screenshotting Ghostty and Vesktop side by side on the same
+    // wallpaper — Ghostty's backdrop was smeared, Vesktop's stars were
+    // pin-sharp. Giving an app real blur means finding real client-side
+    // transparency for it; there is no compositor-side substitute.
     window-rule {
         background-effect {
             blur true
-            xray false
         }
     }
 
+    // A window-rule does not apply to layer-shell surfaces, so Noctalia's
+    // bar/panels/OSD need blur enabled here in their own right — this
+    // block previously set only `xray false` and therefore never enabled
+    // blur on any of them at all.
     layer-rule {
         match namespace=r#"^noctalia-(bar-[^"]+|notification|dock|panel|attached-panel|osd)$"#
         background-effect {
-            xray false
+            blur true
         }
     }
 
@@ -30,7 +45,6 @@
         match namespace="noctalia-window-switcher"
         background-effect {
             blur true
-            xray false
         }
     }
 
@@ -44,7 +58,11 @@
 
     // Same opacity treatment as Zen (matching the shared value in
     // home/transparency.nix) — pure compositor-level effect, no GTK CSS
-    // changes needed. UNLIKE Zen, focus-ring stays enabled here rather than
+    // changes needed. This buys transparency only, never blur: see the
+    // background-effect block at the top of this file for why the two are
+    // not the same mechanism. GTK gives us no client-side alpha to work
+    // with, so tinting is the whole of what Nautilus can have here.
+    // UNLIKE Zen, focus-ring stays enabled here rather than
     // off: niri's own default-config.kdl explains the focus-ring/border
     // "solid background rectangle" bleed-through only happens because it
     // has nowhere else to go for windows with no room around them — Zen is
@@ -68,7 +86,11 @@
         // CSS-based transparency (which needs Zen/Gecko to actually render
         // an alpha-channel surface — niri isn't in that mod's confirmed-
         // working list, only KDE/Hyprland are). This applies regardless of
-        // whether that works, so it's the reliable fallback. Value matches
+        // whether that works, so it's the reliable fallback — for
+        // *transparency*. Blur rides on the mod's client-side alpha, not on
+        // this line, so if the backdrop through Zen looks sharp then the
+        // mod isn't rendering alpha and no niri setting will change that.
+        // Value matches
         // the shared opacity in home/transparency.nix — kept in sync by
         // hand, same as misc.kdl's duplicated cursor block.
         opacity 0.80
@@ -100,6 +122,10 @@
     // same as Nautilus. Pairs with Vesktop's own VencordSettings.store.transparent
     // (home/vesktop.nix) as a compositor-level fallback independent of
     // whether Electron's own transparency renders correctly here.
+    // `transparent` is currently false there (Phase 6 dropped the whole
+    // CSS/Electron-transparency approach), so in practice this window has
+    // tinting and no blur — Vesktop was the control in the live comparison
+    // that established the distinction described at the top of this file.
     window-rule {
         match app-id="vesktop"
         opacity 0.80

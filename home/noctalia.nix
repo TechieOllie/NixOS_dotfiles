@@ -26,6 +26,31 @@ in
       settings = {
         shell = {
           launch_apps_as_systemd_services = true;
+
+          # THE setting that makes Noctalia's own surfaces translucent at
+          # all. It defaults to "solid" — every panel (launcher, control
+          # center, clipboard, session, wallpaper picker) renders fully
+          # opaque, which silently defeated the entire blur setup: niri
+          # can only blur *behind* a surface that has something transparent
+          # to show it through. Confirmed live by screenshotting the
+          # launcher before and after: "solid" gives a flat dark panel,
+          # "glass" gives a translucent one with the wallpaper visibly
+          # blurred through it. The other values are "soft" (translucent,
+          # less pronounced) and "solid".
+          #
+          # The TOML path is [shell.panel], NOT [panels], despite Noctalia's
+          # own settings *schema* filing this option under "panels"
+          # (settings.schema.panels.transparency-mode) and its option values
+          # under "shell" (settings.options.shell.panel-transparency.glass).
+          # Neither of those is the config path. Found by writing candidate
+          # sections and reading Noctalia's own startup warnings, which
+          # report both "<section>: unknown section" and
+          # "<section>.<key>: unknown setting" — [panels], [shell] and a
+          # dozen other guesses were all rejected that way. If this ever
+          # appears not to apply, check `journalctl --user -u noctalia` for
+          # exactly those warnings before assuming the value is wrong: an
+          # unknown key is ignored silently apart from that one line.
+          panel.transparency_mode = "glass";
         };
 
         # Fires after every full re-theme pass completes (confirmed via
