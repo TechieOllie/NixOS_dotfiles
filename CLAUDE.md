@@ -10,7 +10,7 @@ Three documents, three jobs — don't duplicate between them:
 - **`ARCHITECTURE.md`** — the design and every convention. The single source of truth; read it in full before making an architectural decision not already reflected in the code.
 - **this file** — current state, commands, and the gotchas that will bite again.
 - **`docs/decisions.md`** — the investigation log: what was tried, what broke, what was ruled out and why. Read it before re-attempting something, or when you need the reasoning behind a non-obvious choice.
-- **`docs/`** also holds runbooks: `bootstrapping-a-host.md`, `secrets.md`, `live-dotfiles.md`.
+- **`docs/`** also holds runbooks: `bootstrapping-a-host.md`, `secrets.md`, `live-dotfiles.md`, `testing-on-the-vm.md`.
 
 ## Commands
 
@@ -63,7 +63,7 @@ files are excluded from all three lints (see `handWrittenNix` in `flake.nix`).
 
 | Host | State | Filesystem | Notes |
 | --- | --- | --- | --- |
-| `the-entertaining-nios-vm` | bootstrapped, verified live | ext4, no swap | `features.niri = true`. **All development and verification happens here.** Disposable; only ever gets a throwaway test SSH key. |
+| `the-entertaining-nios-vm` | bootstrapped, verified live | ext4, no swap | `features.niri = true`. **All development and verification happens here.** Disposable; only ever gets a throwaway test SSH key. Deliberately set up to be driven entirely over SSH — passwordless `wheel` sudo, greetd autologin into niri, and an `in-session` wrapper — see `docs/testing-on-the-vm.md`. Those three are VM-only and must not spread to a real host. |
 | `the-entertaining-nios-laptop` | fully wired, eval-clean, **not installed** | btrfs + 32G swap | The machine this repo is developed on, still running CachyOS. Blocked only on the `/dev/CHANGEME` placeholder in its `disko.nix` (needs `lsblk` from an installer). The install is deliberately on hold — it would wipe the live CachyOS system. |
 | `the-entertaining-nios-desktop` | scaffold only | btrfs + 16G swap | No `hardware-configuration.nix`, `secrets.nix`, or `flake.nix` entry yet. Also has a `/dev/CHANGEME` placeholder. |
 
@@ -137,7 +137,7 @@ Each of these has bitten at least once and will again. Full write-ups in
 - **Noctalia templates that mutate a file in place conflict with Home Manager.** Any official template using `sed -i` or a temp-file-then-`mv` (starship, lazygit) destroys an HM-managed symlink at that path. Use a custom `theme.templates.user.<id>` template that renders the whole file instead, or point the template at a separate output file HM doesn't manage (ghostty, gtk, qt, yazi). Never manage a file Noctalia's template engine owns.
 - **`home.sessionVariables` values are not shell-expanded.** They're written into a script as-is, so `"$XDG_CONFIG_HOME/..."` silently resolves to a broken path. Use `${config.xdg.configHome}`.
 - **"Existing file … would be clobbered" during activation**: retry the switch once before assuming the config is wrong. It has occurred as a one-off home-manager activation-ordering race.
-- **An ad-hoc SSH shell has no session context.** `NIRI_SOCKET`, `SSH_AUTH_SOCK`, and friends are scoped to the graphical session's own systemd user manager; export them manually (`systemctl --user show-environment`) when driving a live session over SSH.
+- **An ad-hoc SSH shell has no session context.** `NIRI_SOCKET`, `SSH_AUTH_SOCK`, and friends are scoped to the graphical session's own systemd user manager; export them manually (`systemctl --user show-environment`) when driving a live session over SSH. On the VM this is packaged as the `in-session` wrapper (`ssh ol@<vm> in-session niri msg windows`); on a real host it's still manual.
 - **`useGlobalPkgs` means Home Manager can't set `nixpkgs.config`.** Unfree allowances must go in `modules/desktop/unfree.nix` at the NixOS level.
 - **A rolling input's source rots in place, and `--no-build` can't see it.** No input does this any more — `home/zen-browser.nix` moved off Zen's `twilight` nightly to the `beta` channel precisely because of it — but the shape is worth recognising before adding an input. A rolling source means upstream replaces the tarball behind an already-locked revision every few days, and the fixed-output source derivation then starts failing with a hash mismatch on whatever commit happens to be pushed next, with no relation to what that commit changed. `nix flake check --no-build` (so `just check-fast`, so `driver.sh check`) passes throughout, since it never fetches. Prefer an input with immutable release artifacts; run the *full* `nix flake check` after any `nix flake update` before pushing.
 - **The VM has its own rendering quirks** (cursor duplication/orientation, occasional MESA errors) traced to `virtio-gpu-gl`/SPICE, not this repo. Don't chase them as config bugs; garbled text is usually virt-manager's View → Scale Display.

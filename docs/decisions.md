@@ -1409,3 +1409,62 @@ The general rule this leaves: **when a channel changes, re-read the built
 package's own `.desktop` and icon names rather than carrying its predecessor's
 fixes forward.** A workaround for a bug that no longer exists is
 indistinguishable from configuration until something breaks.
+
+## Making the VM non-interactive
+
+### The friction, and why it mattered
+
+Verifying anything on `the-entertaining-nios-vm` needed a human twice per
+cycle: a sudo password for every `nixos-rebuild switch` over SSH, and a
+console login at the greeter before any GUI existed to test against. Root
+SSH is off (`modules/system/ssh.nix`, `PermitRootLogin = "no"`) and the
+`ol` account is password-gated for sudo, so neither was scriptable.
+
+That is a bigger problem than it sounds, because this repo's own hardest-won
+rule is that **eval passing is not verification** — every phase has shipped
+a bug that only appeared when an app was actually opened. A verification
+step that requires a human at a console twice is a verification step that
+gets skipped, and the rule quietly stops being followed.
+
+### What was added, all on the host and none of it in a module
+
+Three settings in `hosts/the-entertaining-nios-vm/default.nix`:
+
+- `security.sudo.wheelNeedsPassword = false` — makes
+  `ssh ol@<vm> sudo nixos-rebuild switch …` run unattended.
+- `services.greetd.settings.initial_session` — autologin into `niri-session`
+  at boot, so a graphical session exists with nobody at the console.
+  Upstream's noctalia-greeter module sets only `default_session.command`,
+  at `mkDefault` (confirmed by reading its `nix/nixos-module.nix`), so this
+  merges rather than conflicts. `initial_session` applies only to the first
+  login after boot, so the greeter is still reachable by logging out — it
+  stays testable.
+- An `in-session` wrapper script — imports `WAYLAND_DISPLAY`, `NIRI_SOCKET`
+  and the other graphical variables out of the session's systemd `--user`
+  manager, then execs. This is the long-standing "an ad-hoc SSH shell has no
+  session context" gotcha turned into one command.
+
+**Host file, not a module or profile, and deliberately so.** Each of the
+first two trades away a real security property. That trade is only
+defensible for this specific machine — disposable, host-local libvirt
+network, throwaway SSH key, holds nothing — and a module would make it
+available to the laptop and desktop, which are none of those things. This is
+the same reasoning that keeps `services.spice-vdagentd` in this file: it
+describes one machine, not a role.
+
+Passwordless sudo was left at the whole `wheel` group rather than an
+allow-list of `nixos-rebuild`. An allow-list reads tighter but isn't:
+rebuilding to an arbitrary flake path is already root by another name.
+
+### The bootstrap is unavoidably interactive, exactly once
+
+Applying the change that removes the password prompt still requires a
+password-authenticated switch. There is no way around it from the
+development machine, and it is worth stating rather than rediscovering.
+
+### What this does not do
+
+It makes the mechanics non-interactive; it does not make verification
+automatic. Rendering, "does this look right", and anything visual still
+needs eyes on the VM's display. The point is only to remove the friction
+that made the live check expensive enough to skip.

@@ -13,3 +13,4 @@ the way lives in [`decisions.md`](./decisions.md). This directory answers
 - [`secrets.md`](./secrets.md) — sops-nix day to day: adding secrets, adding a recipient, rotating a key.
 - [`decisions.md`](./decisions.md) — the investigation log: what was tried, what broke, what was ruled out and why. Not a runbook; read it before re-attempting something or when you need the reasoning behind a non-obvious choice.
 - [`live-dotfiles.md`](./live-dotfiles.md) — cloning this repo to `~/.dotfiles` on a host, and which files (wallpapers, niri config) are read live from it instead of the Nix store.
+- [`testing-on-the-vm.md`](./testing-on-the-vm.md) — the verification cycle against `the-entertaining-nios-vm` over SSH: rebuild without a password prompt, reach the autologged-in graphical session, run GUI commands in it.
