@@ -59,22 +59,27 @@ fi
 cmd="${1:-check}"
 host="${2:-$DEFAULT_HOST}"
 
-# Noctalia Shell is fetched from its own Cachix cache (see
-# modules/desktop/noctalia.nix) rather than nixpkgs — that substituter is
-# only actually *trusted* once a host running this flake has been switched
-# to at least once (chicken-and-egg: the trust comes from the config you're
-# trying to build). On a machine that has never built/switched this flake
-# before, pass these explicitly or `nix build` may build Noctalia from
-# source instead of substituting it (~20 minutes, per flake.nix's own
-# comment on the noctalia input) rather than failing outright.
-NOCTALIA_SUBSTITUTER_ARGS=(
-  --extra-substituters "https://noctalia.cachix.org"
-  --extra-trusted-public-keys "noctalia.cachix.org-1:pCOR47nnMEo5thcxNDtzWpOxNFQsBRglJzxWPp3dkU4="
+# Noctalia Shell and chaotic-nyx are fetched from their own caches (see
+# modules/desktop/noctalia.nix and chaotic's own NixOS module) rather than
+# nixpkgs. Those substituters are only actually *trusted* once a host
+# running this flake has been switched to at least once (chicken-and-egg:
+# the trust comes from the config you're trying to build). Passing them
+# here helps on a machine that has never built this flake, where Nix would
+# otherwise build a Wayland/OpenGL shell — and, once the desktop has a
+# flake entry, a kernel — from source rather than failing outright.
+#
+# These flags are best-effort only: the daemon ignores client-supplied
+# substituters from users not in `trusted-users`. The durable fix is the
+# same two lines in /etc/nix/nix.conf that CI sets in
+# .github/workflows/check.yml; keep the three in sync.
+SUBSTITUTER_ARGS=(
+  --extra-substituters "https://noctalia.cachix.org https://nyx-cache.chaotic.cx"
+  --extra-trusted-public-keys "noctalia.cachix.org-1:pCOR47nnMEo5thcxNDtzWpOxNFQsBRglJzxWPp3dkU4= nyx-cache.chaotic.cx:dJxTrgMC3V3cFfyIiBQDQorG6k1LsqurH/srpMSq7qk="
 )
 
 do_check() {
   echo "== nix flake check (evals nixosConfigurations.* + packages.*, no build) =="
-  nix flake check --no-build "${NOCTALIA_SUBSTITUTER_ARGS[@]}"
+  nix flake check --no-build "${SUBSTITUTER_ARGS[@]}"
 }
 
 do_eval() {
@@ -88,13 +93,13 @@ do_build() {
   local h="$1"
   echo "== nix build .#nixosConfigurations.$h.config.system.build.toplevel =="
   nix build ".#nixosConfigurations.${h}.config.system.build.toplevel" \
-    -o "result-${h}" -L "${NOCTALIA_SUBSTITUTER_ARGS[@]}"
+    -o "result-${h}" -L "${SUBSTITUTER_ARGS[@]}"
   echo "-> $(readlink -f "result-${h}")"
 }
 
 do_iso() {
   echo "== nix build .#installer-iso =="
-  nix build .#installer-iso -o result-iso -L "${NOCTALIA_SUBSTITUTER_ARGS[@]}"
+  nix build .#installer-iso -o result-iso -L "${SUBSTITUTER_ARGS[@]}"
   echo "-> $(readlink -f result-iso)/iso/"
   ls -la "$(readlink -f result-iso)/iso/"
 }
