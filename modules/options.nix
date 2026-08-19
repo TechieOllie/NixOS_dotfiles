@@ -33,6 +33,11 @@
           default = false;
           description = "Enable CUPS printing and Avahi-based network printer/scanner discovery.";
         };
+        moonshine = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Enable the Moonshine streaming server: a headless Moonlight-compatible host exposing a full niri desktop, Steam Big Picture and a remote poweroff.";
+        };
       };
     };
     default = { };

@@ -11,6 +11,7 @@
   zen-browser,
   chaotic,
   millennium,
+  moonshine,
 }:
 { system, hostPath }:
 let
@@ -24,7 +25,8 @@ nixpkgs.lib.nixosSystem {
   # files that actually use them), keeping mkHost feature-agnostic.
   # chaotic/millennium get the identical treatment for the gaming stack:
   # modules/programs/steam.nix imports them, so a host that isn't a gaming
-  # host never pulls either into its closure.
+  # host never pulls either into its closure. moonshine likewise, imported
+  # by modules/services/moonshine.nix.
   specialArgs = {
     inherit
       vars
@@ -32,6 +34,7 @@ nixpkgs.lib.nixosSystem {
       noctalia
       chaotic
       millennium
+      moonshine
       ;
   };
   modules = [

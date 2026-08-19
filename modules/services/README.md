@@ -19,8 +19,13 @@ flag (see `modules/options.nix`):
 - `printing.nix` (`features.printing`) — CUPS with driverless IPP plus
   Avahi/mDNS discovery. Vendor driver packages are deliberately not
   guessed at in advance.
+- `moonshine.nix` (`features.moonshine`) — a headless Moonlight-compatible
+  streaming server. Desktop only: it needs the GPU and the game library.
+  Streams a full niri desktop, Steam Big Picture and a remote poweroff, each
+  inside its own isolated compositor. Reachable over the tailnet only — the
+  GameStream ports are deliberately not opened to the LAN.
 
-All four are enabled on the laptop and desktop; the VM deliberately runs
-none of them.
+The first four are enabled on the laptop and desktop; `moonshine.nix` is on
+the desktop alone, and the VM deliberately runs none of them.
 
 Full rationale: [`ARCHITECTURE.md`](../../ARCHITECTURE.md).

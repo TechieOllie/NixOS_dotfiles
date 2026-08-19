@@ -66,6 +66,23 @@
     millennium = {
       url = "github:SteamClientHomebrew/Millennium?dir=packages/nix";
     };
+
+    # Moonshine, a headless Moonlight-compatible game/desktop streaming
+    # server. Not in nixpkgs (confirmed against this repo's pinned
+    # revision); upstream ships the flake, whose nixosModules.moonshine is
+    # the whole install procedure — lingering, uinput/uhid, udev rules, the
+    # moonshine-wsi Vulkan layer and the system unit — done declaratively.
+    #
+    # Unlike noctalia/chaotic/millennium above this one *does* follow our
+    # nixpkgs: upstream publishes no binary cache, so there is no cache to
+    # lose by following, and not following would mean a fourth nixpkgs in
+    # the closure for nothing. The cost either way is that moonshine builds
+    # from source (~300 derivations), which the full `nix flake check`
+    # closure-build for the desktop now pays for.
+    moonshine = {
+      url = "github:hgaiser/moonshine";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -80,6 +97,7 @@
       zen-browser,
       chaotic,
       millennium,
+      moonshine,
       ...
     }:
     let
@@ -98,6 +116,7 @@
           zen-browser
           chaotic
           millennium
+          moonshine
           ;
       };
 
