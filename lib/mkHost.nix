@@ -47,6 +47,26 @@ nixpkgs.lib.nixosSystem {
       # Share the system's pkgs instance instead of evaluating a second one
       # for Home Manager.
       home-manager.useGlobalPkgs = true;
+
+      # Install home.packages into /etc/profiles/per-user/<name> — part of
+      # the system generation, swapped atomically with it — rather than
+      # into the user's own ~/.nix-profile via an activation side-effect.
+      # This is what the repo's "one nixos-rebuild switch, one rollback"
+      # premise actually asks for: the packages were always in the system
+      # closure either way, but with this off their *visible location* was
+      # a mutable per-user profile that home-manager-<name>.service had to
+      # go and rewrite on every switch — one more activation step able to
+      # half-fail, on a repo that already has an HM activation race in its
+      # standing gotchas.
+      #
+      # It also gives system-level units a stable path to a Home Manager
+      # package, which ~/.nix-profile never did: see the Heroic entry in
+      # modules/services/moonshine.nix.
+      #
+      # Upstream's own flake templates set this, and its manual says it
+      # "may become the default value in the future". It was off here only
+      # because it defaults off and nothing ever set it.
+      home-manager.useUserPackages = true;
       # zen-browser has no NixOS module (home-manager only) — passed through
       # here only, matching noctalia's own treatment. home/zen-browser.nix
       # imports zen-browser.homeModules.beta itself.
