@@ -66,6 +66,15 @@
 }:
 let
   opacity = import ./transparency.nix;
+
+  # Every transparency-related pref below is derived from the shared value
+  # rather than hardcoded, so turning transparency off (opacity = 1.0) flips
+  # them all together and turning it back on restores them — no second place
+  # to remember. With this false, Zen renders its normal, fully-themed chrome
+  # (Noctalia's "zen-browser" community template still colors it), instead of
+  # the opaque-black backplate that `zen_bg_color_enabled` would otherwise
+  # force at #000000FF.
+  transparent = opacity < 1.0;
 in
 {
   imports = [ zen-browser.homeModules.beta ];
@@ -77,15 +86,15 @@ in
 
       policies.Preferences = {
         "browser.tabs.allow_transparent_browser" = {
-          Value = true;
+          Value = transparent;
           Status = "default";
         };
         "zen.widget.linux.transparency" = {
-          Value = true;
+          Value = transparent;
           Status = "default";
         };
         "mod.sameerasw.zen_bg_color_enabled" = {
-          Value = true;
+          Value = transparent;
           Status = "default";
         };
         "mod.sameerasw.zen_transparency_color" = {
@@ -105,8 +114,9 @@ in
           # (chrome.css) is meant to blend invisibly against an opaque
           # white page — with a transparent backplate it shows up instead
           # as a stray rim just inside niri's own border. Confirmed via
-          # live testing.
-          Value = true;
+          # live testing. Only relevant while the backplate is actually
+          # transparent, so it follows the same shared value.
+          Value = transparent;
           Status = "default";
         };
       };
