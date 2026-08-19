@@ -1,12 +1,12 @@
 # the-entertaining-nios-laptop
 
-Not yet installed — this is the machine the dotfiles are currently being
-developed on, still running CachyOS. Fully wired on the Nix side though:
-real `hardware-configuration.nix` (generated read-only alongside the live
-CachyOS install), a dedicated sops age key registered in `.sops.yaml`, an
-encrypted `secrets/secrets.yaml` + `secrets.nix`, and a `nixosConfigurations`
-entry in `flake.nix`. `nix eval` on this host's `system.build.toplevel`
-succeeds.
+Not yet installed — an Intel laptop with an SD-card reader, a genuinely
+different machine from the AMD `the-entertaining-nios-desktop`. Fully wired on
+the Nix side though: real
+`hardware-configuration.nix`, a dedicated sops age key registered in
+`.sops.yaml`, an encrypted `secrets/secrets.yaml` + `secrets.nix`, and a
+`nixosConfigurations` entry in `flake.nix`. `nix eval` on this host's
+`system.build.toplevel` succeeds.
 
 Left to do before this host can actually be installed:
 

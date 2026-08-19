@@ -130,6 +130,16 @@
         hostPath = ./hosts/the-entertaining-nios-laptop;
       };
 
+      # Wired in before the machine has ever been installed, deliberately:
+      # the `checks` attribute below is derived from this set, so an entry
+      # here is what makes CI build this host's closure — and this is the
+      # only host that imports profiles/gaming.nix, so until now the entire
+      # Phase 7 gaming stack was never built by anything.
+      nixosConfigurations.the-entertaining-nios-desktop = mkHost {
+        inherit system;
+        hostPath = ./hosts/the-entertaining-nios-desktop;
+      };
+
       # Bootstrap tool, not a host: a minimal installer ISO with the
       # operator's key pre-authorized for root, so nixos-anywhere can SSH in
       # without any manual console step. Reads hosts/installer/variables.nix

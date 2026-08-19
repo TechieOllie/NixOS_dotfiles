@@ -28,7 +28,7 @@ forward.
 
 Phase 1 (Foundation) is done, Phase 2 (Profiles) is in progress, Phase 3 (Desktop environment) is done, Phase 4 (Terminal environment) is done (Zsh, Starship, Lazygit, Git, Ghostty, a bare Neovim package — all landed and verified live), Phase 5 (Theming) has landed and is mostly verified live on `the-entertaining-nios-vm` — cursor/icon theme/GTK3 modernization/Qt color-scheme all confirmed working (see the roadmap section below for the full writeup, the two accepted trade-offs, and two real bugs found and fixed during verification); the greeter's own cursor still needs its one-time `greeter.toml` reset (same gotcha as any other `greetd.nix` `settings` change) to actually show on an already-booted host. Phase 6 (Applications — VS Code, Zen Browser, Vesktop, Nautilus) has landed and is verified live on `the-entertaining-nios-vm` (see the dedicated Phase 6 writeup below); one small self-healing gap remains (Zen Browser's Noctalia theming needs the browser launched once to create a profile before it can apply). `flake.nix` now has two `nixosConfigurations` entries: `the-entertaining-nios-vm` (a VM, bootstrapped and verified via a full nixos-anywhere install) and `the-entertaining-nios-laptop` (fully wired and eval-clean, but **not yet installed** — see below). Both are built through `lib/mkHost.nix` (`{ system, hostPath }: nixosSystem`, wiring `disko`, `sops-nix`, `modules/options.nix`, the host itself, and `home-manager.nixosModules.home-manager`) rather than inline. `mkHost` was extracted ahead of the guide's usual "wait for a second *bootstrapped* host" trigger — bootstrapped meaning installed on real/virtual hardware via nixos-anywhere, which the laptop still isn't — because the desktop and laptop hosts' imminent bootstrap made the duplication a near-certainty rather than a hypothetical; treat this as a deliberate, explicitly-requested exception, not a precedent for extracting other `lib/` helpers early.
 
-`the-entertaining-nios-laptop` is the machine this repo is currently developed on (still running CachyOS, not NixOS yet). It now has everything nixos-anywhere needs except a resolved disk device: real `hardware-configuration.nix` (generated via `nixos-generate-config --dir`, run read-only alongside the live CachyOS install, with the scan's `fileSystems`/`swapDevices` entries dropped since `disko.nix` owns that instead), its own sops age key (`~/.config/sops/age/the-entertaining-nios-laptop.txt`, operator-held, not committed) added as a `.sops.yaml` recipient with its own `creation_rules` entry, an encrypted `secrets/secrets.yaml` (`password-hash`, hashed and encrypted by the user directly so the plaintext never touched the assistant), `secrets.nix` mirroring the VM's, and both wired into `default.nix`'s imports and into `flake.nix`'s `nixosConfigurations`. `nix eval` on its `system.build.toplevel` succeeds. The **only** thing left before an actual install is resolving the placeholder `/dev/CHANGEME` disk device in `disko.nix` (only knowable from an installer environment via `lsblk`) — and then actually running `nixos-anywhere`, which is deliberately deferred since that step wipes the target disk and the user wants to keep CachyOS bootable until the dotfiles are fully functional. `the-entertaining-nios-desktop` is still scaffold-only: no `hardware-configuration.nix`, `secrets.nix`, or `flake.nix` entry yet, since it hasn't been bootstrapped against real hardware either.
+`the-entertaining-nios-laptop` is still running CachyOS, not NixOS yet. It now has everything nixos-anywhere needs except a resolved disk device: real `hardware-configuration.nix` (generated via `nixos-generate-config --dir`, run read-only alongside the live CachyOS install, with the scan's `fileSystems`/`swapDevices` entries dropped since `disko.nix` owns that instead), its own sops age key (`~/.config/sops/age/the-entertaining-nios-laptop.txt`, operator-held, not committed) added as a `.sops.yaml` recipient with its own `creation_rules` entry, an encrypted `secrets/secrets.yaml` (`password-hash`, hashed and encrypted by the user directly so the plaintext never touched the assistant), `secrets.nix` mirroring the VM's, and both wired into `default.nix`'s imports and into `flake.nix`'s `nixosConfigurations`. `nix eval` on its `system.build.toplevel` succeeds. The **only** thing left before an actual install is resolving the placeholder `/dev/CHANGEME` disk device in `disko.nix` (only knowable from an installer environment via `lsblk`) — and then actually running `nixos-anywhere`, which is deliberately deferred since that step wipes the target disk and the user wants to keep CachyOS bootable until the dotfiles are fully functional. `the-entertaining-nios-desktop` is still scaffold-only: no `hardware-configuration.nix`, `secrets.nix`, or `flake.nix` entry yet, since it hasn't been bootstrapped against real hardware either.
 
 `home/` and `lib/` now exist (`overlays/`, `pkgs/` still don't — that's Phase 3+ and later). `home/default.nix` is a machine-agnostic Home Manager entry point (username/homeDirectory from `vars`, a pinned `home.stateVersion`, `programs.home-manager.enable`) imported by every host via `mkHost` — there's no per-host Home Manager entry point. It has no actual program configuration yet.
 
@@ -1103,9 +1103,8 @@ The roadmap line was "Docker, Steam, Proton GE, Tailscale, gaming profile."
 Three of those five changed on contact with the operator's actual
 requirements.
 
-**Proton GE became proton-cachyos.** The operator runs CachyOS on the
-machine this repo is developed from and wanted its Proton fork and its
-gaming kernel rather than the more commonly-packaged GE build. Neither is
+**Proton GE became proton-cachyos.** The operator runs CachyOS and wanted
+its Proton fork and its gaming kernel rather than the more commonly-packaged GE build. Neither is
 in nixpkgs — verified against this repo's pinned revision, where the only
 attribute matching "cachy" at all is `ananicy-rules-cachyos`. Both come
 from [chaotic-nyx](https://www.nyx.chaotic.cx/)
@@ -1927,3 +1926,149 @@ windows and the bar, are judgements only a live session can make. Both
 are one-value changes — `style` in `home/noctalia.nix`, and the font size
 in `home/gtk.nix` — if they look wrong.
 
+---
+
+## Bringing the desktop host up to installable
+
+The desktop was a scaffold: `/dev/CHANGEME`, no `nixosConfigurations` entry,
+no `hardware-configuration.nix`, no secrets, and no `modules/desktop/*`
+imports at all, so installing it would have produced a gaming machine with no
+graphical session. This closes
+everything that doesn't physically require the installer or a drive that
+isn't plugged in.
+
+### The machine
+
+The scaffold was already written for this exact box (16 G swap,
+`linuxPackages_cachyos`, `lact` for an RX 6600) and the hardware confirms it:
+ASRock B550M Pro4, Ryzen 5 5600X, 15.5 GiB RAM, Navi 23 (RX 6600), UEFI.
+
+Worth recording because the two real hosts are easy to conflate on paper:
+this one is AMD, while
+`hosts/the-entertaining-nios-laptop/hardware-configuration.nix` declares
+`kvm-intel` and an `rtsx_pci_sdmmc` card reader. Two genuinely different
+machines, not two names for one.
+
+### Why a `/dev/disk/by-id/` path, not `/dev/nvme0n1`
+
+The placeholder existed because "the real device name is only knowable from
+an installer environment" — but that framing accepts a hazard it doesn't need
+to. Kernel enumeration order is not a promise, so `/dev/nvme0n1` resolved
+from *this* boot is not guaranteed to name the same disk from the installer's
+boot. `/dev/disk/by-id/nvme-Samsung_SSD_980_1TB_S649NL0T998840Y` encodes the
+model and serial, so it either matches the intended disk or matches nothing.
+For a step whose failure mode is "silently formats the wrong drive", that
+asymmetry is worth the longer string.
+
+The same device also appears as `nvme-eui.002538d921a42377` and as a `…_1`
+suffixed duplicate of the chosen name. All three are the same disk.
+
+### The second disk: ext4, `nofail`, and a placeholder that stays
+
+The 2 TB drive is bulk storage for games and video. Deliberately plain ext4
+on a single partition rather than btrfs: nothing there wants snapshots
+(`features.snapshots`' snapper configs cover `/` and `/home` only) and a
+library of already-compressed media is CPU spent for nothing under
+`compress=zstd`.
+
+`mountOptions = [ "nofail" ]` is load-bearing rather than defensive habit.
+This is a secondary drive on a machine that boots fine without it; without
+`nofail`, systemd makes the mount a requirement of `local-fs.target` and a
+missing or failed drive drops the entire boot to an emergency shell.
+
+Its device stays `/dev/CHANGEME-storage` because the drive is not attached to
+the machine yet — there is no `by-id` path to read. Same reasoning as the
+original placeholder: obviously invalid beats plausibly wrong.
+
+### The 500 GB SATA SSD is deliberately absent from `disko.nix`
+
+It holds the live CachyOS install. Leaving it undeclared means
+`nixos-anywhere` never touches it, so after the install it is still a
+bootable, working system reachable from the firmware boot menu — a real
+fallback during the period when the new NixOS install is unproven. Declaring
+it as extra storage would have wiped exactly the thing worth keeping.
+
+### `/mnt/storage` plus a symlink, and why neither half lives in `home/`
+
+`/mnt/storage` is the conventional spot and keeps the path machine-level
+rather than tied to the `ol` user; the `~/Storage` symlink is what makes it
+one click away in Nautilus and in file dialogs. Mounting directly at
+`/home/ol/Storage` was considered and rejected: it puts a mountpoint inside
+snapper's `@home` scope, and a drive that drops out then looks like an empty
+folder rather than a missing disk.
+
+Both the ownership rule and the symlink are `systemd.tmpfiles.rules` in the
+host's own `default.nix`, for two separate reasons. disko formats ext4 but
+leaves its root directory owned by `root`, so something has to chown it. And
+the symlink cannot live in `home/`: that entry point is machine-agnostic
+(there is no per-host Home Manager module), so a symlink declared there would
+dangle on the VM and the laptop. Same reasoning that already keeps this
+host's kernel and `lact` in its own `default.nix`.
+
+### The flake entry was added before the machine can boot
+
+`checks` is derived from `self.nixosConfigurations`, and the desktop is the
+only host importing `profiles/gaming.nix`. So until now nothing built the
+Phase 7 gaming stack at all — `CLAUDE.md` recorded it as eval-only precisely
+because of the missing entry, and the workaround was temporarily importing
+`profiles/gaming.nix` on the VM. Adding the entry converts that into a real,
+permanent closure build in CI. The cost is a slower `nix flake check` pulling
+from chaotic's and Millennium's own substituters; the benefit is that the
+gaming stack can no longer rot unnoticed.
+
+The host evaluates without `secrets.nix`: `modules/system/users.nix` only
+sets `hashedPasswordFile` if a `password-hash` secret exists, and
+`modules/system/ssh.nix` gives key-only login from `vars.user.sshPublicKey`.
+`secrets.nix` cannot simply be imported early and left inert —
+`defaultSopsFile = ./secrets/secrets.yaml` is a path literal, so importing it
+before the file exists is an eval error.
+
+### GNOME, COSMIC and Plasma were evaluated for this host, and niri kept
+
+Since this machine is primarily for gaming and video, a conventional desktop
+environment was considered. Against the pinned nixpkgs the options were real
+and current — GNOME 50.2, COSMIC 1.5.0, KDE Plasma 6.7.3, all with
+first-class NixOS modules — and Plasma in particular has the strongest
+gaming story (mature HDR, per-display VRR, an explicit tearing-allowed mode).
+
+niri + Noctalia was kept anyway. Worth recording what the switch would have
+cost, since the reason is structural rather than aesthetic: `features.niri`
+is not really a niri flag. It gates the entire graphical layer — every GUI
+app module (`home/vscode.nix`, `zen-browser.nix`, `vesktop.nix`,
+`feishin.nix`, `obsidian.nix`, `nautilus.nix`, `xdg-mime-apps.nix`,
+`xdg-user-dirs.nix`) as well as niri, Noctalia, greetd and the GTK/Qt/cursor
+theming, and `ARCHITECTURE.md` documents it that way. A second desktop
+environment therefore can't just be added; the flag has to be split first —
+the shape agreed on was an enum (`features.desktop = null | "niri" | …`),
+gating shared app modules on `!= null` and session-specific ones on the
+value, which makes mutual exclusion structural instead of an assertion. That
+refactor is not needed now, but it is the entry point if a DE swap is ever
+revisited.
+
+### The desktop's SSH key: real, per-host, passphrase-less
+
+`hosts/the-entertaining-nios-vm/secrets.nix` already had the mechanism —
+provision an SSH private key through sops straight to `~/.ssh/id_ed25519`
+(owner `ol`, mode `0400`) and let the GCR agent `programs.niri` already runs
+pick it up at login, with no module and no `features.*` flag involved. The
+desktop reuses it unchanged. What differs is the key: the VM deliberately
+only ever gets a throwaway, while this is a real `ol@the-entertaining-nios-desktop`
+identity intended for GitHub.
+
+Per-host rather than one shared key, and separate from `variables.nix`'s
+`sshPublicKey`: those are three different jobs. The bootstrap key reaches
+installer ISOs, the host key is regenerated by NixOS on every reinstall, and
+this one authenticates the operator to GitHub *from this machine* — so it can
+be revoked there without disturbing any other host.
+
+No passphrase, deliberately. What actually protects the key is the host's age
+key at `/var/lib/sops-nix/key.txt`, staged in by
+`nixos-anywhere --extra-files` and readable only by root: anyone who can read
+that decrypts the SSH key regardless of a passphrase. A passphrase would also
+have to be typed once per boot chain by hand, since there is nowhere
+declarative to keep it — the encrypted-at-rest guarantee is already provided
+one layer down. The trade is reversible with `ssh-keygen -p` and a re-encrypt;
+nothing in the config depends on it.
+
+Round-tripped before committing: `sops decrypt` of the stored value, fed back
+to `ssh-keygen -y`, reproduces the same public key.

@@ -2,6 +2,7 @@
 {
   features = {
     snapshots = true;
+    niri = true;
     docker = true;
     tailscale = true;
     printing = true;
