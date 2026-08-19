@@ -134,6 +134,26 @@
         "type": "github"
       }
     },
+    "moonshine": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1787088788,
+        "narHash": "sha256-cd7IHexHOqcgS/X1362FPQ7F1GmtncXKvCOhx1xCc5w=",
+        "owner": "hgaiser",
+        "repo": "moonshine",
+        "rev": "c2da458ac8de7776086d8814bbeb1a525319b368",
+        "type": "github"
+      },
+      "original": {
+        "owner": "hgaiser",
+        "repo": "moonshine",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1786599213,
@@ -240,6 +260,7 @@
         "disko": "disko",
         "home-manager": "home-manager_2",
         "millennium": "millennium",
+        "moonshine": "moonshine",
         "nixpkgs": "nixpkgs_3",
         "noctalia": "noctalia",
         "noctalia-greeter": "noctalia-greeter",
