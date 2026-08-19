@@ -107,6 +107,12 @@ per host (today: `the-entertaining-nios-vm` and `the-entertaining-nios-laptop`;
 it's bootstrapped) and the `installer-iso` package. Note there is no per-host
 `pkgs` construction and no overlay: `pkgs` comes from `nixosSystem` itself and
 is shared with Home Manager via `home-manager.useGlobalPkgs = true`.
+`home-manager.useUserPackages = true` goes with it, so `home.packages` are
+installed into `/etc/profiles/per-user/<name>` — part of the system
+generation, swapped atomically with it — rather than into the user's own
+`~/.nix-profile` by an activation side-effect. That is what makes "one
+`nixos-rebuild switch`, one rollback" true of user packages too, and it is
+what gives a system unit a stable path to a Home Manager package.
 
 **Two different mechanisms for two different kinds of data — chosen deliberately, not interchangeably:**
 
@@ -337,6 +343,7 @@ modules/
         docker.nix         # config.features.docker
         tailscale.nix      # config.features.tailscale
         printing.nix       # config.features.printing
+        moonshine.nix      # config.features.moonshine — remote streaming, desktop only
 
     hardware/          # classes of hardware a machine may or may not have
         controllers.nix    # xone + xpadneo, config.features.gaming
@@ -878,6 +885,7 @@ and the exact packages/options verified.
 **Status: done — eval-verified, not yet run on hardware.**
 
 - Docker, Tailscale, printing: `modules/services/{docker,tailscale,printing}.nix`, gated on `features.docker`/`features.tailscale`/`features.printing`, enabled on the laptop and desktop. The VM deliberately runs none of them.
+- Moonshine (added after the phase, same shape): `modules/services/moonshine.nix`, gated on `features.moonshine`, desktop only. A headless Moonlight-compatible streaming server whose "apps" are a full niri desktop, Steam Big Picture, Heroic in console mode and a remote poweroff, each in its own isolated compositor. The two launcher entries are additionally gated on `features.gaming`, which is the flag that installs them. The module is thin because upstream's `nixosModules.moonshine` already does lingering, `uinput`/`uhid`, udev, the moonshine-wsi Vulkan layer and the system unit. Reachable over the tailnet only — `openFirewall` is deliberately `false`, since `modules/services/tailscale.nix` already trusts `tailscale0`. Config is NixOS-side (`services.moonshine.settings`) with no `home/` counterpart, deliberately. Full reasoning in `docs/decisions.md`.
 - Gaming: `profiles/gaming.nix` + `modules/programs/steam.nix` + `modules/hardware/controllers.nix` + `home/heroic.nix`, all gated on `features.gaming`, desktop only. Steam is Millennium-patched, Proton is CachyOS's fork, and the desktop additionally pins `boot.kernelPackages = pkgs.linuxPackages_cachyos` and enables `services.lact` in its own `default.nix`.
 - Btrfs snapshots (snapper) — landed early, ahead of the rest of this phase: `modules/services/snapper.nix` and the `features.snapshots` toggle, enabled on the laptop and desktop hosts. See **Filesystem Choice and Snapshots** above; the subvolume layout itself is decided per-host at install time (in that host's `disko.nix`).
 

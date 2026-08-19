@@ -2077,3 +2077,258 @@ nothing in the config depends on it.
 
 Round-tripped before committing: `sops decrypt` of the stored value, fed back
 to `ssh-keygen -y`, reproduces the same public key.
+
+## Moonshine on the desktop — remote desktop and game streaming
+
+Goal: reach the desktop from a Moonlight client with nobody logged in at the
+machine, and get a full niri desktop rather than just a game.
+
+### Why Moonshine rather than Sunshine
+
+Sunshine captures an existing session, which means somebody has to be logged
+in at the machine and the stream shows whatever is on the physical screen.
+Moonshine is headless by design: every stream gets its own isolated
+compositor, spun up fresh, and what Moonlight lists as an "app" is just a
+command Moonshine runs inside it. A full remote *desktop* therefore isn't a
+special mode — it's an app entry whose command happens to be a compositor
+session launcher.
+
+### The upstream flake does almost all of it
+
+`github:hgaiser/moonshine` ships `nixosModules.moonshine`, and it is not a
+thin wrapper: it already does lingering (`users.users.<user>.linger`), the
+`uinput`/`uhid` kernel modules, the udev rules, `users.groups.moonshine` for
+the sleep-inhibit polkit rule the package itself ships, `hardware.graphics`
+plus the moonshine-wsi Vulkan layer installed into `/run/opengl-driver`
+(where the loader scans regardless of environment — a systemd system service
+has no `XDG_DATA_DIRS`, and without it everything silently falls back to
+XWayland rendering), and the system unit with `XDG_RUNTIME_DIR` and
+`DBUS_SESSION_BUS_ADDRESS` bootstrapped the way upstream's
+`start-moonshine.sh` does by hand.
+
+So `modules/services/moonshine.nix` is thin on purpose. It imports that
+module — in the one file that consumes it, the same rule
+`modules/programs/steam.nix` follows for chaotic/millennium — and adds only
+what is genuinely this repo's business: which user, the app list, two group
+memberships, and one polkit rule.
+
+The input *does* `.follows` this repo's nixpkgs, unlike noctalia/chaotic/
+millennium. Those three don't follow because following costs them a binary
+cache; Moonshine publishes none, so there is nothing to lose and a fourth
+nixpkgs in the closure to avoid. The cost is real either way: ~300
+derivations built from source, which the full `nix flake check` closure-build
+for the desktop now pays for. `--no-build` (so `just check-fast`, so
+`driver.sh check`) is unaffected.
+
+### Three things the obvious approach gets wrong
+
+**A `home/moonshine.nix` writing `~/.config/moonshine/config.toml` would be
+read by nothing.** The upstream module generates the TOML into the store and
+passes it to the daemon as argv, and Moonshine only ever writes a config of
+its own when the given path doesn't exist. All configuration goes NixOS-side
+through `services.moonshine.settings`. This is also why the service is a
+system unit rather than a user one: `nixos-rebuild switch` only manages the
+lifecycle of system units, so as a user unit every config change would need a
+manual `systemctl --user restart`.
+
+**A polkit rule dropped into `/etc/polkit-1/rules.d` is read by nothing
+either.** nixpkgs builds polkit with its rules directory under
+`/run/current-system/sw/share`. `security.polkit.extraConfig` is the route.
+
+**The module asserts on an underived uid.** It reads
+`users.users.<user>.uid` to locate `/run/user/<uid>` and to order itself
+after `user@<uid>.service`, and this repo had never declared one — the
+primary user's uid was left to be allocated. `modules/system/users.nix` now
+pins `uid = 1000`, which is the value the first normal user gets on every
+host here anyway, so it changes nothing on disk while making the fact
+declared. Preferred over hardcoding `services.moonshine.uid` in the service
+module, which would have put an unexplained literal in the wrong file.
+
+### GNOME was never on the table
+
+Tried first, and it black-screens: Mutter grabs the DRM device rather than
+nesting inside Moonshine's compositor, unlike the Sway/COSMIC examples in
+upstream's TIPS.md. GNOME 49 removed `--nested` from Shell/Mutter outright
+and GNOME 50 dropped the X11 backend, killing the `gnome-xorg` fallback too.
+The replacement, `gnome-shell --devkit --wayland` (needs `mutter-devkit`), is
+a development tool for testing Shell extensions, not a supported way to run a
+real session — no session-manager or portal integration, no autostart. Not
+worth carrying.
+
+Debugging note for next time, since it cost the most time: the apps Moonshine
+launches run as *transient* units in the user manager, so their output is in
+`journalctl --user -u moonshine-session.service`, not in the system service's
+log. And by default apps are launched with `StandardOutput=null`, so a
+failing app produces no diagnostics at all — every entry here sets
+`stdout`/`stderr` to `"journal"` for that reason, cheap insurance on a stack
+that has never run on hardware.
+
+### niri, and the one caveat
+
+niri is a Smithay compositor with a supported nested (Winit) backend, which
+it auto-detects with no flag — the same category as the Sway/COSMIC examples
+that already work. `niri-session` rather than bare `niri`: launched as one of
+Moonshine's transient units it detects that (`MANAGERPID` set,
+`SYSTEMD_EXEC_PID` equal to its own pid) and execs `niri --session`, which
+does the systemd/D-Bus session setup a display manager would normally
+provide. greetd never sees this session, so nothing else would do it.
+
+The caveat, verified by reading the `niri-session` script: `niri --session`
+does `systemctl --user import-environment` and drives
+`graphical-session.target` in the *same* user manager as a local login.
+Streaming the desktop while also logged in at the machine means two niri
+instances contending over that target and over `WAYLAND_DISPLAY`. The
+headless case — the one lingering exists for — is clean. Not worked around,
+because working around it would mean giving up the session setup that makes
+portals and Noctalia work at all.
+
+### Tailnet only
+
+`openFirewall` is left `false`. `modules/services/tailscale.nix` already puts
+`tailscale0` in `networking.firewall.trustedInterfaces`, so Moonshine is
+reachable over the tailnet — already authenticated and encrypted — without
+opening TCP 47984/47989/48010 and UDP 47998/47999/48000 to the LAN. Upstream
+is explicit that Moonshine is not designed for untrusted networks. Flipping
+the flag is the escape hatch for a client that can't be on the tailnet.
+
+### The app entries
+
+`Desktop` is the point of the exercise. `Steam` carries upstream's
+recommended `pre_command` (TIPS.md, issue #134): Steam is single-instance per
+user, so with a desktop Steam already running the `steam://` URL is forwarded
+to *it* — Big Picture opens on the physical screen and the stream dies with a
+503. The pre-command asks any running Steam to quit and waits up to ~30s.
+Note it therefore closes a desktop Steam session when a stream starts.
+
+`Heroic` covers the rest of the library — Epic, GOG and Amazon — launched
+with `--console`, Heroic's console mode: a controller-driven, TV-shaped UI
+that swaps the normal sidebar layout for a full-viewport one, which is the
+right shape on the end of a stream. The flag was verified rather than
+assumed, by grepping Heroic 2.22.0's `app.asar`: the main process reads it as
+`process.argv.includes("--console")`, next to `--fullscreen` and `--no-gui`,
+and the renderer keys a distinct `consoleContent` layout off it. `--fullscreen`
+is available as well if the window ever comes up smaller than the stream.
+
+Heroic is named from a *different profile* than the entries around it:
+`/etc/profiles/per-user/ol/bin/heroic`, not `/run/current-system/sw/bin/...`.
+The two are different things — the latter is `environment.systemPackages`,
+the former is Home Manager's `home.packages`, and Heroic is a Home Manager
+package (`home/heroic.nix`). That path only exists because
+`home-manager.useUserPackages` is on; see the entry below, which turned it
+on. It was briefly a store path via `lib.getExe` while the flag was still
+off, since back then `home.packages` lived in the user's own
+`~/.nix-profile` and no system unit could name them at all.
+
+Steam stays on the system path deliberately: `programs.steam` installs a
+*wrapped* Steam there, and the unwrapped derivation would be the wrong thing
+to launch.
+
+Both launcher entries are gated on `config.features.gaming`, not just on
+`features.moonshine`. The two flags are independent, and `features.gaming` is
+what installs Steam and Heroic in the first place — without the guard, a
+host that streamed but didn't game would advertise two entries in Moonlight
+whose commands point at binaries that were never installed, which is exactly
+the silent-failure mode the `stdout`/`stderr` settings exist to mitigate.
+Verified by `extendModules`-ing the host with `features.gaming = false`: the
+app list drops from `["Desktop","Steam","Heroic","Shutdown"]` to
+`["Desktop","Shutdown"]`.
+
+`Shutdown` needs two independent things, which is easy to conflate: the
+polkit rule grants the *authorization* (Moonshine launches apps from a
+context polkit doesn't consider an active interactive session, so
+`systemctl poweroff` otherwise fails with `InteractiveAuthorizationRequired`),
+while `-i` governs whether systemd proceeds despite *other* sessions and
+inhibitors. Both are required.
+
+Two group memberships, for unrelated reasons. `input` because streamed games
+read the virtual gamepad/keyboard/mouse Moonshine creates through inputtino —
+an active local session would get that via the seat's ACLs, but the headless
+case has no active seat and upstream's module deliberately doesn't grant it.
+`moonshine` because that is the group upstream's own polkit rule is scoped
+to, which is what lets Moonshine hold a block-type sleep inhibitor for the
+duration of a stream; without it streaming works but the host may suspend
+mid-session.
+
+### Status
+
+Eval-only, like the rest of the desktop's stack — the machine still runs
+CachyOS and has never been booted into this configuration. Pairing is at
+`http://<host>:47989/pin` once it is.
+
+## Turning on `home-manager.useUserPackages`
+
+Prompted by the Moonshine work above: the Heroic app entry needed a stable
+path to a Home Manager package for a *system* unit to launch, and there
+wasn't one. Investigating why turned up an unexamined default rather than a
+decision.
+
+### It was never chosen
+
+`useUserPackages` appeared nowhere in this repo — not in `lib/mkHost.nix`,
+not in `ARCHITECTURE.md`, not here. `mkHost` set only `useGlobalPkgs`, and
+upstream declares the other as `mkEnableOption`, so it defaulted to `false`
+and that default simply fell through. Both of home-manager's own flake
+templates set it `true`, and its manual says it "may become the default value
+in the future".
+
+### What it actually changes — and what it doesn't
+
+Not what's in the closure. Checked before changing anything: Heroic is in the
+desktop's toplevel *derivation* closure either way
+(`heroic-unwrapped-2.22.0.drv`, `heroic-2.22.0-fhsenv-profile.drv`, …),
+alongside `home-manager-path.drv`. Home Manager packages were always built,
+fetched and GC-rooted with the generation.
+
+What changes is how they are *exposed*:
+
+- **off** — a oneshot activation unit `home-manager-ol.service`
+  (`ExecStart=…/hm-setup-env`, `TimeoutStartSec=5m`) imperatively installs
+  `home.path` into the user's own nix profile on every switch.
+- **on** — `home.path` becomes `users.users.<name>.packages`, i.e.
+  `/etc/profiles/per-user/<name>`, built declaratively and swapped atomically
+  with the generation. Verified: `users.users.ol.packages` went from `[]` to
+  `["home-manager-path"]`.
+
+Rollback worked before — the old generation's activation unit re-runs and
+re-points the profile — so this is not a bug fix. It is a fidelity fix. The
+repo's headline claim is "one `nixos-rebuild switch`, one rollback", and with
+the flag off the user's package set moved by an activation side-effect rather
+than by the generation swap: one more step able to half-fail, on a repo whose
+standing gotchas already include an HM activation race ("Existing file …
+would be clobbered"). It also removes the reason the Heroic entry had to name
+a store path.
+
+### Two knock-on effects, both checked before flipping it
+
+**`xdg.portal` grows an assertion** under this flag: it requires
+`environment.pathsToLink` to contain `/share/applications` and
+`/share/xdg-desktop-portal`. Harmless here twice over — nothing in `home/`
+enables `xdg.portal` (portals come from `programs.niri` at the NixOS level),
+and both paths are in `pathsToLink` already.
+
+**Home Manager's `fonts.fontconfig.enable` changes its default** from `false`
+to the value of NixOS' `fonts.fontconfig.enable`, so it flipped on. That
+looked like a direct threat to this repo's rule that UI fonts have exactly
+one source of truth (`modules/system/fonts.nix`), so the three generated
+files were read rather than assumed:
+
+- `52-hm-default-fonts.conf` — an empty no-op. HM's `defaultFonts.*` all
+  default to `[]`, so it contains a `<description>` and nothing else. The
+  system's `fonts.fontconfig.defaultFonts` is untouched.
+- `10-hm-rendering.conf` — likewise a no-op (`<match target="font"></match>`).
+- `10-hm-fonts.conf` — adds font *directories*, including
+  `/etc/profiles/per-user/ol/share/fonts`.
+
+So the font default stays where it was, and the flip is a small net gain:
+fonts installed through `home.packages` become discoverable to fontconfig,
+which upstream's own comment says they are not on NixOS by default.
+
+### The one migration cost
+
+`environment.profiles` lists `$HOME/.nix-profile` *before*
+`/etc/profiles/per-user/$USER`. On a host already installed with the flag
+off, the stale user profile therefore keeps shadowing the new location until
+it is removed by hand — an old binary silently winning after a switch that
+looks clean. Only `the-entertaining-nios-vm` is affected; it is disposable,
+and the desktop and laptop have never been installed, so they get this for
+free. Recorded as a standing gotcha in `CLAUDE.md`.

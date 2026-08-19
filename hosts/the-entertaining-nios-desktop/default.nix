@@ -11,6 +11,7 @@
     ../../modules/services/docker.nix
     ../../modules/services/tailscale.nix
     ../../modules/services/printing.nix
+    ../../modules/services/moonshine.nix
 
     # The desktop stack, the same five modules the VM imports — this is the
     # machine's daily driver session, not a headless box. features.niri in
