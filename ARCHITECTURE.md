@@ -107,6 +107,12 @@ per host (today: `the-entertaining-nios-vm` and `the-entertaining-nios-laptop`;
 it's bootstrapped) and the `installer-iso` package. Note there is no per-host
 `pkgs` construction and no overlay: `pkgs` comes from `nixosSystem` itself and
 is shared with Home Manager via `home-manager.useGlobalPkgs = true`.
+`home-manager.useUserPackages = true` goes with it, so `home.packages` are
+installed into `/etc/profiles/per-user/<name>` — part of the system
+generation, swapped atomically with it — rather than into the user's own
+`~/.nix-profile` by an activation side-effect. That is what makes "one
+`nixos-rebuild switch`, one rollback" true of user packages too, and it is
+what gives a system unit a stable path to a Home Manager package.
 
 **Two different mechanisms for two different kinds of data — chosen deliberately, not interchangeably:**
 

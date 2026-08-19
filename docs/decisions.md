@@ -2204,18 +2204,19 @@ assumed, by grepping Heroic 2.22.0's `app.asar`: the main process reads it as
 and the renderer keys a distinct `consoleContent` layout off it. `--fullscreen`
 is available as well if the window ever comes up smaller than the stream.
 
-Heroic is the one entry named by *store path* rather than by
-`/run/current-system/sw/bin/...`, and the reason generalises. It's a Home
-Manager package (`home/heroic.nix`), and this repo leaves `useUserPackages`
-off — confirmed by evaluating `users.users.ol.packages` to `[]` — so
-`home.packages` land in the user's own `~/.nix-profile` and appear in neither
-`/run/current-system/sw/bin` nor `/etc/profiles/per-user`. A system service
-pointing at either would find nothing. `lib.getExe pkgs.heroic` costs nothing
-here: `useGlobalPkgs` means it is the very same derivation `home/heroic.nix`
-installs (verified — same store hash), not a second copy, and it can't go
-stale the way a profile symlink can. Steam stays on the system path
-deliberately: `programs.steam` installs a *wrapped* Steam there, and the
-unwrapped derivation would be the wrong thing to launch.
+Heroic is named from a *different profile* than the entries around it:
+`/etc/profiles/per-user/ol/bin/heroic`, not `/run/current-system/sw/bin/...`.
+The two are different things — the latter is `environment.systemPackages`,
+the former is Home Manager's `home.packages`, and Heroic is a Home Manager
+package (`home/heroic.nix`). That path only exists because
+`home-manager.useUserPackages` is on; see the entry below, which turned it
+on. It was briefly a store path via `lib.getExe` while the flag was still
+off, since back then `home.packages` lived in the user's own
+`~/.nix-profile` and no system unit could name them at all.
+
+Steam stays on the system path deliberately: `programs.steam` installs a
+*wrapped* Steam there, and the unwrapped derivation would be the wrong thing
+to launch.
 
 Both launcher entries are gated on `config.features.gaming`, not just on
 `features.moonshine`. The two flags are independent, and `features.gaming` is
@@ -2248,3 +2249,81 @@ mid-session.
 Eval-only, like the rest of the desktop's stack — the machine still runs
 CachyOS and has never been booted into this configuration. Pairing is at
 `http://<host>:47989/pin` once it is.
+
+## Turning on `home-manager.useUserPackages`
+
+Prompted by the Moonshine work above: the Heroic app entry needed a stable
+path to a Home Manager package for a *system* unit to launch, and there
+wasn't one. Investigating why turned up an unexamined default rather than a
+decision.
+
+### It was never chosen
+
+`useUserPackages` appeared nowhere in this repo — not in `lib/mkHost.nix`,
+not in `ARCHITECTURE.md`, not here. `mkHost` set only `useGlobalPkgs`, and
+upstream declares the other as `mkEnableOption`, so it defaulted to `false`
+and that default simply fell through. Both of home-manager's own flake
+templates set it `true`, and its manual says it "may become the default value
+in the future".
+
+### What it actually changes — and what it doesn't
+
+Not what's in the closure. Checked before changing anything: Heroic is in the
+desktop's toplevel *derivation* closure either way
+(`heroic-unwrapped-2.22.0.drv`, `heroic-2.22.0-fhsenv-profile.drv`, …),
+alongside `home-manager-path.drv`. Home Manager packages were always built,
+fetched and GC-rooted with the generation.
+
+What changes is how they are *exposed*:
+
+- **off** — a oneshot activation unit `home-manager-ol.service`
+  (`ExecStart=…/hm-setup-env`, `TimeoutStartSec=5m`) imperatively installs
+  `home.path` into the user's own nix profile on every switch.
+- **on** — `home.path` becomes `users.users.<name>.packages`, i.e.
+  `/etc/profiles/per-user/<name>`, built declaratively and swapped atomically
+  with the generation. Verified: `users.users.ol.packages` went from `[]` to
+  `["home-manager-path"]`.
+
+Rollback worked before — the old generation's activation unit re-runs and
+re-points the profile — so this is not a bug fix. It is a fidelity fix. The
+repo's headline claim is "one `nixos-rebuild switch`, one rollback", and with
+the flag off the user's package set moved by an activation side-effect rather
+than by the generation swap: one more step able to half-fail, on a repo whose
+standing gotchas already include an HM activation race ("Existing file …
+would be clobbered"). It also removes the reason the Heroic entry had to name
+a store path.
+
+### Two knock-on effects, both checked before flipping it
+
+**`xdg.portal` grows an assertion** under this flag: it requires
+`environment.pathsToLink` to contain `/share/applications` and
+`/share/xdg-desktop-portal`. Harmless here twice over — nothing in `home/`
+enables `xdg.portal` (portals come from `programs.niri` at the NixOS level),
+and both paths are in `pathsToLink` already.
+
+**Home Manager's `fonts.fontconfig.enable` changes its default** from `false`
+to the value of NixOS' `fonts.fontconfig.enable`, so it flipped on. That
+looked like a direct threat to this repo's rule that UI fonts have exactly
+one source of truth (`modules/system/fonts.nix`), so the three generated
+files were read rather than assumed:
+
+- `52-hm-default-fonts.conf` — an empty no-op. HM's `defaultFonts.*` all
+  default to `[]`, so it contains a `<description>` and nothing else. The
+  system's `fonts.fontconfig.defaultFonts` is untouched.
+- `10-hm-rendering.conf` — likewise a no-op (`<match target="font"></match>`).
+- `10-hm-fonts.conf` — adds font *directories*, including
+  `/etc/profiles/per-user/ol/share/fonts`.
+
+So the font default stays where it was, and the flip is a small net gain:
+fonts installed through `home.packages` become discoverable to fontconfig,
+which upstream's own comment says they are not on NixOS by default.
+
+### The one migration cost
+
+`environment.profiles` lists `$HOME/.nix-profile` *before*
+`/etc/profiles/per-user/$USER`. On a host already installed with the flag
+off, the stale user profile therefore keeps shadowing the new location until
+it is removed by hand — an old binary silently winning after a switch that
+looks clean. Only `the-entertaining-nios-vm` is affected; it is disposable,
+and the desktop and laptop have never been installed, so they get this for
+free. Recorded as a standing gotcha in `CLAUDE.md`.

@@ -14,7 +14,6 @@
 {
   config,
   lib,
-  pkgs,
   vars,
   moonshine,
   ...
@@ -129,17 +128,18 @@
             # and `--no-gui`. Add `--fullscreen` here too if the window ever
             # comes up smaller than the stream.
             #
-            # A store path, unlike the entries above. Heroic is a Home
-            # Manager package (home/heroic.nix), and this repo leaves
-            # `useUserPackages` off, so it lands in the user's own
-            # ~/.nix-profile rather than in /run/current-system/sw/bin or
-            # /etc/profiles/per-user — neither of which would resolve. The
-            # store path costs nothing: `useGlobalPkgs` means this is the
-            # very same derivation home/heroic.nix installs, not a second
-            # copy, and it can't go stale the way a profile symlink can.
+            # A different profile from the entries above, not a different
+            # kind of path. Heroic is a Home Manager package
+            # (home/heroic.nix), so it isn't in `environment.systemPackages`
+            # and never appears in /run/current-system/sw/bin —
+            # /etc/profiles/per-user is where `home.packages` land, which is
+            # true only because lib/mkHost.nix sets
+            # `home-manager.useUserPackages`. With that off this would have
+            # to be a store path, since the packages would live in the
+            # user's own ~/.nix-profile and no system unit could name it.
             title = "Heroic";
             command = [
-              (lib.getExe pkgs.heroic)
+              "/etc/profiles/per-user/${vars.user.name}/bin/heroic"
               "--console"
             ];
             stdout = "journal";
