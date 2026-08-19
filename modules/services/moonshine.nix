@@ -14,6 +14,7 @@
 {
   config,
   lib,
+  pkgs,
   vars,
   moonshine,
   ...
@@ -60,6 +61,13 @@
       settings = {
         name = "Moonshine";
 
+        # Split rather than one flat list: the two game launchers only exist
+        # when features.gaming is on, and features.moonshine is an
+        # independent flag. A host that streamed without the gaming stack
+        # would otherwise advertise two entries in Moonlight whose commands
+        # point at binaries that were never installed — an app that fails
+        # with no diagnostics, which is exactly the failure mode the
+        # stdout/stderr settings below exist to avoid.
         application = [
           {
             # The full remote desktop. niri is a Smithay compositor with a
@@ -86,6 +94,8 @@
             stdout = "journal";
             stderr = "journal";
           }
+        ]
+        ++ lib.optionals config.features.gaming [
           {
             title = "Steam";
             command = [
@@ -108,6 +118,35 @@
             stdout = "journal";
             stderr = "journal";
           }
+          {
+            # The other half of the library — Epic, GOG and Amazon, which
+            # Steam doesn't cover. `--console` is Heroic's console mode: a
+            # controller-driven, TV-shaped UI that replaces the normal
+            # sidebar layout with a full-viewport one, which is what you
+            # want on the end of a stream. Verified as a real CLI flag
+            # rather than assumed — Heroic's main process reads it as
+            # `process.argv.includes("--console")`, alongside `--fullscreen`
+            # and `--no-gui`. Add `--fullscreen` here too if the window ever
+            # comes up smaller than the stream.
+            #
+            # A store path, unlike the entries above. Heroic is a Home
+            # Manager package (home/heroic.nix), and this repo leaves
+            # `useUserPackages` off, so it lands in the user's own
+            # ~/.nix-profile rather than in /run/current-system/sw/bin or
+            # /etc/profiles/per-user — neither of which would resolve. The
+            # store path costs nothing: `useGlobalPkgs` means this is the
+            # very same derivation home/heroic.nix installs, not a second
+            # copy, and it can't go stale the way a profile symlink can.
+            title = "Heroic";
+            command = [
+              (lib.getExe pkgs.heroic)
+              "--console"
+            ];
+            stdout = "journal";
+            stderr = "journal";
+          }
+        ]
+        ++ [
           {
             # Remote poweroff, so the machine doesn't have to be left on
             # after a session. -i is not optional here: without it systemd

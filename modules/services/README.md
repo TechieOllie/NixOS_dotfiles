@@ -21,9 +21,11 @@ flag (see `modules/options.nix`):
   guessed at in advance.
 - `moonshine.nix` (`features.moonshine`) — a headless Moonlight-compatible
   streaming server. Desktop only: it needs the GPU and the game library.
-  Streams a full niri desktop, Steam Big Picture and a remote poweroff, each
-  inside its own isolated compositor. Reachable over the tailnet only — the
-  GameStream ports are deliberately not opened to the LAN.
+  Streams a full niri desktop, Steam Big Picture, Heroic in console mode and
+  a remote poweroff, each inside its own isolated compositor. The two
+  launchers are gated on `features.gaming` as well, since that flag is what
+  installs them. Reachable over the tailnet only — the GameStream ports are
+  deliberately not opened to the LAN.
 
 The first four are enabled on the laptop and desktop; `moonshine.nix` is on
 the desktop alone, and the VM deliberately runs none of them.

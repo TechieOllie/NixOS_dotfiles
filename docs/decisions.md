@@ -2186,7 +2186,7 @@ opening TCP 47984/47989/48010 and UDP 47998/47999/48000 to the LAN. Upstream
 is explicit that Moonshine is not designed for untrusted networks. Flipping
 the flag is the escape hatch for a client that can't be on the tailnet.
 
-### The three app entries
+### The app entries
 
 `Desktop` is the point of the exercise. `Steam` carries upstream's
 recommended `pre_command` (TIPS.md, issue #134): Steam is single-instance per
@@ -2194,6 +2194,38 @@ user, so with a desktop Steam already running the `steam://` URL is forwarded
 to *it* — Big Picture opens on the physical screen and the stream dies with a
 503. The pre-command asks any running Steam to quit and waits up to ~30s.
 Note it therefore closes a desktop Steam session when a stream starts.
+
+`Heroic` covers the rest of the library — Epic, GOG and Amazon — launched
+with `--console`, Heroic's console mode: a controller-driven, TV-shaped UI
+that swaps the normal sidebar layout for a full-viewport one, which is the
+right shape on the end of a stream. The flag was verified rather than
+assumed, by grepping Heroic 2.22.0's `app.asar`: the main process reads it as
+`process.argv.includes("--console")`, next to `--fullscreen` and `--no-gui`,
+and the renderer keys a distinct `consoleContent` layout off it. `--fullscreen`
+is available as well if the window ever comes up smaller than the stream.
+
+Heroic is the one entry named by *store path* rather than by
+`/run/current-system/sw/bin/...`, and the reason generalises. It's a Home
+Manager package (`home/heroic.nix`), and this repo leaves `useUserPackages`
+off — confirmed by evaluating `users.users.ol.packages` to `[]` — so
+`home.packages` land in the user's own `~/.nix-profile` and appear in neither
+`/run/current-system/sw/bin` nor `/etc/profiles/per-user`. A system service
+pointing at either would find nothing. `lib.getExe pkgs.heroic` costs nothing
+here: `useGlobalPkgs` means it is the very same derivation `home/heroic.nix`
+installs (verified — same store hash), not a second copy, and it can't go
+stale the way a profile symlink can. Steam stays on the system path
+deliberately: `programs.steam` installs a *wrapped* Steam there, and the
+unwrapped derivation would be the wrong thing to launch.
+
+Both launcher entries are gated on `config.features.gaming`, not just on
+`features.moonshine`. The two flags are independent, and `features.gaming` is
+what installs Steam and Heroic in the first place — without the guard, a
+host that streamed but didn't game would advertise two entries in Moonlight
+whose commands point at binaries that were never installed, which is exactly
+the silent-failure mode the `stdout`/`stderr` settings exist to mitigate.
+Verified by `extendModules`-ing the host with `features.gaming = false`: the
+app list drops from `["Desktop","Steam","Heroic","Shutdown"]` to
+`["Desktop","Shutdown"]`.
 
 `Shutdown` needs two independent things, which is easy to conflate: the
 polkit rule grants the *authorization* (Moonshine launches apps from a
