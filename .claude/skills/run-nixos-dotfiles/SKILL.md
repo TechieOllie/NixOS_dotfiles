@@ -129,7 +129,9 @@ driver's own wrapper text.
 and the `format`/`statix`/`deadnix` checks are derivations — `--no-build`
 evaluates them without realizing them, so a misformatted or dead-code'd file
 sails through green here and fails in CI, which runs the full `nix flake
-check`. Run `just fmt` before committing, and `just check` (or `nix flake
+check`. (Confirmed empirically: a passing `check` run prints `checking
+derivation checks.x86_64-linux.format... derivation evaluated to
+/nix/store/…-check-format.drv` and never builds it.) Run `just fmt` before committing, and `just check` (or `nix flake
 check`) when you want the same verdict CI will give. Treat `driver.sh check`
 as "does the Nix still evaluate", not "is this commit-ready".
 
@@ -208,8 +210,10 @@ nothing passes just as green as one that works.
   disabled` is a missing `~/.config/nix/nix.conf`, not a flake error. Both
   are Prerequisites problems — don't debug the config until `nix flake
   metadata` succeeds.
-- **`warning: ignoring untrusted substituter 'https://noctalia.cachix.org',
-  you are not a trusted user`** — expected on a multi-user Nix daemon
+- **`warning: ignoring the client-specified setting 'trusted-public-keys',
+  because it is a restricted setting and you are not a trusted user`** (the
+  wording Nix 2.35 emits; older versions said `ignoring untrusted
+  substituter '<url>'`) — expected on a multi-user Nix daemon
   install where your user isn't in `trusted-users` (only `root` is, by
   default — check with `nix config show | grep trusted-users`). The driver
   passes `--extra-substituters`/`--extra-trusted-public-keys` for the
