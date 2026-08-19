@@ -28,7 +28,7 @@ forward.
 
 Phase 1 (Foundation) is done, Phase 2 (Profiles) is in progress, Phase 3 (Desktop environment) is done, Phase 4 (Terminal environment) is done (Zsh, Starship, Lazygit, Git, Ghostty, a bare Neovim package — all landed and verified live), Phase 5 (Theming) has landed and is mostly verified live on `the-entertaining-nios-vm` — cursor/icon theme/GTK3 modernization/Qt color-scheme all confirmed working (see the roadmap section below for the full writeup, the two accepted trade-offs, and two real bugs found and fixed during verification); the greeter's own cursor still needs its one-time `greeter.toml` reset (same gotcha as any other `greetd.nix` `settings` change) to actually show on an already-booted host. Phase 6 (Applications — VS Code, Zen Browser, Vesktop, Nautilus) has landed and is verified live on `the-entertaining-nios-vm` (see the dedicated Phase 6 writeup below); one small self-healing gap remains (Zen Browser's Noctalia theming needs the browser launched once to create a profile before it can apply). `flake.nix` now has two `nixosConfigurations` entries: `the-entertaining-nios-vm` (a VM, bootstrapped and verified via a full nixos-anywhere install) and `the-entertaining-nios-laptop` (fully wired and eval-clean, but **not yet installed** — see below). Both are built through `lib/mkHost.nix` (`{ system, hostPath }: nixosSystem`, wiring `disko`, `sops-nix`, `modules/options.nix`, the host itself, and `home-manager.nixosModules.home-manager`) rather than inline. `mkHost` was extracted ahead of the guide's usual "wait for a second *bootstrapped* host" trigger — bootstrapped meaning installed on real/virtual hardware via nixos-anywhere, which the laptop still isn't — because the desktop and laptop hosts' imminent bootstrap made the duplication a near-certainty rather than a hypothetical; treat this as a deliberate, explicitly-requested exception, not a precedent for extracting other `lib/` helpers early.
 
-`the-entertaining-nios-laptop` is the machine this repo is currently developed on (still running CachyOS, not NixOS yet). It now has everything nixos-anywhere needs except a resolved disk device: real `hardware-configuration.nix` (generated via `nixos-generate-config --dir`, run read-only alongside the live CachyOS install, with the scan's `fileSystems`/`swapDevices` entries dropped since `disko.nix` owns that instead), its own sops age key (`~/.config/sops/age/the-entertaining-nios-laptop.txt`, operator-held, not committed) added as a `.sops.yaml` recipient with its own `creation_rules` entry, an encrypted `secrets/secrets.yaml` (`password-hash`, hashed and encrypted by the user directly so the plaintext never touched the assistant), `secrets.nix` mirroring the VM's, and both wired into `default.nix`'s imports and into `flake.nix`'s `nixosConfigurations`. `nix eval` on its `system.build.toplevel` succeeds. The **only** thing left before an actual install is resolving the placeholder `/dev/CHANGEME` disk device in `disko.nix` (only knowable from an installer environment via `lsblk`) — and then actually running `nixos-anywhere`, which is deliberately deferred since that step wipes the target disk and the user wants to keep CachyOS bootable until the dotfiles are fully functional. `the-entertaining-nios-desktop` is still scaffold-only: no `hardware-configuration.nix`, `secrets.nix`, or `flake.nix` entry yet, since it hasn't been bootstrapped against real hardware either.
+`the-entertaining-nios-laptop` is still running CachyOS, not NixOS yet. It now has everything nixos-anywhere needs except a resolved disk device: real `hardware-configuration.nix` (generated via `nixos-generate-config --dir`, run read-only alongside the live CachyOS install, with the scan's `fileSystems`/`swapDevices` entries dropped since `disko.nix` owns that instead), its own sops age key (`~/.config/sops/age/the-entertaining-nios-laptop.txt`, operator-held, not committed) added as a `.sops.yaml` recipient with its own `creation_rules` entry, an encrypted `secrets/secrets.yaml` (`password-hash`, hashed and encrypted by the user directly so the plaintext never touched the assistant), `secrets.nix` mirroring the VM's, and both wired into `default.nix`'s imports and into `flake.nix`'s `nixosConfigurations`. `nix eval` on its `system.build.toplevel` succeeds. The **only** thing left before an actual install is resolving the placeholder `/dev/CHANGEME` disk device in `disko.nix` (only knowable from an installer environment via `lsblk`) — and then actually running `nixos-anywhere`, which is deliberately deferred since that step wipes the target disk and the user wants to keep CachyOS bootable until the dotfiles are fully functional. `the-entertaining-nios-desktop` is still scaffold-only: no `hardware-configuration.nix`, `secrets.nix`, or `flake.nix` entry yet, since it hasn't been bootstrapped against real hardware either.
 
 `home/` and `lib/` now exist (`overlays/`, `pkgs/` still don't — that's Phase 3+ and later). `home/default.nix` is a machine-agnostic Home Manager entry point (username/homeDirectory from `vars`, a pinned `home.stateVersion`, `programs.home-manager.enable`) imported by every host via `mkHost` — there's no per-host Home Manager entry point. It has no actual program configuration yet.
 
@@ -1733,23 +1733,23 @@ configuration that evaluated perfectly and rendered wrong.
 ## Bringing the desktop host up to installable
 
 The desktop was a scaffold: `/dev/CHANGEME`, no `nixosConfigurations` entry,
-no `hardware-configuration.nix`, no secrets, and — despite being the intended
-daily driver — no `modules/desktop/*` imports at all, so installing it would
-have produced a gaming machine with no graphical session. This closes
+no `hardware-configuration.nix`, no secrets, and no `modules/desktop/*`
+imports at all, so installing it would have produced a gaming machine with no
+graphical session. This closes
 everything that doesn't physically require the installer or a drive that
 isn't plugged in.
 
-### The machine, and a stale note corrected
+### The machine
 
 The scaffold was already written for this exact box (16 G swap,
 `linuxPackages_cachyos`, `lact` for an RX 6600) and the hardware confirms it:
 ASRock B550M Pro4, Ryzen 5 5600X, 15.5 GiB RAM, Navi 23 (RX 6600), UEFI.
 
-`CLAUDE.md` described the *laptop* as "the machine this repo is developed
-on". That was wrong by the time it was read: this box is AMD, while
+Worth recording because the two real hosts are easy to conflate on paper:
+this one is AMD, while
 `hosts/the-entertaining-nios-laptop/hardware-configuration.nix` declares
-`kvm-intel` and an `rtsx_pci_sdmmc` card reader. Two different machines; the
-note has been moved to the desktop's row.
+`kvm-intel` and an `rtsx_pci_sdmmc` card reader. Two genuinely different
+machines, not two names for one.
 
 ### Why a `/dev/disk/by-id/` path, not `/dev/nvme0n1`
 
