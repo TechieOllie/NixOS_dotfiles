@@ -30,32 +30,52 @@ installed on whichever machine you're on. Check before doing anything else:
 command -v nix || echo "Nix is not installed — see below"
 ```
 
-If it's missing, the setup on CachyOS/Arch is (all of these need root, so they
-are the operator's to run, not an agent's):
+Installing the package is not enough. Arch's `nix` package (verified against
+2.35.2-1.1 on CachyOS) ships `/nix/var` and nothing else — **it does not
+create the store**, and every Nix command fails with `error: opening file
+"/nix/store": No such file or directory` until someone does. Three of the four
+steps below need root, so they are the operator's to run, not an agent's:
 
 ```bash
 sudo pacman -S nix                          # 'nix' is in extra/ (and cachyos-extra-v3/)
+sudo nix-store --init                       # creates /nix/store + /nix/var/nix/db — REQUIRED
 sudo systemctl enable --now nix-daemon.socket
-sudo usermod -aG nix-users "$USER"          # then log out and back in
 ```
 
-Then enable flakes and the two third-party binary caches in `/etc/nix/nix.conf`:
+Note what is *not* here. There is no `nix-users` group on current Arch — the
+package's `sysusers.d` file creates only the `nixbld` build-user group and
+`nixbld01`–`nixbld10`, and the daemon socket is mode `0666`, so an ordinary
+user needs no group membership and no re-login. (Older Arch packaging did use
+a `nix-users` group with a `0660` socket; instructions saying to `usermod -aG
+nix-users` are stale and will fail with "group does not exist".) Run
+`nix-store --init` as non-root and it silently succeeds while creating
+nothing, because the client just hands the request to the daemon — so verify
+with `ls -d /nix/store`, not with the exit code.
+
+Flakes are off by default and are a **client-side** setting, so enabling them
+needs no root at all — write `~/.config/nix/nix.conf`:
 
 ```
 experimental-features = nix-command flakes
+```
+
+The two third-party binary caches do need root, because `trusted-users` is
+`root` alone by default (`nix config show | grep trusted-users`) and the
+daemon discards substituters supplied by anyone else. In `/etc/nix/nix.conf`:
+
+```
 extra-substituters = https://noctalia.cachix.org https://nyx-cache.chaotic.cx
 extra-trusted-public-keys = noctalia.cachix.org-1:pCOR47nnMEo5thcxNDtzWpOxNFQsBRglJzxWPp3dkU4= nyx-cache.chaotic.cx:dJxTrgMC3V3cFfyIiBQDQorG6k1LsqurH/srpMSq7qk=
 ```
 
-Those two substituter lines matter and are not optional-in-practice: a NixOS
-host running this flake gets them from its own config
-(`modules/desktop/noctalia.nix`, chaotic's own NixOS module), but a plain
-CachyOS dev box has no such config. Without them, Nix silently falls back to
-building a native Wayland/OpenGL shell — and, once the desktop is wired, a
-kernel — from source. Setting them at the daemon level is the real fix; the
-`--extra-substituters` flags the driver passes are ignored for non-trusted
-users (see Gotchas). `.github/workflows/check.yml` configures exactly these
-same two lines for CI, for exactly this reason.
+Those lines are not optional-in-practice: a NixOS host running this flake gets
+them from its own config (`modules/desktop/noctalia.nix`, chaotic's own NixOS
+module), but a plain CachyOS dev box has no such config. Without them, Nix
+silently falls back to building a native Wayland/OpenGL shell — and, once the
+desktop is wired, a kernel — from source. Setting them at the daemon level is
+the real fix; the `--extra-substituters` flags the driver passes are ignored
+for non-trusted users (see Gotchas). `.github/workflows/check.yml` configures
+exactly these same two lines for CI, for exactly this reason.
 
 ## Run (agent path)
 
@@ -181,6 +201,13 @@ nothing passes just as green as one that works.
   `command -v nix` before concluding a driver failure means the config is
   wrong, and see Prerequisites. Nothing in this skill can run without it,
   and installing it needs root.
+- **`error: opening file "/nix/store": No such file or directory` means Nix
+  is installed but never initialized**, not that the repo is broken. Arch's
+  package creates `/nix/var` only; the store and DB come from `sudo
+  nix-store --init`. Equally, `experimental Nix feature 'nix-command' is
+  disabled` is a missing `~/.config/nix/nix.conf`, not a flake error. Both
+  are Prerequisites problems — don't debug the config until `nix flake
+  metadata` succeeds.
 - **`warning: ignoring untrusted substituter 'https://noctalia.cachix.org',
   you are not a trusted user`** — expected on a multi-user Nix daemon
   install where your user isn't in `trusted-users` (only `root` is, by
