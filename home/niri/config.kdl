@@ -6,5 +6,13 @@ include "./cfg/animation.kdl"
 include "./cfg/rules.kdl"
 include "./cfg/misc.kdl"
 
+// Colors (focus ring, border, shadow), written by Noctalia's builtin "niri"
+// template on every re-theme pass.
 include "./noctalia.kdl"
+
+// Shape (window corner radius), written by the custom "niri-style" user
+// template declared in home/noctalia.nix, whose input is generated from that
+// file's `style` block. Seeded at Home Manager activation too, so this
+// include always resolves — niri treats a missing include as fatal.
+include "./noctalia-style.kdl"
 

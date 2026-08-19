@@ -18,6 +18,24 @@ lib.mkIf osConfig.features.niri {
   gtk = {
     enable = true;
 
+    # The shared UI font. modules/system/fonts.nix's fontconfig sansSerif
+    # default would already resolve GTK's own "Sans 10" default to this
+    # family, so this is belt-and-braces on the *family* — but not on the
+    # size: GTK's default is 10, and 11 is what actually matches the visual
+    # weight of Noctalia's bar next to a Nautilus window. Set here rather than
+    # in fonts.nix because it's a Home Manager toolkit setting with no
+    # system-level equivalent, and because the greeter (which fonts.nix does
+    # have to cover) has no GTK surface of its own.
+    #
+    # Qt deliberately has no counterpart in home/qt.nix — see the note in
+    # modules/system/fonts.nix on qt5ct/qt6ct storing fonts as a serialized
+    # QFont blob that can't be written as INI.
+    font = {
+      package = pkgs.adwaita-fonts;
+      name = "Adwaita Sans";
+      size = 11;
+    };
+
     iconTheme = {
       package = pkgs.papirus-icon-theme;
       name = "Papirus-Dark"; # confirmed real folder name via a live build

@@ -1,13 +1,27 @@
-    window-rule {
-        geometry-corner-radius 20 // Set every window radius to 20
-        clip-to-geometry true
-    }
+    // The global window corner radius moved OUT of this file, to
+    // ~/.config/niri/noctalia-style.kdl (included from config.kdl), so it
+    // shares one source of truth with Noctalia's bar radius — home/noctalia.nix's
+    // `style` block. It was 20 here while Noctalia's bar was 12; they are now
+    // both style.radius. Don't add a geometry-corner-radius back here: a
+    // second bare window-rule setting it would silently win or lose depending
+    // on include order.
 
     layer-rule {
         match namespace="^noctalia-wallpaper"
         place-within-backdrop true
     }
 
+    // ─────────────────────────────────────────────────────────────────────
+    // BLUR IS CURRENTLY OFF, at the operator's request. Everything from here
+    // to the end of this banner is commented out rather than deleted: the
+    // findings below took months to establish and are the reason the setup
+    // works at all when it *is* on. Re-enabling is uncommenting these three
+    // blocks plus, in home/noctalia.nix, shell.panel.transparency_mode =
+    // "glass" and a home/transparency.nix value below 1.0 — the compositor
+    // half alone does nothing without client-side alpha, which is precisely
+    // what the note below explains.
+    // ─────────────────────────────────────────────────────────────────────
+    //
     // Blur, enabled broadly for windows and explicitly for Noctalia's own
     // layer surfaces. https://docs.noctalia.dev/v5/compositor-settings/niri
     //
@@ -24,29 +38,29 @@
     // wallpaper — Ghostty's backdrop was smeared, Vesktop's stars were
     // pin-sharp. Giving an app real blur means finding real client-side
     // transparency for it; there is no compositor-side substitute.
-    window-rule {
-        background-effect {
-            blur true
-        }
-    }
+    // window-rule {
+    //     background-effect {
+    //         blur true
+    //     }
+    // }
 
     // A window-rule does not apply to layer-shell surfaces, so Noctalia's
     // bar/panels/OSD need blur enabled here in their own right — this
     // block previously set only `xray false` and therefore never enabled
     // blur on any of them at all.
-    layer-rule {
-        match namespace=r#"^noctalia-(bar-[^"]+|notification|dock|panel|attached-panel|osd)$"#
-        background-effect {
-            blur true
-        }
-    }
+    // layer-rule {
+    //     match namespace=r#"^noctalia-(bar-[^"]+|notification|dock|panel|attached-panel|osd)$"#
+    //     background-effect {
+    //         blur true
+    //     }
+    // }
 
-    layer-rule {
-        match namespace="noctalia-window-switcher"
-        background-effect {
-            blur true
-        }
-    }
+    // layer-rule {
+    //     match namespace="noctalia-window-switcher"
+    //     background-effect {
+    //         blur true
+    //     }
+    // }
 
     // Noctalia v5's own settings window, floating rather than tiled.
     window-rule {
@@ -75,7 +89,7 @@
     // the translucent content — not the "off" treatment Zen needed.
     window-rule {
         match app-id="org.gnome.Nautilus"
-        opacity 0.80
+        // opacity 0.80  // OFF: see the blur banner above
         draw-border-with-background false
     }
 
@@ -93,7 +107,7 @@
         // Value matches
         // the shared opacity in home/transparency.nix — kept in sync by
         // hand, same as misc.kdl's duplicated cursor block.
-        opacity 0.80
+        // opacity 0.80  // OFF: see the blur banner above
         // prefer-no-csd (misc.kdl) already asks Zen to drop its own
         // decorations. Matches Nautilus's fix (below/rules.kdl) rather than
         // disabling focus-ring/border outright — deliberately, even though
@@ -128,7 +142,7 @@
     // that established the distinction described at the top of this file.
     window-rule {
         match app-id="vesktop"
-        opacity 0.80
+        // opacity 0.80  // OFF: see the blur banner above
         draw-border-with-background false
     }
 
