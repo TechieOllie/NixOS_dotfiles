@@ -33,7 +33,7 @@ command -v nix || echo "Nix is not installed — see below"
 Installing the package is not enough. Arch's `nix` package (verified against
 2.35.2-1.1 on CachyOS) ships `/nix/var` and nothing else — **it does not
 create the store**, and every Nix command fails with `error: opening file
-"/nix/store": No such file or directory` until someone does. Three of the four
+"/nix/store": No such file or directory` until someone does. All of the
 steps below need root, so they are the operator's to run, not an agent's:
 
 ```bash
