@@ -1,8 +1,8 @@
 # the-entertaining-nios-laptop
 
 Not yet installed — an Intel laptop with an SD-card reader, a genuinely
-different machine from `the-entertaining-nios-desktop`, which is the one this
-repo is actually developed on. Fully wired on the Nix side though: real
+different machine from the AMD `the-entertaining-nios-desktop`. Fully wired on
+the Nix side though: real
 `hardware-configuration.nix`, a dedicated sops age key registered in
 `.sops.yaml`, an encrypted `secrets/secrets.yaml` + `secrets.nix`, and a
 `nixosConfigurations` entry in `flake.nix`. `nix eval` on this host's

@@ -1,9 +1,8 @@
 # the-entertaining-nios-desktop
 
-The machine this repo is currently developed on — an ASRock B550M Pro4 with a
-Ryzen 5 5600X, 16 GB of RAM and a Radeon RX 6600 — still running CachyOS, and
-the intended daily driver once installed. It is the only host that imports
-`profiles/gaming.nix`, and it carries the full niri + Noctalia desktop stack.
+An ASRock B550M Pro4 with a Ryzen 5 5600X, 16 GB of RAM and a Radeon RX 6600,
+still running CachyOS. It is the only host that imports `profiles/gaming.nix`,
+and it carries the full niri + Noctalia desktop stack.
 
 Wired on the Nix side: real `disko.nix` (both disks), `features.nix`, a
 generated `hardware-configuration.nix`, a `nixosConfigurations` entry in

@@ -1103,9 +1103,8 @@ The roadmap line was "Docker, Steam, Proton GE, Tailscale, gaming profile."
 Three of those five changed on contact with the operator's actual
 requirements.
 
-**Proton GE became proton-cachyos.** The operator runs CachyOS on the
-machine this repo is developed from and wanted its Proton fork and its
-gaming kernel rather than the more commonly-packaged GE build. Neither is
+**Proton GE became proton-cachyos.** The operator runs CachyOS and wanted
+its Proton fork and its gaming kernel rather than the more commonly-packaged GE build. Neither is
 in nixpkgs — verified against this repo's pinned revision, where the only
 attribute matching "cachy" at all is `ananicy-rules-cachyos`. Both come
 from [chaotic-nyx](https://www.nyx.chaotic.cx/)

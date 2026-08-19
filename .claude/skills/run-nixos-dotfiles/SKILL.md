@@ -15,8 +15,8 @@ repo root (the directory with `flake.nix`).
 
 ## Prerequisites
 
-Nix itself, multi-user daemon install (already the case on the dev machine
-this was authored on — `nix (Nix) 2.34.8`, `/nix/var/nix/profiles/default/bin/nix`
+Nix itself, multi-user daemon install (already the case where this was
+authored — `nix (Nix) 2.34.8`, `/nix/var/nix/profiles/default/bin/nix`
 on the PATH). Nothing else — no dependency install step, no separate build
 tool. Confirmed working on plain CachyOS (not NixOS) with just Nix installed;
 the flake itself pulls in `nixpkgs`, `home-manager`, `disko`, `sops-nix`,

@@ -37,8 +37,8 @@ nixos-anywhere --flake .#<host> root@<installer-ip>
 
 | Host | State | Notes |
 | --- | --- | --- |
-| `the-entertaining-nios-vm` | bootstrapped, verified live | ext4. The development and verification target — disposable, driven entirely over SSH ([`docs/testing-on-the-vm.md`](./docs/testing-on-the-vm.md)). |
-| `the-entertaining-nios-desktop` | wired and eval-clean, not installed | btrfs + swap. The machine this repo is developed on, still running CachyOS. The only gaming host, and carries the full niri desktop stack. |
+| `the-entertaining-nios-vm` | bootstrapped, verified live | ext4. The verification target — disposable, driven entirely over SSH ([`docs/testing-on-the-vm.md`](./docs/testing-on-the-vm.md)). |
+| `the-entertaining-nios-desktop` | wired and eval-clean, not installed | btrfs + swap. AMD, still running CachyOS. The only gaming host, and carries the full niri desktop stack. |
 | `the-entertaining-nios-laptop` | wired and eval-clean, not installed | btrfs + swap. Intel. No desktop stack yet, by choice. |
 
 `hosts/installer/` is not a machine — it holds only the operator identity the
