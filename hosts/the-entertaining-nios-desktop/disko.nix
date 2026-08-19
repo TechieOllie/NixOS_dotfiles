@@ -98,13 +98,17 @@
     # failing to shrink), and features.snapshots' snapper configs cover /
     # and /home only.
     disk.storage = {
-      # Placeholder, same convention and same reason as the ESP/swap sizes
-      # above being real: this drive is not attached to the machine yet, so
-      # its by-id path is unknowable. Resolve it from
-      # `ls -l /dev/disk/by-id/` once the drive is physically installed —
-      # left obviously invalid so a premature nixos-anywhere run fails loudly
-      # rather than silently formatting whatever /dev/sdb happens to be.
-      device = "/dev/CHANGEME-storage";
+      # The Seagate ST2000DM008, serial ZK3055P8 — resolved from
+      # `ls -l /dev/disk/by-id/` once the drive was physically installed.
+      # By-id for the same reason as the system disk above: /dev/sdX
+      # enumeration order is not a promise, and this layout formats
+      # whatever it points at. Confirm the serial still matches from the
+      # installer before running nixos-anywhere.
+      #
+      # NOTE: as of writing this drive still carries a single NTFS
+      # partition labelled "Extra" from its CachyOS life. disko will
+      # destroy it. Copy anything worth keeping off first.
+      device = "/dev/disk/by-id/ata-ST2000DM008-2FR102_ZK3055P8";
       type = "disk";
       content = {
         type = "gpt";

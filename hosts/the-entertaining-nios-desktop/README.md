@@ -28,8 +28,10 @@ Two disks, deliberately asymmetric:
   disk: 1 G ESP, 16 G swap (hibernation), btrfs root with the repo's standard
   subvolumes. Currently holds Windows, which the install replaces.
 - **2 TB drive** — bulk storage, plain ext4 at `/mnt/storage` with a
-  `~/Storage` symlink, `nofail` so a missing drive can't block boot. Not
-  physically attached yet, hence the placeholder device.
+  `~/Storage` symlink, `nofail` so a missing drive can't block boot. Now
+  physically attached and addressed by its real `by-id` path (Seagate
+  ST2000DM008, serial ZK3055P8). It still carries its old NTFS partition
+  labelled `Extra`, which the install destroys.
 
 The 500 GB Samsung 860 EVO holding the live CachyOS install is deliberately
 **not** declared in `disko.nix` at all, so the install leaves it alone and it
@@ -37,11 +39,10 @@ stays bootable as a fallback system.
 
 Left to do before this host can actually be installed:
 
-- [ ] Resolve `/dev/CHANGEME-storage` in `disko.nix` once the 2 TB drive is
-      physically installed (`ls -l /dev/disk/by-id/`).
+- [ ] Copy anything worth keeping off the 2 TB drive's existing NTFS
+      partition (`Extra`) — `disko` reformats the whole disk.
 - [ ] Run `nixos-anywhere` — the destructive step. It wipes the NVMe
-      (Windows) and, once its placeholder is resolved, formats the 2 TB
-      drive.
+      (Windows) and reformats the 2 TB drive.
 
 After install:
 

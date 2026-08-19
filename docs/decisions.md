@@ -1976,9 +1976,14 @@ This is a secondary drive on a machine that boots fine without it; without
 `nofail`, systemd makes the mount a requirement of `local-fs.target` and a
 missing or failed drive drops the entire boot to an emergency shell.
 
-Its device stays `/dev/CHANGEME-storage` because the drive is not attached to
-the machine yet — there is no `by-id` path to read. Same reasoning as the
-original placeholder: obviously invalid beats plausibly wrong.
+Its device was `/dev/CHANGEME-storage` for as long as the drive was not
+attached — there was no `by-id` path to read, and obviously invalid beats
+plausibly wrong. The drive is now physically installed, and the placeholder
+is resolved to `/dev/disk/by-id/ata-ST2000DM008-2FR102_ZK3055P8` (Seagate
+ST2000DM008, serial ZK3055P8), read from `ls -l /dev/disk/by-id/` on the live
+CachyOS install. It arrives carrying one NTFS partition labelled `Extra` from
+that life; `disko` destroys it, so anything worth keeping has to come off
+first.
 
 ### The 500 GB SATA SSD is deliberately absent from `disko.nix`
 
