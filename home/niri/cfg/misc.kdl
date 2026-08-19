@@ -46,12 +46,16 @@
     // *except* the wallpaper, so both modes sample the same thing.
     // Confirmed by pixel-diffing screenshots taken with and without
     // `xray false` — identical.
-    blur {
-        passes 2
-        offset 3.0
-        noise 0.03
-        saturation 1.0
-    }
+    // OFF along with the blur rules in rules.kdl — see the banner there.
+    // Left in place because these are tuned values, not defaults, and
+    // re-deriving them would mean redoing the pixel-diff work described
+    // above.
+    // blur {
+    //     passes 2
+    //     offset 3.0
+    //     noise 0.03
+    //     saturation 1.0
+    // }
 
     // Command updated to Noctalia's current recommendation
     // (noctalia msg session lock-and-suspend, replacing the old plain
