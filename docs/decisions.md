@@ -2462,3 +2462,74 @@ them. So the mirror-onto-every-output behaviour is noctalia-greeter's alone,
 not something inherent to Wayland compositors on amdgpu, and `output.name`
 is needed only for the greeter — niri's own `display.kdl` needs no
 corresponding exclusion.
+
+## CI routes around Millennium's unreproducible Bun FOD
+
+Adding the desktop's `nixosConfigurations` entry made CI build the Phase 7
+gaming stack for the first time — and turned the `flake-check` workflow red
+on every push that touched anything, for a reason having nothing to do with
+the diff:
+
+```
+error: hash mismatch in fixed-output derivation '…-millennium-typescript-bun-deps.drv':
+         specified: sha256-BEupNhAlkAELGGLj6/SVUjj101hBm4JzJH9N5i1qM6A=
+            got:    sha256-FgPlXsAfLLsrvCn3AXqltUe2TvE0MgbuYmfTpVNTmSY=
+```
+
+### Why no re-pin can fix it
+
+Upstream's `millennium-typescript-bun-deps` runs a *build* inside a
+fixed-output derivation — `bun install --frozen-lockfile` plus a rollup
+bundle, with whole `node_modules` trees copied into `$out`. An FOD promises
+a stable output hash; a build of a JS dependency tree cannot make that
+promise. Three GitHub Actions runs of one unchanged revision produced three
+different hashes, while `nix build --rebuild` on the same `.drv` reproduces
+the expected hash locally. Bumping the `millennium` input doesn't help: at
+`cecdc95` (the newest revision as of this entry) the derivation has the same
+shape, only a different `outputHash`. Upstream publishes no binary cache
+either, so the CI substituter trick that already covers noctalia and
+chaotic-nyx has nothing to point at.
+
+That is what makes this different from the rolling-source rot that killed
+`update.yml`: upstream drift gives every failure the *same* wrong hash and a
+re-pin fixes it, this gives a different hash each time and no pin ever holds.
+
+### What was rejected
+
+- **Wait for upstream.** The honest answer, and the previous state — but it
+  leaves a permanently red gate on the one host that most needs building,
+  which trains everyone to ignore CI.
+- **Drop the desktop's `build-<host>` check.** Loses closure coverage for the
+  entire niri stack, proton-cachyos, the controller modules and Home Manager
+  on that host, to work around one package.
+- **Weaken the check to eval-only.** Redundant: `nix flake check` already
+  evaluates every `nixosConfigurations` attribute, so this would have been a
+  check that could not fail for any reason the existing pass wouldn't catch.
+- **Our own Cachix.** Would work, but it means credentials, a secret in the
+  repo's Actions config, and a cache to maintain — a lot of standing
+  machinery to paper over someone else's bug.
+
+### What was done
+
+`flake.nix` grew a `ciClosure` helper between `nixosConfigurations` and
+`checks`. For a host with `features.gaming` it returns
+`host.extendModules { … programs.steam.package = lib.mkForce pkgs.steam; }`'s
+toplevel; for every other host it returns the host's own toplevel unchanged.
+Only the `checks` attribute goes through it — `nixosConfigurations` itself,
+and therefore `just build`, `just switch` and `nixos-anywhere`, still get the
+Millennium-patched Steam.
+
+Verified before committing: the check's derivation closure
+(`nix-store -qR`) contains no `millennium` path at all, still contains
+`proton-cachyos` and a stock `steam-1.0.0.87`, and the vm and laptop check
+derivations hash identically to the ones the failing run built — so the
+substitution touches exactly one host and exactly one package. The real
+config still resolves `programs.steam.package` to Millennium's
+`steam-1.0.0.85`, the same store path that appears in the failure log.
+
+The cost, stated plainly: a build failure *inside* Millennium will no longer
+be caught by CI, only on the machine. That is a real reduction in coverage,
+accepted because CI could never build that derivation successfully in the
+first place. `ciClosure` is deliberately one small, self-describing
+function, to be deleted whole the day upstream's FOD stops being a build (or
+nixpkgs#382086 lands and Millennium comes from nixpkgs proper).
