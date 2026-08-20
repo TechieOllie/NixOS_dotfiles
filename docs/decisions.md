@@ -2740,3 +2740,107 @@ anything else, Moonshine included: that module deliberately sets
 `openFirewall = false` because `modules/services/tailscale.nix` trusts
 `tailscale0`, which means streaming cannot work until the same login
 happens.
+
+## The desktop's first day of use: no XWayland, and a keyring nobody unlocked
+
+Two unrelated complaints from the first real session on
+`the-entertaining-nios-desktop`: Steam refusing to start for want of an X
+server, and VS Code warning that it was falling back to weak/plaintext
+encryption for stored credentials. Both turned out to be one-line gaps, and
+one of them was a documented claim that was simply false.
+
+### Steam: there was no XWayland at all
+
+`programs.niri.enable` does not bring XWayland, and this repo never added it
+— `docs/decisions.md`'s Phase 3 notes recorded the "xwayland-satellite not
+found" line in niri's log as *expected*, which it was, right up until an
+X11-only app was actually installed. The Steam client has no Wayland backend
+of any kind, so it simply refuses to run without `DISPLAY`.
+
+What the fix is **not**: a systemd user unit for `xwayland-satellite`, a
+`spawn-at-startup` line, or an `xwayland-satellite {}` block in the KDL.
+Reading niri 26.04's own config defaults (`niri-config/src/lib.rs`) shows
+the integration is already on:
+
+```rust
+xwayland_satellite: XwaylandSatellite {
+    off: false,
+    path: "xwayland-satellite",
+},
+```
+
+`path` is a bare binary name, resolved on the compositor's PATH at startup.
+So the entire fix is `environment.systemPackages = [ pkgs.xwayland-satellite ];`
+in `modules/desktop/niri.nix`. It has to be system-level: niri is launched by
+greetd, whose PATH is `/run/current-system/sw/bin`, so a `home.packages`
+entry would not be visible at the moment niri looks.
+
+Two behaviours worth having written down, both read out of `src/main.rs`:
+niri sets `DISPLAY` from the satellite *before* calling `import_environment()`,
+and `DISPLAY` is one of the five variables that function passes to
+`systemctl --user import-environment` — so unlike the KDL `environment {}`
+block (the standing gotcha), this really does reach the systemd `--user`
+manager, and apps Noctalia launches as user services get it too. But
+`niri.rs`'s reload path is explicit that it doesn't repeat that
+(`// This won't change the systemd environment, but oh well.`), so the change
+lands on a fresh login, not on a config reload.
+
+`home/cursor.nix`'s comment about `x11.enable` was re-checked rather than
+flipped: home-manager's `home.pointerCursor` exports `XCURSOR_THEME` and
+`XCURSOR_SIZE` unconditionally, and `x11.enable` only adds an `xsetroot` call
+in `xsession.profileExtra` plus two Xresources properties — an xsession this
+repo never starts. Xwayland clients are covered by the env vars already, so
+the option stays off; only the comment's reasoning changed.
+
+### VS Code: two separate halves, and a false claim in ARCHITECTURE.md
+
+The warning is Chromium's, not VS Code's own: Electron's `safeStorage` picks
+a password store by sniffing `XDG_CURRENT_DESKTOP`, recognises GNOME and KDE
+and nothing else, and under `niri` falls back to "basic text encryption" —
+Settings Sync tokens and extension credentials written to disk in the clear.
+Pinning it is `--password-store=gnome-libsecret`, delivered through
+nixpkgs' own `code` wrapper hook:
+
+```bash
+if [[ -f $XDG_CONFIG_HOME/code-flags.conf ]]; then
+   CODE_USER_FLAGS="$(sed 's/#.*//' $XDG_CONFIG_HOME/code-flags.conf | tr '\n' ' ')"
+fi
+```
+
+`code-flags.conf` over `~/.vscode/argv.json` deliberately: all three of the
+package's `.desktop` entries exec that same wrapper (`Exec=code %F` and
+friends), so the flag applies from the launcher as well as from a shell,
+while `argv.json` is VS Code's own mutable state and gets rewritten — the
+app-owned-state conflict this repo keeps rediscovering. `libsecret` is
+already in `pkgs.vscode`'s closure, so nothing else needed installing.
+
+That flag alone would still not have been enough. Checking whether a keyring
+was actually available turned up the second half:
+
+```
+$ nix eval .#nixosConfigurations.the-entertaining-nios-desktop.config.security.pam.services.greetd.enableGnomeKeyring
+false
+```
+
+`ARCHITECTURE.md`'s SSH-agent section asserted that enabling
+`services.gnome.gnome-keyring` "in turn makes greetd's own module set
+`security.pam.services.greetd.enableGnomeKeyring = true`". It does not.
+Grepping nixpkgs, neither the greetd module nor the niri module touches that
+option — the only references are in `security/pam.nix`, where it is *read*.
+Both real hosts evaluated it `false`, meaning the keyring daemon has been
+running since Phase 3 with a login keyring that nothing ever unlocked. What
+made this hard to notice is that the one thing anyone tested — `ssh-add`
+followed by a real `git push` over the gcr agent — works either way for the
+lifetime of a session.
+
+`modules/desktop/greetd.nix` now sets it explicitly, alongside the greeter
+settings, since it describes the login path rather than one machine. The
+ARCHITECTURE.md paragraph is corrected in place with a dated note rather than
+silently rewritten.
+
+**Still to verify live** (this was all written from a laptop; the desktop was
+off the tailnet at the time): that Steam actually launches and shows a window
+under the satellite, that `journalctl --user` no longer carries the
+satellite-not-found line, that VS Code stops warning, and that the login
+keyring is genuinely open after a greetd login (`secret-tool store`/`lookup`
+is the direct test, not `ssh-add -l`).

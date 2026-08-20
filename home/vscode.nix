@@ -21,4 +21,21 @@
 }:
 lib.mkIf osConfig.features.niri {
   home.packages = [ pkgs.vscode ];
+
+  # Force Electron's secret storage onto libsecret. Chromium picks a
+  # password store by sniffing XDG_CURRENT_DESKTOP, recognises GNOME/KDE and
+  # nothing else — under "niri" it finds no keyring, warns that it is falling
+  # back to "basic text encryption", and writes Settings Sync and extension
+  # credentials to disk in the clear. The keyring itself is present and, as
+  # of modules/desktop/greetd.nix, actually unlocked at login; only the
+  # detection was missing, and libsecret is already in vscode's closure.
+  #
+  # code-flags.conf, not ~/.vscode/argv.json: nixpkgs' own `code` wrapper
+  # sources this file (and the .desktop entries all exec that wrapper, so it
+  # applies from the launcher as well as the shell), while argv.json is VS
+  # Code's own mutable state — it rewrites it, which is exactly the
+  # app-owned-state conflict this repo keeps running into.
+  xdg.configFile."code-flags.conf".text = ''
+    --password-store=gnome-libsecret
+  '';
 }

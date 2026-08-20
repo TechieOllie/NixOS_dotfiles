@@ -50,5 +50,24 @@
         };
       };
     };
+
+    # Unlock the gnome-keyring login keyring with the password already typed
+    # into the greeter. ARCHITECTURE.md claimed greetd's own NixOS module
+    # turns this on whenever services.gnome.gnome-keyring.enable is set —
+    # it does not, and never did: grepping nixpkgs, nothing but this line
+    # sets it, and both hosts evaluated to `false`. programs.niri does enable
+    # the keyring daemon itself (for the Secret portal), so the daemon has
+    # been running all along with a keyring nothing ever unlocked.
+    #
+    # Symptom that found it: VS Code refusing the OS keyring and falling back
+    # to its plaintext "basic text encryption" store. Anything else speaking
+    # libsecret (Zen's saved logins, Nautilus remote mounts) has the same
+    # dependency. The gcr ssh-agent that home/ssh relies on is the other side
+    # of this — see docs/decisions.md.
+    #
+    # Here rather than in the host: every host that logs in through this
+    # greeter wants it, and it is a property of the login path, not of one
+    # machine's hardware.
+    security.pam.services.greetd.enableGnomeKeyring = true;
   };
 }
