@@ -10,11 +10,14 @@
 # `beta` publishes immutable per-release artifacts, so a locked revision
 # stays buildable and the lock only moves when the operator moves it.
 #
-# No extension/policy porting: the operator's real profile (bookmarks,
-# logins, manually-installed extensions like uBlock Origin/Dark Reader/
-# Obsidian Web Clipper) lives in mutable Firefox-style profile state
-# (~/.config/zen/<profile>/...), out of scope for Nix the same way it
-# always is in this repo. Zen's own theming (userChrome.css/userContent.css)
+# Extensions ARE ported (policies.ExtensionSettings, below), mirroring the
+# set actually installed on the operator's daily-driver CachyOS laptop.
+# Everything else in the real profile — bookmarks, logins, history,
+# workspaces, pinned tabs — is *not*, and deliberately: that machine is
+# signed into Firefox Sync (an account-side concern, and one that carries
+# credentials Nix has no business holding), which already replicates all of
+# it to a new install. So Nix seeds the browser; Sync seeds the profile.
+# Zen's own theming (userChrome.css/userContent.css)
 # is handled by Noctalia's "zen-browser" community template instead (see
 # home/noctalia.nix) — it mutates that same mutable profile state directly,
 # so there's nothing for Nix to conflict with here either.
@@ -40,6 +43,37 @@
 # instead via its own mod.sameerasw.zen_bg_color_enabled/zen_transparency_color
 # prefs (confirmed real via the mod's own preferences.json, mod UUID
 # 642854b5-88b4-4c40-b256-e035532109df, github:sameerasw/zen-themes).
+#
+# policies.Preferences silently drops any pref outside Firefox's own prefix
+# allowlist. Read straight out of the shipped browser
+# (browser/omni.ja -> modules/policies/Policies.sys.mjs, `Preferences:
+# onBeforeAddons`, Zen 1.21.10b): the allowed prefixes are accessibility.,
+# alerts., app.update., browser., datareporting.policy., devtools., dom.,
+# extensions., general.autoScroll, general.smoothScroll, geo., gfx.,
+# identity.fxaccounts.toolbar., intl., keyword.enabled, layers., layout.,
+# mathml.disabled, media., network., pdfjs., places., pref., print., four
+# specific privacy.* prefs, sidebar., signon., spellchecker., two svg.*,
+# toolkit.legacyUserProfileCustomizations.stylesheets, ui., two webgl.*,
+# widget., and some xpinstall.*; security.* is an exact-match allow-list of
+# its own. Anything else is rejected with an `Unable to set preference X.
+# Preference not allowed for stability reasons.` line in the browser console
+# and nothing else — no eval error, no visible failure.
+#
+# `zen.*` and `mod.*` are NOT on that list. Zen inherits the upstream
+# allowlist unchanged and does not add its own namespace to it. So the
+# transparency prefs below in those two namespaces are inert, and every
+# genuinely Zen-specific UI setting on the operator's laptop
+# (zen.view.compact.enable-at-startup, zen.view.use-single-toolbar,
+# zen.glance.activation-method, zen.tabs.ctrl-tab.ignore-essential-tabs,
+# zen.pinned-tab-manager.restore-pinned-tabs-to-pinned-url,
+# zen.swipe.is-fast-swipe, zen.workspaces.continue-where-left-off) is
+# unreachable from here. Reaching them needs profiles.<name>.settings, i.e.
+# handing the profile directory to Home Manager — the exact thing the next
+# paragraph explains this repo does not do. They are left to the browser's
+# own settings UI (and to Sync, which carries some of them) rather than
+# quietly declared in a place that cannot apply them. The transparency prefs
+# are kept in those inert namespaces anyway, so that turning transparency
+# back on doesn't silently lose the intent.
 #
 # Set via policies.Preferences (policies.json), not profiles.<name>.settings
 # (prefs.js) — deliberately, not just following the flake's own examples:
@@ -75,6 +109,15 @@ let
   # the opaque-black backplate that `zen_bg_color_enabled` would otherwise
   # force at #000000FF.
   transparent = opacity < 1.0;
+
+  # Every pref below is seeded, never locked: Status = "default" sets the
+  # starting value and then leaves it an ordinary user-editable pref, so the
+  # browser's own settings UI keeps working. Same choice as the transparency
+  # prefs, which predate this helper.
+  seed = Value: {
+    inherit Value;
+    Status = "default";
+  };
 in
 {
   imports = [ zen-browser.homeModules.beta ];
@@ -118,6 +161,123 @@ in
           # transparent, so it follows the same shared value.
           Value = transparent;
           Status = "default";
+        };
+
+        # --- Ported from the operator's live CachyOS profile ---------------
+        # Read out of ~/.config/zen/<profile>/prefs.js on
+        # the-entertaining-caos-laptop and filtered down to prefs that are
+        # (a) a deliberate choice rather than browser-written state, (b) not
+        # machine-local (download.lastDir, backup.location and friends are
+        # dropped — they name paths that need not exist on a NixOS host), and
+        # (c) inside the policy allowlist documented above.
+
+        # Tab and window behaviour.
+        "browser.ctrlTab.sortByRecentlyUsed" = seed true;
+        "general.autoScroll" = seed true;
+        "accessibility.typeaheadfind.flashBar" = seed 0;
+
+        # Ask where to put every download rather than dropping it in
+        # ~/Downloads, and clear private-window downloads on close.
+        "browser.download.useDownloadDir" = seed false;
+        "browser.download.deletePrivate" = seed true;
+
+        # New tab: no second search box (the URL bar is the search box), no
+        # sponsored content, stories kept. showSponsoredTopSites is left
+        # alone on purpose — it is still at its default on the laptop, so
+        # there is no operator choice here to reproduce.
+        "browser.newtabpage.activity-stream.showSearch" = seed false;
+        "browser.newtabpage.activity-stream.showSponsored" = seed false;
+        "browser.newtabpage.activity-stream.feeds.section.topstories" = seed true;
+
+        # URL bar: history/bookmarks before search suggestions, and no
+        # "search with <engine>" rows.
+        "browser.search.suggest.enabled" = seed true;
+        "browser.urlbar.showSearchSuggestionsFirst" = seed false;
+        "browser.urlbar.suggest.engines" = seed false;
+
+        # Translation is off entirely on the laptop, including the built-in
+        # AI translation feature that would otherwise re-offer it.
+        "browser.translations.enable" = seed false;
+        "browser.translations.automaticallyPopup" = seed false;
+        "browser.ai.control.translations" = seed "blocked";
+
+        # Passwords and form data belong to Bitwarden (installed below), not
+        # to the browser — so its own password manager is switched off rather
+        # than left to compete for the same save prompts.
+        "signon.rememberSignons" = seed false;
+        "signon.management.page.breach-alerts.enabled" = seed false;
+        "extensions.formautofill.addresses.enabled" = seed false;
+        "extensions.formautofill.creditCards.enabled" = seed false;
+
+        # No speculative connections or prefetching.
+        "network.prefetch-next" = seed false;
+        "network.http.speculative-parallel-limit" = seed 0;
+
+        # Picture-in-picture: follow the video across tab switches, no
+        # subtitle toggle overlay.
+        "media.videocontrols.picture-in-picture.enable-when-switching-tabs.enabled" = seed true;
+        "media.videocontrols.picture-in-picture.display-text-tracks.toggle.enabled" = seed false;
+        "extensions.pictureinpicture.enable_picture_in_picture_overrides" = seed true;
+
+        # UK English UI, French second, and dates/units from the OS locale.
+        # The French language pack is force-installed below; en-GB and en-US
+        # ship in the build.
+        "intl.locale.requested" = seed "en-GB,fr,en-US";
+        "intl.regional_prefs.use_os_locales" = seed true;
+
+        # Zen's own sidebar replaces the Firefox one.
+        "sidebar.visibility" = seed "hide-sidebar";
+
+        # Required for chrome/userChrome.css to be read at all — which is
+        # how both Noctalia's "zen-browser" template and any Zen mod apply
+        # themselves. Set on the laptop, and easy to lose on a fresh profile.
+        "toolkit.legacyUserProfileCustomizations.stylesheets" = seed true;
+      };
+
+      # The extension set actually installed and enabled on the laptop,
+      # by add-on ID. `normal_installed` rather than `force_installed`:
+      # it installs the extension on first run and keeps it updated, but
+      # leaves the operator able to disable or remove one from about:addons
+      # — the same seed-don't-lock stance as Status = "default" above.
+      # Pinned to AMO's /latest/ redirect rather than a versioned file URL,
+      # so this doesn't need a bump every time an extension updates; the
+      # cost is that the exact version installed isn't reproducible, which
+      # is already true of everything else in a browser profile.
+      #
+      # Deliberately absent: the two disabled themes (DarkMagic, Matte
+      # Black) and Conex, all three inactive on the laptop.
+      policies.ExtensionSettings = {
+        # uBlock Origin.
+        "uBlock0@raymondhill.net" = {
+          install_url = "https://addons.mozilla.org/firefox/downloads/latest/ublock-origin/latest.xpi";
+          installation_mode = "normal_installed";
+        };
+        # Dark Reader.
+        "addon@darkreader.org" = {
+          install_url = "https://addons.mozilla.org/firefox/downloads/latest/darkreader/latest.xpi";
+          installation_mode = "normal_installed";
+        };
+        # Bitwarden Password Manager — the reason signon.rememberSignons is
+        # false above.
+        "{446900e4-71c2-419f-a6a7-df9c091e268b}" = {
+          install_url = "https://addons.mozilla.org/firefox/downloads/latest/bitwarden-password-manager/latest.xpi";
+          installation_mode = "normal_installed";
+        };
+        # Obsidian Web Clipper — pairs with home/obsidian.nix.
+        "clipper@obsidian.md" = {
+          install_url = "https://addons.mozilla.org/firefox/downloads/latest/web-clipper-obsidian/latest.xpi";
+          installation_mode = "normal_installed";
+        };
+        # Chrome Mask — presents a Chrome user agent to sites that refuse
+        # anything else.
+        "chrome-mask@overengineer.dev" = {
+          install_url = "https://addons.mozilla.org/firefox/downloads/latest/chrome-mask/latest.xpi";
+          installation_mode = "normal_installed";
+        };
+        # French language pack, for intl.locale.requested's "fr" fallback.
+        "langpack-fr@firefox.mozilla.org" = {
+          install_url = "https://addons.mozilla.org/firefox/downloads/latest/francais-language-pack/latest.xpi";
+          installation_mode = "normal_installed";
         };
       };
     };
