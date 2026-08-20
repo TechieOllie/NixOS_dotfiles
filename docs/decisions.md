@@ -2838,9 +2838,15 @@ settings, since it describes the login path rather than one machine. The
 ARCHITECTURE.md paragraph is corrected in place with a dated note rather than
 silently rewritten.
 
-**Still to verify live** (this was all written from a laptop; the desktop was
-off the tailnet at the time): that Steam actually launches and shows a window
-under the satellite, that `journalctl --user` no longer carries the
-satellite-not-found line, that VS Code stops warning, and that the login
+**Verified live, the Steam half** (2026-08-20, on the desktop after a switch
+and a fresh login): Steam starts and shows its window under the satellite.
+That is also the first time anything in Phase 7's gaming stack has actually
+run on hardware rather than merely evaluating — the launcher only, though; no
+game has been launched through Proton yet and no controller has been paired,
+so `xone`/`xpadneo` and `proton-cachyos` remain untested.
+
+**Still to verify live**: that VS Code stops warning, and that the login
 keyring is genuinely open after a greetd login (`secret-tool store`/`lookup`
-is the direct test, not `ssh-add -l`).
+is the direct test, not `ssh-add -l`). The keyring half of this commit is the
+part with no live evidence at all yet — Steam working says nothing about it,
+since the two fixes are unrelated.
