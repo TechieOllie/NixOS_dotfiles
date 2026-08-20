@@ -2850,3 +2850,65 @@ keyring is genuinely open after a greetd login (`secret-tool store`/`lookup`
 is the direct test, not `ssh-add -l`). The keyring half of this commit is the
 part with no live evidence at all yet — Steam working says nothing about it,
 since the two fixes are unrelated.
+
+
+### Follow-up: the keyring was fine, the flags file was read by nothing
+
+Live on the desktop after the switch and a fresh login, Steam worked and VS
+Code went on warning. Checked over SSH, in this order:
+
+```
+$ cat ~/.config/code-flags.conf
+--password-store=gnome-libsecret
+$ busctl --user --json=short call org.freedesktop.secrets \
+    /org/freedesktop/secrets/collection/login \
+    org.freedesktop.DBus.Properties Get ss org.freedesktop.Secret.Collection Locked
+{"type":"v","data":[{"type":"b","data":false}]}
+```
+
+So the keyring half of the previous commit works: the login collection
+exists and is **unlocked** after a greetd login, and its two items are
+Noctalia's own (`Noctalia encrypted storage key`, `Noctalia calendar refresh
+token`) — a real app storing real secrets through libsecret. `/etc/pam.d/greetd`
+turns out to be nothing but `include login`, and the `pam_gnome_keyring.so`
+auth/session lines live in `/etc/pam.d/login`, which the include pulls in
+with the entered password. Worth knowing before reading that file and
+concluding the option didn't apply.
+
+What was missing is a `Code Safe Storage` item — nothing VS Code had ever
+written. The reason was in the installed wrapper:
+
+```
+$ cat $(readlink -f $(which code))
+…
+exec -a "$0" "/nix/store/…-vscode-1.130.0/bin/.code-wrapped" \
+  ${NIXOS_OZONE_WL:+${WAYLAND_DISPLAY:+--ozone-platform-hint=auto …}} "$@"
+```
+
+No `code-flags.conf` handling anywhere in it. That hook is real, but it
+arrived in a *newer* nixpkgs than this flake pins — the wrapper it was read
+out of came from `nix build nixpkgs#vscode` on the laptop, which resolves the
+**registry's** nixpkgs (VS Code 1.133.0), not this flake's locked input (VS
+Code 1.130.0). A perfect example of the kind of check that cannot fail:
+`xdg.configFile` wrote the file, eval was green, `nix flake check` was green,
+and the feature was inert. Inspect wrapper-provided hooks through the flake's
+own locked nixpkgs, always.
+
+The fix is upstream's own supported argument, which exists at both revisions:
+
+```nix
+home.packages = [
+  (pkgs.vscode.override { commandLineArgs = "--password-store=gnome-libsecret"; })
+];
+```
+
+Verified by building it and reading the wrapper back, rather than by
+assuming a second time — the last line is now
+`… "$@"  --password-store=gnome-libsecret`. The cost is that vscode's
+derivation is rebuilt (an unpack and a wrapper, no compilation) instead of
+coming straight from cache.
+
+**Still to verify live**: that the warning is actually gone, and that a
+`Code Safe Storage` item appears in the login keyring once VS Code stores
+something. That item's presence is the unambiguous test — the notification
+can be dismissed, the keyring item can't be faked.
