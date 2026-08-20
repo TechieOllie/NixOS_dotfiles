@@ -2332,3 +2332,121 @@ it is removed by hand — an old binary silently winning after a switch that
 looks clean. Only `the-entertaining-nios-vm` is affected; it is disposable,
 and the desktop and laptop have never been installed, so they get this for
 free. Recorded as a standing gotcha in `CLAUDE.md`.
+
+## The desktop's first boot: a black screen with a live cursor
+
+The desktop bootstrapped and rebooted cleanly, and landed on a black screen
+— with a mouse cursor that moved, and was already the right Bibata theme.
+That combination is the whole diagnosis in miniature: a Wayland compositor
+was up and had loaded the greeter's cursor settings, but nothing was being
+drawn.
+
+### It was not the GPU, and not theming
+
+Both were checked first and both came back clean. `amdgpu` was loaded with
+`/dev/dri/card1` present, and the greeter's own log had already got as far
+as `EGL 1.5`, `OpenGL ES vendor="AMD" renderer="AMD Radeon RX 6600
+(radeonsi, navi23, ACO, DRM 3.64, 7.1.8-cachyos)"`, Mesa 26.1.6. greetd was
+running, the greetd socket was connected, the keymap had loaded. The cursor
+being *correctly themed* was itself positive evidence that `greeter.toml`
+had been written and read.
+
+The greeter runs as uid 998, and its stderr goes to the journal under that
+uid rather than under the `greetd` unit — `journalctl -b -u greetd` shows
+only PAM lines and is actively misleading here. `journalctl -b _UID=998` is
+where the failure actually is:
+
+```
+[wayland] output 'DP-1' ready 2560x1440 at (0,0) scale=2
+[wayland] output 'HDMI-A-1' ready 1920x1080 at (0,0) scale=1
+[greeter] syncOutputWindows: 3 target output(s), 0 view(s)
+...
+[greeter-window] toplevel close requested
+[WRN] [render] renderScene failed: eglSwapBuffers failed
+[ERR] [greeter] Wayland flush failed after greeter init
+[ERR] [main] failed to initialize greeter
+[ERR] [main] holding process so greetd does not respawn; fix config and restart greetd
+```
+
+The first attempt, before greetd's one restart, failed more explicitly with
+`protocol error 3 interface=xdg_surface`.
+
+### Three outputs, two monitors
+
+`/sys/class/drm/card*-*/status` explains the count:
+
+```
+card1-DP-1        connected
+card1-DP-2        disconnected
+card1-DP-3        disconnected
+card1-HDMI-A-1    connected
+card1-Writeback-1 unknown
+```
+
+amdgpu exposes a `Writeback-1` connector — a DRM writeback target, not a
+display. noctalia-greeter's default is to mirror onto every output, so it
+counted writeback as a third monitor, created a surface on it that can never
+be presented, violated xdg-shell, and aborted before drawing a single frame.
+It then deliberately held the process open rather than exiting, which is why
+greetd did not respawn-loop and why the compositor stayed up drawing the
+cursor.
+
+`examples/greeter.toml` in the pinned greeter source documents the fix
+directly: `[output] name` — "Pin the greeter to one connector; omit to
+mirror on every monitor."
+
+### Why the pin is host-level
+
+`programs.noctalia-greeter.settings.output.name = "DP-1"` went into
+`hosts/the-entertaining-nios-desktop/default.nix`, not
+`modules/desktop/greetd.nix`. A connector name describes one machine's
+cabling, and the VM shares that module and has neither a DP-1 nor a
+writeback connector — the module stays host-agnostic, per the usual layering
+rule.
+
+Worth noting the option merges cleanly across the two files despite
+`settings` being declared as `oneOf [ tomlFormat.type str path ]`; this was
+verified by evaluating the merged result rather than assumed, since a
+`oneOf` containing non-attrset members is exactly the shape that can reject
+a second definition:
+
+```json
+{"cursor": {"size": 22, "theme": "Bibata-Modern-Classic"},
+ "keyboard": {"layout": "fr"},
+ "output": {"name": "DP-1"}}
+```
+
+Consequence to accept: HDMI-A-1 shows nothing at the login screen. Only the
+session drives both monitors.
+
+### Correction: the `greeter.toml` seed-once gotcha is obsolete
+
+Phase 3 recorded (and `CLAUDE.md` carried) that
+`programs.noctalia-greeter.settings` only ever *seeds*
+`/var/lib/noctalia-greeter/greeter.toml` through a systemd-tmpfiles `C`-type
+rule, so changes needed `sudo rm … && sudo systemd-tmpfiles --create && sudo
+systemctl restart greetd` to land. That was true when it was written. At the
+pinned revision (`4aa960d`) upstream's `nix/nixos-module.nix` uses an `L+`
+force-symlink instead:
+
+```nix
+"/var/lib/noctalia-greeter/greeter.toml"."L+" = {
+  argument = "${generateToml "greeter.toml" cfg.settings}";
+```
+
+and its own option description now reads "Full declarative greeter.toml,
+symlinked into the Nix store and replaced on every activation". So a plain
+`nixos-rebuild switch` is sufficient and the manual dance is dead. The
+earlier Phase 3 and Phase 5 entries above are left as written — this is an
+investigation log, and they were accurate at the time — but `CLAUDE.md` and
+the comment in `modules/desktop/greetd.nix` have been corrected. Re-check
+that tmpfiles rule whenever the `noctalia-greeter` input is bumped; it has
+changed once already.
+
+### Still unverified
+
+Whether niri itself trips over `Writeback-1` once a session starts. niri
+generally ignores writeback connectors, but this host had never reached a
+session when the fix was written, so the first successful login is the real
+test — not something to record as working on the strength of the greeter
+being fixed.

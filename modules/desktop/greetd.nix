@@ -26,12 +26,20 @@
       # own nix/nixos-module.nix (its documented example uses this shape).
       # modules/desktop/theming.nix installs the bibata-cursors package
       # system-wide so this greeter, which runs outside any user's Home
-      # Manager profile, can find it by name. Note: greeter.toml is only
-      # ever *seeded* once (systemd-tmpfiles C-type rule) and never
-      # overwritten afterward — on an already-booted host, this change needs
-      # `sudo rm /var/lib/noctalia-greeter/greeter.toml && sudo
-      # systemd-tmpfiles --create && sudo systemctl restart greetd` to
-      # actually take effect.
+      # Manager profile, can find it by name.
+      #
+      # greeter.toml used to be *seeded* once via a systemd-tmpfiles C-type
+      # rule, so a change here needed a manual rm + `systemd-tmpfiles
+      # --create` + greetd restart to take effect. At the pinned revision the
+      # upstream module uses an `L+` force-symlink to a store path, rebuilt
+      # on every activation, so a plain `nixos-rebuild switch` is enough.
+      # Re-check that rule if this input is ever bumped.
+      #
+      # Multi-monitor hosts also need `output.name` set — the greeter mirrors
+      # onto every output by default, and amdgpu's Writeback-1 connector
+      # counts as one, which crashes it before it draws. That's a per-machine
+      # connector name, so it lives in the host, not here; see
+      # hosts/the-entertaining-nios-desktop/default.nix.
       settings = {
         cursor = {
           theme = "Bibata-Modern-Classic";

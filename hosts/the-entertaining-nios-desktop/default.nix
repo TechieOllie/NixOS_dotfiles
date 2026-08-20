@@ -23,6 +23,19 @@
     ../../modules/desktop/nautilus.nix
   ];
 
+  # Pin the login greeter to the primary monitor. amdgpu exposes a
+  # `Writeback-1` DRM connector alongside the two real ones (DP-1, HDMI-A-1),
+  # and noctalia-greeter's default behaviour — mirror onto every output —
+  # counts it as a third display, builds a surface on it that can never be
+  # presented, and dies with an xdg_surface protocol error before it draws
+  # anything. The result is a black screen with a live cursor. Naming one
+  # connector skips the multi-output path entirely.
+  #
+  # Host-level, not in modules/desktop/greetd.nix: a connector name describes
+  # this machine's cabling, and the VM (which shares that module) has neither
+  # a DP-1 nor a writeback connector.
+  programs.noctalia-greeter.settings.output.name = "DP-1";
+
   networking.hostName = vars.system.hostName;
   time.timeZone = vars.system.timeZone;
   console.keyMap = vars.system.keyMap;
