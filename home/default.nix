@@ -30,6 +30,7 @@
     ./freecad.nix
     ./jetbrains.nix
     ./claude-code.nix
+    ./gh.nix
   ];
 
   home.username = vars.user.name;
