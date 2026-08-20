@@ -2443,10 +2443,22 @@ the comment in `modules/desktop/greetd.nix` have been corrected. Re-check
 that tmpfiles rule whenever the `noctalia-greeter` input is bumped; it has
 changed once already.
 
-### Still unverified
+### niri is unaffected — verified in a live session
 
-Whether niri itself trips over `Writeback-1` once a session starts. niri
-generally ignores writeback connectors, but this host had never reached a
-session when the fix was written, so the first successful login is the real
-test — not something to record as working on the strength of the greeter
-being fixed.
+The open question when the fix was written was whether niri would trip over
+`Writeback-1` the same way the greeter did. It does not. From the running
+session on the desktop:
+
+```
+$ niri msg outputs
+Output "Samsung Electric Company C27F390 H4ZR113985" (HDMI-A-1)
+  Current mode: 1920x1080 @ 60.000 Hz (preferred)
+Output "Samsung Electric Company LS27CG51x H9JW901815" (DP-1)
+  Current mode: 2560x1440 @ 164.999 Hz (preferred)
+```
+
+Two outputs, both at their preferred mode, no writeback connector among
+them. So the mirror-onto-every-output behaviour is noctalia-greeter's alone,
+not something inherent to Wayland compositors on amdgpu, and `output.name`
+is needed only for the greeter — niri's own `display.kdl` needs no
+corresponding exclusion.
