@@ -91,21 +91,52 @@ in
       # forever on that host.
       #
       # Practical consequence: adding a key here does not change an
-      # already-provisioned host if that host's sidecar names the same key. The
-      # VM's sidecar was audited when the settings below were written and
-      # carries exactly four shadowing keys — shell.telemetry_enabled,
-      # theme.templates.builtin_ids (a verbatim duplicate of the list below,
-      # so inert but still shadowing), lockscreen_widgets.*, and the
-      # wallpaper.default/last/monitors trio. Deleting those sections from the
-      # sidecar is a one-time operator step per host; see docs/decisions.md.
+      # already-provisioned host if that host's sidecar names the same key.
+      # Deleting the corresponding sections from that host's sidecar is a
+      # one-time operator step; see docs/decisions.md for the per-key list and
+      # the one section that must NOT be deleted.
       #
       # Deliberately not automated by an activation script that rewrites the
       # sidecar: that file is also where Noctalia stores genuinely
       # runtime-learned state, and a rebuild that silently reverted a choice
       # made in the UI would be a worse surprise than a stale key.
+      #
+      # The settings below were derived by exporting the desktop's *effective*
+      # config — Noctalia's own merge of this file and that host's sidecar,
+      # i.e. what the operator actually sees — and folding back everything in
+      # it that is not tied to a particular display. That filter is the whole
+      # editorial rule for this block: a widget id, a toggle or a plugin name
+      # is the same on every host and belongs here; a connector name
+      # (DP-1/HDMI-A-1/Virtual-1), an absolute pixel coordinate, or a
+      # per-output table does not, and stays runtime state. Where upstream's
+      # own default differs from the value below, the comment says so.
       settings = {
         shell = {
           launch_apps_as_systemd_services = true;
+
+          # Noctalia's own polkit agent. niri's upstream module starts no
+          # authentication agent of its own, so without this a pkexec prompt
+          # from anything graphical (lact, the Docker socket, a GParted-style
+          # tool) has nothing to draw it and fails silently. Upstream default
+          # is false (config_types.h: `bool polkitAgent = false`).
+          polkit_agent = true;
+
+          # Per-application foreground time accounting, surfaced in the
+          # control center. Local-only bookkeeping — it writes
+          # ~/.local/state/noctalia/screen_time.json and is unrelated to
+          # telemetry_enabled below, which is the one thing here that leaves
+          # the machine.
+          screen_time_enabled = true;
+
+          # Recolor app icons to a palette role rather than leaving them at
+          # their shipped colors. NOTE: this key is inert on its own —
+          # example.toml documents it as "ColorSpec role or #hex *when
+          # colorize is enabled*", and `app_icon_colorize` defaults to false
+          # (config_types.h: `bool appIconColorize = false`). Declared as the
+          # exported state has it, deliberately without switching colorize
+          # on: turning it on is a visible appearance change across the whole
+          # shell, and is the operator's call to make in the UI first.
+          app_icon_color = "on_surface_variant";
 
           # Anonymous startup ping to Noctalia's own endpoint. Upstream
           # defaults it to false (config_types.h: `bool telemetryEnabled =
@@ -192,6 +223,42 @@ in
             direction = "down";
             alpha = 0.55;
           };
+
+          # Push this shell's resolved palette to noctalia-greeter, so the
+          # lock/login screen matches the session it belongs to without the
+          # greeter needing its own copy of the theme. The greeter half of
+          # this lives outside Home Manager entirely (see
+          # modules/desktop/greetd.nix) and learns the colors through
+          # /var/lib/noctalia-greeter/sync.toml — which is precisely the
+          # runtime-learned state that file exists for, and the reason it is
+          # deliberately not Nix-managed.
+          greeter_sync.auto_sync = true;
+
+          launcher = {
+            # Trigger character for the launcher's provider prefixes, so
+            # ":emo" reaches the emoji provider. Upstream's default is "/",
+            # which collides with typing an absolute path into the same
+            # box — the first thing you do when launching anything by path.
+            provider_prefix = ":";
+
+            # Also surface emoji hits in unprefixed search, rather than only
+            # behind ":emo". Every other provider stays prefix-only.
+            providers.emoji.global = true;
+          };
+
+          screenshot = {
+            # All three default false upstream. Region capture without a
+            # confirmation step fires on mouse-up with no chance to adjust,
+            # and without remember_last_region a re-shot of the same area
+            # has to be re-dragged by hand.
+            confirm_region = true;
+            remember_last_region = true;
+
+            # The pointer is usually the subject when screenshotting a UI
+            # bug — which of these three is a taste call rather than a
+            # correctness one.
+            show_cursor = true;
+          };
         };
 
         # Fires after every full re-theme pass completes (confirmed via
@@ -227,22 +294,216 @@ in
           # accidental rather than deliberate, which is the whole complaint
           # this change answers.
           inherit (style) radius;
+
+          # Draw each widget group as its own rounded pill rather than one
+          # continuous strip. Upstream default is false.
+          capsule = true;
+
+          # The bar's widget layout. Deliberately display-independent: these
+          # are widget *ids*, identical on every host, unlike the lockscreen
+          # canvas below whose ids embed a connector name. Per-monitor bar
+          # overrides do exist upstream ([bar.<name>.monitor.<key>] with a
+          # `match` on a connector) and are deliberately not used — a bar
+          # that is the same everywhere is one less thing that can differ
+          # between the desktop's two outputs and the laptop's one.
+          #
+          # Four of these ids resolve through [widget.*] blocks near the end
+          # of this file rather than being built-ins: "bar" and "bar_2" are
+          # generic plugin widget slots, and "mini-docker" is a plugin widget
+          # named after its plugin. See the plugins note there — "bar_2"'s
+          # plugin is not currently in plugins.enabled, so that slot renders
+          # nothing until it is.
+          start = [
+            "launcher"
+            "wallpaper"
+            "bar"
+            "mini-docker"
+            "sysmon"
+            "clock"
+            "active_window"
+          ];
+          center = [
+            "workspaces"
+            "privacy"
+            "taskbar"
+          ];
+          end = [
+            "media"
+            "bar_2"
+            "tray"
+            "notifications"
+            "bluetooth"
+            "volume"
+            "brightness"
+            "control-center"
+            "session"
+          ];
         };
 
-        # The lockscreen's widget canvas. Noctalia's lockscreen editor writes
-        # this whole block into the runtime sidecar the moment it is opened —
-        # the VM's copy carries `enabled = false` plus a stray
-        # `lockscreen-login-box@Virtual-1` placement, and nothing else in the
-        # repo said anything about it. Only the switch is portable: widget ids
-        # embed a connector name and cx/cy are absolute pixels on that
-        # output, so replaying the VM's placement onto the desktop's 2560x1440
-        # DP-1 would put the box somewhere arbitrary — the same reason
-        # connector names are host-level everywhere else here.
+        # The lockscreen's widget canvas — the switch only, never a layout.
         #
-        # `false` is upstream's default and what the VM actually runs; stated
-        # so every host gets Noctalia's built-in lockscreen rather than
-        # whichever layout a host happened to have its editor opened on.
-        lockscreen_widgets.enabled = false;
+        # Noctalia's lockscreen editor writes an entire canvas into the
+        # runtime sidecar the moment it is opened: a `widget_order` list, a
+        # `[lockscreen_widgets.grid]` block, and one
+        # `[lockscreen_widgets.widget.<id>]` table per widget. Every part of
+        # that is display-bound. Login-box ids are literally
+        # `lockscreen-login-box@<connector>`; every widget carries an
+        # `output` name plus `cx`/`cy`/`placement_width`/`placement_height`
+        # in absolute pixels on that output. Declaring any of it here would
+        # hard-code this repo to one machine's cabling and resolutions, and
+        # would place widgets off-screen on any host whose outputs differ —
+        # the same reason the greeter's `output.name` pin is host-level and
+        # not in a module.
+        #
+        # Only `enabled` is display-independent, so only `enabled` is
+        # declared. That is safe to turn on with no placements stored,
+        # confirmed by reading upstream rather than assuming: the controller
+        # normalizes its snapshot through
+        # `lockscreen_login_box::ensureWidgets`, which walks the live Wayland
+        # outputs and *inserts* a login box (centered, default-sized, via
+        # `defaultPanelCenter`/`defaultPanelSize`) for every connected output
+        # that does not already have one, then force-enables one if none is
+        # enabled. So a fresh host with an empty canvas comes up with a
+        # working, centered login box per monitor rather than an unlockable
+        # blank screen — the failure this would otherwise risk.
+        #
+        # The consequence worth stating: the widget *arrangement* stays
+        # runtime state, per host, and is not backed up by this repo.
+        lockscreen_widgets.enabled = true;
+
+        # Blur the desktop behind the lock screen. Independent of the
+        # blur/transparency mechanism that is currently switched off
+        # elsewhere in this file — that one is niri compositing behind
+        # translucent client surfaces (see home/transparency.nix); this is
+        # Noctalia blurring its own captured backdrop, and it works
+        # regardless. Upstream default is false.
+        lockscreen.blurred_desktop = true;
+
+        # Desktop widgets are Noctalia's other canvas — same editor, same
+        # per-output absolute-pixel placement problem. Left off, which is
+        # both upstream's default and the exported state, so the question of
+        # declaring a display-bound layout never arises.
+        desktop_widgets.enabled = false;
+
+        # Weather and the calendar's local time both resolve from here.
+        # Noctalia's resolution order is `auto_locate` (IP geolocation) ->
+        # `address` (geocoded) -> manual latitude/longitude, per the comment
+        # on LocationConfig in config_types.h. A stated address is preferred
+        # over IP geolocation because a VPN — and this operator runs Tailscale
+        # on two hosts — moves the IP-derived answer to wherever the exit node
+        # is. It is also the one setting in this file that is about the
+        # operator rather than the machine, which is why it is the same on
+        # every host rather than host-level.
+        location.address = "Liré, France";
+
+        calendar = {
+          # Upstream default is false, which hides the control center's
+          # calendar tab entirely.
+          enabled = true;
+
+          # The account is named by an arbitrary table key ("personal_google"),
+          # not by any credential: `type` selects the backend and `color`
+          # picks a palette role for its events. Nothing secret lives here —
+          # the OAuth token Noctalia obtains is stored in its own runtime
+          # state, which is exactly where it belongs and why this key can be
+          # declarative without involving sops.
+          account.personal_google = {
+            type = "google";
+            color = "primary";
+          };
+        };
+
+        control_center = {
+          # Logical pixels for the full sidebar; compact/none modes scale
+          # down from it (config_types.h: `width = kDefaultWidth`). Widened
+          # from the default so the calendar's month grid fits without the
+          # week-number column squeezing the day cells.
+          width = 1000;
+
+          # ISO 8601 week numbers, matching the lockscreen calendar widget's
+          # own setting. Upstream default is false.
+          calendar.show_week_numbers = true;
+
+          # The quick-toggle row, in render order. An array of tables, each
+          # naming one built-in toggle by `type` — no display or hardware
+          # coupling, though a toggle whose hardware is absent (bluetooth on
+          # a host without a radio) simply renders inert rather than
+          # erroring, which is why this needs no feature gating.
+          shortcuts = [
+            { type = "bluetooth"; }
+            { type = "caffeine"; }
+            { type = "nightlight"; }
+            { type = "notification"; }
+            { type = "power_profile"; }
+          ];
+        };
+
+        # Prune the notification history after half a day. Upstream default
+        # is 0 (config_types.h: `int historyRetentionHours = 0`), which keeps
+        # everything forever — the history file on this desktop had already
+        # grown past 20 KB of JSON plus a directory of cached notification
+        # images before this was set.
+        notification.history_retention_hours = 12;
+
+        # Noctalia's own plugin system: ids are `<author>/<name>`, fetched
+        # and cached by Noctalia into ~/.local/state/noctalia/plugins rather
+        # than coming from Nix. Declared here so a rebuilt host re-fetches
+        # the same set instead of the operator re-adding them by hand.
+        #
+        # Deliberately not gated on features.docker/features.tailscale: these
+        # are shell widgets, not the services themselves, and one whose
+        # backend is missing renders empty rather than failing. Note that
+        # the bar's "bar_2" slot above points at `icefish/phone-connect`,
+        # which is *not* in this list — that slot stays blank until the
+        # plugin is added here.
+        plugins.enabled = [
+          "8bury/mini-docker"
+          "rylos/tailnet"
+        ];
+
+        # Per-widget settings, keyed by the same widget ids the bar layout
+        # above lists. All display-independent.
+        widget = {
+          # Cap the title before it starts scrolling, rather than letting a
+          # long title push the bar's other groups around.
+          active_window = {
+            min_length = 60;
+            title_scroll = "always";
+          };
+
+          # The two generic plugin slots. `type` is what binds a slot to a
+          # plugin's exported widget (`<author>/<name>:<widget>`); without
+          # it the slot is empty, which is why these blocks exist at all
+          # rather than the bar list being enough.
+          bar = {
+            type = "rylos/tailnet:bar";
+            show_count = false;
+          };
+          bar_2.type = "icefish/phone-connect:bar";
+
+          "mini-docker" = {
+            type = "8bury/mini-docker:mini-docker";
+            show_count = false;
+
+            # Scrolling over the widget switches containers, which is easy
+            # to do by accident while scrolling past the bar.
+            enable_scroll = false;
+          };
+
+          # Icons only, no text labels — the bar is dense enough with the
+          # widget set above.
+          network.show_label = false;
+          sysmon.show_value = false;
+
+          # Only show the mic/camera/screen-share indicators when something
+          # is actually using that device.
+          privacy.hide_inactive = true;
+
+          # Show only the focused workspace's windows. On the desktop this
+          # is what keeps the taskbar from listing every window across both
+          # monitors' workspaces at once.
+          taskbar.only_active_workspace = true;
+        };
 
         theme = {
           mode = "dark";
@@ -366,6 +627,19 @@ in
               "zen-browser"
               "feishin"
               "obsidian"
+
+              # The three gaming targets, added through Noctalia's own
+              # template picker on the desktop and folded in here so they
+              # aren't lost with that host's runtime state. Deliberately not
+              # gated on features.gaming, unlike home/heroic.nix and
+              # home/prismlauncher.nix: a community template only writes a
+              # theme file into the app's config directory, so on a host
+              # where the app is absent it produces an unread file rather
+              # than an error, and gating would mean this list differed per
+              # host for no behavioural gain.
+              "heroiclauncher"
+              "prismlauncher"
+              "steam"
             ];
 
             # Custom templates, written and checked into this repo
@@ -459,7 +733,7 @@ in
         # Consequence worth knowing: changing this line does *not* reach an
         # already-provisioned host. Clearing that host's sidecar wallpaper
         # keys is the operator step — see docs/decisions.md.
-        wallpaper.default.path = "/home/${vars.user.name}/.dotfiles/wallpapers/4k-black-hole-minimalistic-wallpaper.png";
+        wallpaper.default.path = "/home/${vars.user.name}/.dotfiles/wallpapers/877223.jpg";
 
         # Deliberately a plain string, NOT a Nix path (e.g. ../wallpapers) —
         # a path literal gets copied into the Nix store as its own
