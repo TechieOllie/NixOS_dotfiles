@@ -2912,3 +2912,61 @@ coming straight from cache.
 `Code Safe Storage` item appears in the login keyring once VS Code stores
 something. That item's presence is the unambiguous test — the notification
 can be dismissed, the keyring item can't be faked.
+
+
+### `extraCompatPackages` never reaches Heroic
+
+Reported live on the desktop (2026-08-20): Heroic's per-game compatibility
+dropdown offered no `proton-cachyos`, despite `modules/programs/steam.nix`
+declaring it. The two facts that explain it:
+
+`programs.steam.extraCompatPackages` is not a system-wide installation. It
+exports `STEAM_EXTRA_COMPAT_TOOLS_PATHS` into Steam's *own* FHS environment
+and nothing else — no directory is created anywhere on disk, and indeed
+`~/.steam/root/compatibilitytools.d` did not exist at all on a host that had
+already run Steam. Any other launcher is on its own.
+
+Heroic's search paths were read out of the shipped bundle rather than guessed
+at (`…-heroic-2.22.0-fhsenv-rootfs/opt/heroic/resources/app.asar`, which
+greps fine as plain text). It collects candidate directories:
+
+```
+~/.config/heroic/tools/proton/
+<steam lib>/steamapps/common          (only with showValveProton)
+<steam lib>/root/compatibilitytools.d
+<steam lib>/compatibilitytools.d
+```
+
+then, for each entry `b` in each, accepts it if `<dir>/<b>/proton` exists,
+naming the tool after the directory. So a Proton build is discovered by
+directory layout, not by any registry — which makes it something a symlink
+can satisfy:
+
+```nix
+home.file.".config/heroic/tools/proton/proton-cachyos".source =
+  "${pkgs.proton-cachyos}/bin";
+```
+
+`$out/bin`, not `$out`: this derivation puts the whole tool tree (`proton`,
+`toolmanifest.vdf`, `files/`, `protonfixes/`) under `bin`. That is the layout
+Steam expects of a *search path* entry, not of a tool — nixpkgs' steam module
+builds `STEAM_EXTRA_COMPAT_TOOLS_PATHS` with
+`lib.makeSearchPathOutput "steamcompattool" ""`, and this package has only an
+`out` output, so Steam is handed `$out` and finds the tool one level down in
+`bin/` (it takes the name from that directory's `compatibilitytool.vdf`,
+which says `Proton-CachyOS`; Heroic, by contrast, names it after the
+directory, hence the symlink's name).
+
+Choosing Heroic's own tools directory over `~/.steam/root/compatibilitytools.d`
+was deliberate. The latter would have to be created for Steam, which has no
+reason to want it — Steam already has the env var — and putting a
+Nix-managed symlink inside a directory Steam creates and manages on demand is
+the app-owned-mutable-state trap. Heroic's tools directory is only ever
+written by Heroic's downloader, one directory per build, so an extra entry
+alongside is exactly what the app expects. The host already had a
+hand-downloaded `GE-Proton-latest` sitting there — the very thing this repo
+avoids for Steam by declining protonup-qt — and it is left untouched.
+
+**Verified live** (2026-08-20, on the desktop after `nixos-rebuild switch`):
+`proton-cachyos` appears in Heroic's dropdown. Still not verified: that a
+game actually *runs* under it, from either launcher.
