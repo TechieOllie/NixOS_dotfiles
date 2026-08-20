@@ -137,6 +137,43 @@
       # formatter or a linter would be undone the next time a host is
       # regenerated. (statix reads the same exclusion from statix.toml.)
       handWrittenNix = "$(find . -name '*.nix' -not -name 'hardware-configuration.nix')";
+
+      # What CI actually realizes for a host. Normally that is the host's
+      # own system closure, unmodified — the point of the build checks
+      # below. A host importing profiles/gaming.nix is the one exception:
+      # its closure pulls in Millennium, whose Bun dependency derivation
+      # runs a *build* inside a fixed-output derivation, which is the one
+      # thing an FOD cannot promise. Its hash re-rolls on every runner (a
+      # different wrong hash each time, so no re-pin can ever hold), and
+      # nothing repo-side fixes that — see the standing gotcha in CLAUDE.md
+      # and Phase 7 in docs/decisions.md.
+      #
+      # So the check builds that host with stock Steam substituted for the
+      # Millennium-patched one. Every other path in the closure — the niri
+      # stack, proton-cachyos, the controller modules, Home Manager — is
+      # still built for real; only the single package upstream cannot make
+      # reproducible is swapped out. The unsubstituted config is still
+      # *evaluated*, by `nix flake check`'s own pass over
+      # nixosConfigurations, so a change that breaks Millennium's wiring at
+      # eval time still fails here. Drop this the day upstream's FOD stops
+      # being a build (nixpkgs#382086 would also make it moot).
+      ciClosure =
+        host:
+        (
+          if host.config.features.gaming then
+            host.extendModules {
+              modules = [
+                (
+                  { lib, pkgs, ... }:
+                  {
+                    programs.steam.package = lib.mkForce pkgs.steam;
+                  }
+                )
+              ];
+            }
+          else
+            host
+        ).config.system.build.toplevel;
     in
     {
       nixosConfigurations.the-entertaining-nios-vm = mkHost {
@@ -211,7 +248,7 @@
       # listed by hand, so a new host can't be added without also being
       # checked.
       // lib.mapAttrs' (
-        name: host: lib.nameValuePair "build-${name}" host.config.system.build.toplevel
+        name: host: lib.nameValuePair "build-${name}" (ciClosure host)
       ) self.nixosConfigurations;
     };
 }
