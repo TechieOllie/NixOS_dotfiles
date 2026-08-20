@@ -2970,3 +2970,32 @@ avoids for Steam by declining protonup-qt — and it is left untouched.
 **Verified live** (2026-08-20, on the desktop after `nixos-rebuild switch`):
 `proton-cachyos` appears in Heroic's dropdown. Still not verified: that a
 game actually *runs* under it, from either launcher.
+
+
+### Phase 7 closes: a game under `proton-cachyos`, and a wired pad on `xone`
+
+Later the same day (2026-08-20), on the desktop, the two remaining eval-only
+claims in Phase 7 were exercised for real:
+
+- **Proton.** Sifu installed and played through Heroic. Heroic's `config.json`
+  default *and* that game's `GamesConfig/*.json` both name
+  `~/.config/heroic/tools/proton/proton-cachyos/proton` with
+  `"type": "proton"`, so the build that ran is the symlink from the section
+  above, not the hand-downloaded `GE-Proton-latest` sitting beside it. The
+  prefix under `~/Games/Heroic/Prefixes/Sifu` is the evidence it got as far as
+  actually running.
+- **Controller.** A wired Xbox pad enumerates as `Microsoft Xbox Controller`
+  on `js1`/`event23`, with `xone_wired` and `xone_gip_gamepad` bound (both via
+  `xone_gip`). So `modules/hardware/controllers.nix` does its job over USB
+  with nothing else declared — no udev rule of this repo's, no user
+  configuration.
+
+What is still untested is `xpadneo`, the *other* module that file enables:
+it is loaded, but with no device bound, because the pad was connected by
+cable. The Bluetooth path is the only part of the gaming stack that has never
+had hardware behind it.
+
+This retires "Phase 7 is eval-only" from `CLAUDE.md`. Worth keeping in view
+that the stack needed two live fixes before it worked at all — XWayland for
+Steam, and the Heroic Proton symlink — neither of which eval could have
+found.
