@@ -80,9 +80,46 @@ in
       # below, per upstream's own recommendation for this combination.
       systemd.enable = true;
 
+      # Everything below renders to ~/.config/noctalia/config.toml, which is
+      # the *base* layer only. Noctalia's settings pages never write here —
+      # every toggle flipped in the UI goes to ~/.local/state/noctalia/
+      # settings.toml (ConfigService::m_overridesPath) and is deep-merged on
+      # top of this file at load, arrays replaced wholesale, with no warning
+      # about the collision. Nothing prunes an override once it matches the
+      # base again (there is no compare-against-base path in
+      # config_overrides.cpp), so a value set in the UI once shadows this file
+      # forever on that host.
+      #
+      # Practical consequence: adding a key here does not change an
+      # already-provisioned host if that host's sidecar names the same key. The
+      # VM's sidecar was audited when the settings below were written and
+      # carries exactly four shadowing keys — shell.telemetry_enabled,
+      # theme.templates.builtin_ids (a verbatim duplicate of the list below,
+      # so inert but still shadowing), lockscreen_widgets.*, and the
+      # wallpaper.default/last/monitors trio. Deleting those sections from the
+      # sidecar is a one-time operator step per host; see docs/decisions.md.
+      #
+      # Deliberately not automated by an activation script that rewrites the
+      # sidecar: that file is also where Noctalia stores genuinely
+      # runtime-learned state, and a rebuild that silently reverted a choice
+      # made in the UI would be a worse surprise than a stale key.
       settings = {
         shell = {
           launch_apps_as_systemd_services = true;
+
+          # Anonymous startup ping to Noctalia's own endpoint. Upstream
+          # defaults it to false (config_types.h: `bool telemetryEnabled =
+          # false`); Noctalia's *setup wizard* asks about it on first run and
+          # writes the answer straight into the runtime sidecar
+          # (setup_wizard_panel.cpp calls setOverride({"shell",
+          # "telemetry_enabled"})), which is how the VM ended up with `true`
+          # in its sidecar while this file said nothing at all.
+          #
+          # Declared explicitly, at the operator's choice, so a click-through
+          # on some future host's wizard isn't the thing that decides it. A
+          # sidecar entry still wins over this value — see the sidecar note
+          # above the settings block.
+          telemetry_enabled = false;
 
           # Typography and shape, the two axes this config never declared at
           # all before. font_family defaulted to the literal string
@@ -191,6 +228,21 @@ in
           # this change answers.
           inherit (style) radius;
         };
+
+        # The lockscreen's widget canvas. Noctalia's lockscreen editor writes
+        # this whole block into the runtime sidecar the moment it is opened —
+        # the VM's copy carries `enabled = false` plus a stray
+        # `lockscreen-login-box@Virtual-1` placement, and nothing else in the
+        # repo said anything about it. Only the switch is portable: widget ids
+        # embed a connector name and cx/cy are absolute pixels on that
+        # output, so replaying the VM's placement onto the desktop's 2560x1440
+        # DP-1 would put the box somewhere arbitrary — the same reason
+        # connector names are host-level everywhere else here.
+        #
+        # `false` is upstream's default and what the VM actually runs; stated
+        # so every host gets Noctalia's built-in lockscreen rather than
+        # whichever layout a host happened to have its editor opened on.
+        lockscreen_widgets.enabled = false;
 
         theme = {
           mode = "dark";
@@ -391,15 +443,24 @@ in
           };
         };
 
-        # Deliberately no default.path/enabled here — confirmed live that
-        # Noctalia only ever reads the *active* wallpaper from its own
-        # ~/.local/state/noctalia/settings.toml (set via `noctalia msg
-        # wallpaper-set` or its own UI), never from config.toml. Setting a
-        # default here would either do nothing, or (via an autostart
-        # workaround) permanently re-pin the wallpaper on every login,
-        # overwriting any choice made through Noctalia's own UI. Instead,
-        # just point the picker at this repo's wallpapers/ directory.
+        # The wallpaper every host starts on. This corrects an earlier note
+        # here that said `default.path` was read by nothing — v5 documents it
+        # (example.toml: "optional initial/default wallpaper path") and
+        # Noctalia's own settings UI writes the same key. What that earlier
+        # note got right is the *precedence*: picking a wallpaper through the
+        # UI writes a per-output `[wallpaper.monitors.<connector>]` entry into
+        # the sidecar, and wallpaper.cpp is explicit that "per-output
+        # overrides win over default in getWallpaperPath()". So this value is
+        # the initial wallpaper on a host that has never picked one, and a
+        # host that has picked one keeps its choice — which is the behaviour
+        # wanted in both directions, and is why declaring it can't "re-pin on
+        # every login" the way the old note feared.
         #
+        # Consequence worth knowing: changing this line does *not* reach an
+        # already-provisioned host. Clearing that host's sidecar wallpaper
+        # keys is the operator step — see docs/decisions.md.
+        wallpaper.default.path = "/home/${vars.user.name}/.dotfiles/wallpapers/4k-black-hole-minimalistic-wallpaper.png";
+
         # Deliberately a plain string, NOT a Nix path (e.g. ../wallpapers) —
         # a path literal gets copied into the Nix store as its own
         # derivation output the moment it's stringified, doubling storage

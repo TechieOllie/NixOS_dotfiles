@@ -2462,3 +2462,121 @@ them. So the mirror-onto-every-output behaviour is noctalia-greeter's alone,
 not something inherent to Wayland compositors on amdgpu, and `output.name`
 is needed only for the greeter — niri's own `display.kdl` needs no
 corresponding exclusion.
+
+## Auditing the VM's Noctalia sidecar into declarative config
+
+The VM had been configured through Noctalia's own settings pages for some
+months, and nothing in this repo recorded what had been changed that way. The
+question was what of it belonged in `home/noctalia.nix` so every host would
+follow it.
+
+### What the sidecar actually held
+
+`~/.local/state/noctalia/settings.toml` on `the-entertaining-nios-vm`, read
+in full, contained five things beyond `config_version`:
+
+| key | value | verdict |
+| --- | --- | --- |
+| `shell.telemetry_enabled` | `true` | declared, as `false` — see below |
+| `theme.templates.builtin_ids` | same five ids as Nix, reordered | already declarative; the sidecar copy is a redundant shadow |
+| `lockscreen_widgets.*` | `enabled = false` + a `lockscreen-login-box@Virtual-1` placement | only the switch is portable |
+| `wallpaper.default` / `.last` / `.monitors.Virtual-1` | the black-hole wallpaper | `default.path` declared |
+| `config_version` | `12` | Noctalia's own migration marker, not a setting |
+
+That is the whole delta. The settings pages had touched far less than the
+size of the file suggested — most of its bulk is one lockscreen widget's
+geometry.
+
+### Telemetry was a setup-wizard click, not a decision
+
+`telemetry_enabled` defaults to `false` upstream (`config_types.h`), and the
+*setup wizard* is what put `true` in the VM's sidecar: `setup_wizard_panel.cpp`
+calls `setOverride({"shell", "telemetry_enabled"})` with whatever the toggle
+was left on. Propagating the VM's value verbatim would have switched an
+anonymous startup ping on for the desktop and laptop on the strength of a
+first-run click on a disposable machine. The operator chose `false`, and it is
+now stated explicitly rather than left to the next host's wizard.
+
+### Correction: `wallpaper.default.path` is not inert
+
+`home/noctalia.nix` carried a note saying Noctalia reads the active wallpaper
+only from its own state and never from `config.toml`, and that declaring a
+default would therefore do nothing. That is half right, and the half it gets
+wrong matters.
+
+The key is real and documented — `example.toml` describes
+`[wallpaper.default] path` as the "optional initial/default wallpaper path",
+and Noctalia's own settings UI writes it. What the old note correctly
+identified is the *precedence*. `wallpaper.cpp` says so in a comment on
+`applyResolvedWallpaper`:
+
+```
+// Match wallpaper panel "All monitors": per-output overrides win over default in
+// getWallpaperPath(), so set every connected output plus default or the image never updates.
+```
+
+Picking a wallpaper in the UI writes `[wallpaper.monitors.<connector>]`, and
+that beats `default`. So the declared value is the wallpaper a host that has
+never picked one comes up on, and a host that has picked one keeps its
+choice. Both halves are wanted, and the feared failure mode — re-pinning the
+wallpaper on every login and overwriting the user's choice — cannot happen,
+because Nix writes only the base layer and never touches the sidecar.
+
+### The lockscreen widget placement is not portable
+
+The VM's widget id is `lockscreen-login-box@Virtual-1` and its position is
+`cx = 640.0, cy = 618.0` — absolute pixels on that machine's single output.
+Widget ids embed a connector name, which is machine cabling, the same reason
+the greeter's `output.name` pin is host-level rather than in a module. Only
+`lockscreen_widgets.enabled = false` was taken; the placement was left behind.
+
+### The sidecar shadows the base config permanently
+
+Worth stating plainly, because it bounds what this change can achieve.
+Noctalia deep-merges the sidecar over `config.toml` at load, and there is no
+compare-against-base pruning anywhere in `config_overrides.cpp` — the only
+erase path is `eraseOverridePath`, called when a setting is explicitly reset.
+So a value set once in the UI shadows this repo forever on that host, even
+after it is declared here and even if the declared value is identical.
+
+Making the VM and the desktop actually follow the declared values is a
+one-time manual step per host: delete the corresponding sections from
+`~/.local/state/noctalia/settings.toml` and restart the shell.
+
+```bash
+# per host, after a switch that carries the new config.toml
+systemctl --user stop noctalia
+$EDITOR ~/.local/state/noctalia/settings.toml   # drop shell.telemetry_enabled,
+                                                # theme.templates.builtin_ids,
+                                                # lockscreen_widgets.*, wallpaper.*
+systemctl --user start noctalia
+```
+
+An activation script that pruned those keys automatically was considered and
+rejected. That file is also where Noctalia keeps genuinely runtime-learned
+state — the active wallpaper, clipboard history position, widget placements —
+and a `nixos-rebuild switch` that silently reverted a choice made in the UI
+would be a worse surprise than a stale key that can be found by reading one
+file. It is the same reasoning that keeps the wallpaper *selection* out of
+Nix while the wallpaper *default* goes in.
+
+### Verification
+
+`driver.sh check` passes for all three hosts, and the generated
+`config.toml` validates clean under Noctalia's own build-time validator (the
+`noctalia-config` derivation, which the home module runs because
+`validateConfig` defaults to `true`).
+
+That validator needed a canary before it could be trusted, per this repo's
+own rule. It does **not** fail the build on a bad key — a junk
+`canary_junk_section.nope` still produced `✓ Config is valid`, exit 0, with
+the problem reported only as `WARN canary_junk_section: unknown section` in
+the build log. So it is a real check, but reading its `nix log` output is the
+part that matters; a green build alone says nothing about whether a key was
+recognised. With the canary removed, the log is warning-free, which is what
+confirms `lockscreen_widgets.enabled` and `wallpaper.default.path` are
+spelled the way Noctalia expects.
+
+Not yet verified live: no host has been switched onto this config, and no
+sidecar has been cleaned. The standing rule that eval passing is not
+verification applies here as everywhere.
