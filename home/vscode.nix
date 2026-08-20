@@ -32,7 +32,7 @@ lib.mkIf osConfig.features.niri {
   # A package override rather than a config file, because there is nowhere to
   # put a config file. ~/.config/code-flags.conf was tried first, on the
   # strength of nixpkgs' `code` wrapper sourcing it — but that hook only
-  # exists in newer nixpkgs. The wrapper at this pin (VS Code 1.130.0) is a
+  # exists in newer nixpkgs. The wrapper at this pin (VS Code 1.133.0) is a
   # plain makeWrapper script ending in `exec .code-wrapped ... "$@"` and
   # reads no flags file at all, so the file sat on disk read by nothing while
   # VS Code went on warning. Re-check whether that hook has landed before
