@@ -2999,3 +2999,164 @@ This retires "Phase 7 is eval-only" from `CLAUDE.md`. Worth keeping in view
 that the stack needed two live fixes before it worked at all — XWayland for
 Steam, and the Heroic Proton symlink — neither of which eval could have
 found.
+
+
+## Z407 volume: two gain stages, because the kernel disabled the hardware one
+
+The Logitech Z407 speakers on the desktop stepped volume unevenly, the puck and
+the keyboard's volume keys disagreed with each other, and the whole scale sat
+far quieter than the same speakers on Windows — "20% was more than loud enough
+there, here I can barely hear anything at 40%."
+
+This took two wrong diagnoses before the hardware was actually asked. Both are
+recorded because the reasoning that produced them was plausible and will be
+tempting again.
+
+### Wrong answer 1, and the question that broke it
+
+First diagnosis: two chained gain stages — the puck drives the speaker's own
+amplifier *and* sends HID volume keys the host acts on. A hwdb entry was written
+to stop the host half.
+
+Then: *why do they work on Windows?* A puck wired straight to the speaker's
+amplifier would misbehave under every OS, so the second stage looked impossible
+and the hwdb entry was reverted.
+
+### Wrong answer 2, and the test that broke it
+
+Second diagnosis: a single stage, made uneven by arithmetic. That part is real
+and is documented below, but it was treated as the *whole* explanation, and the
+Windows argument above was treated as proof that no second stage existed.
+
+The mistake was reasoning from Windows' behaviour to the device's wiring instead
+of measuring the device. The measurement is easy and should have come first:
+comment out the two volume binds in `keybinds.kdl` (niri auto-reloads), freeze
+the host volume, and turn the puck. If loudness changes, the host is not
+involved and the puck reaches the amplifier directly.
+
+It changes. **The second stage is real.** A capture of `/dev/input/event8`
+during the same test also shows exactly one press/release per detent, so it is
+not key repeat and not a double-firing device:
+
+```
+  KEY VOLUMEDOWN press
+  KEY VOLUMEDOWN release      (host volume held at 0.50 throughout)
+```
+
+### Why Windows does not have the problem
+
+The Z407 advertises a real UAC Feature Unit, and the kernel read its range
+successfully: min -13824, max -1024, res 256 in 1/256 dB units — **-54.0 dB to
+-4.0 dB in 50 steps of exactly 1.00 dB.**
+
+Windows drives that unit. So Windows' slider and the puck are two views of the
+*same* gain element: the puck moves the amplifier, the Feature Unit reports it,
+the slider tracks it. One stage, and it can never desync.
+
+Linux cannot do this, because kernel 7.1 refuses the control at probe:
+
+```
+usb 3-2.3: 9:1: sticky mixer values (-13824/-1024/256 => -1024), disabling
+```
+
+`check_sticky_volume_control()` in `sound/usb/mixer.c` writes the control's min
+and max, reads back, and if neither write moves the readback it decides the
+control does nothing and declines to register it. The Z407 keeps only
+`PCM Playback Switch`, the mute half of that same unit; the Yeti Nano on the
+same bus keeps both halves, which is the comparison that makes it obvious.
+
+There is no override — the call site is unguarded, `ignore_ctl_error` does not
+reach it, and no `QUIRK_FLAG_*` in `sound/usb/usbaudio.h` skips it. It is also
+new: `grep -c sticky sound/usb/mixer.c` gives 0 on 6.12.103 and 16 on the
+running 7.1.8-cachyos.
+
+So the host loses its one route to the amplifier and falls back to attenuating
+in software — which *stacks on top of* the amplifier instead of being it. That
+is the second stage, and the kernel's heuristic is what creates it. The device
+may well be sticky exactly as the kernel claims; the puck owning the amplifier
+directly is entirely consistent with the Feature Unit being inert.
+
+### The cubic scale, and why "40% here" is not "40% on Windows"
+
+PipeWire's volume is cubic — the number `wpctl` prints is the cube root of the
+gain. Verified: `wpctl` showed 0.59 while `pw-dump` showed
+`channelVolumes: [ 0.205375, ... ]`, and 0.59³ = 0.205379.
+
+If Windows' slider is roughly linear in amplitude, that is about a 10 dB gap:
+
+```
+  Windows  20%   ->  amplitude 0.200  = -14.0 dB
+  here     40%   ->  amplitude 0.064  = -23.9 dB
+  here     58.5% ->  amplitude 0.200  = -14.0 dB   (the matching position)
+```
+
+The same curve means a flat percentage step is not a constant loudness step.
+Noctalia steps 5% (measured: `volume-up` moved 0.49 to 0.54), which is 1.41 dB
+at 0.90 and 10.57 dB at 0.10.
+
+### The fix
+
+`services.udev.extraHwdb` in the desktop's `default.nix` remaps the puck's three
+volume usages to `reserved`, matched on this speaker's vendor:product so a
+keyboard is unaffected. The puck then drives the amplifier alone — one stage,
+uniform 1 dB steps, which is the Windows behaviour.
+
+A hwdb remap rather than `LIBINPUT_IGNORE_DEVICE` because the same HID interface
+carries play/pause/next/prev. The codes are HID consumer-page usages
+(`c00e9`/`c00ea`/`c00e2`), not evdev keycodes.
+
+With the amplifier as the volume control, **the sink belongs at 100%** —
+anything less is a software stage stacked under the hardware one, and it also
+throws away bit depth on a device that only accepts S16_LE. Raise it with the
+puck turned down first: at 40% the software stage is -24 dB, so going to 100% is
+a 24 dB jump.
+
+### Rejected: a dB-uniform stepping wrapper on the keyboard keys
+
+A `volume-step up|down [dB]` wrapper was written, bound to the volume keys, and
+verified on hardware (+1.000 dB at -18.6 dB, +1.001 dB at -55.2 dB, +3.000 dB
+when asked for 3, and down-then-up returning to the exact starting value). Its
+one non-obvious detail is worth keeping even though the code is gone: it read
+via `pw-dump`, not `wpctl get-volume`, because wpctl rounds its *display* to two
+decimals, and below ~0.26 on the cubic scale a 1 dB step is smaller than 0.01 —
+a two-decimal read quantizes the step away and the volume sticks near the
+bottom.
+
+It was removed at the operator's request once the hwdb rule landed. With the
+amplifier as the volume control and the sink parked at 100%, the keyboard keys
+are a software trim that should not normally be used at all, so a second,
+better-behaved way to drive that trim is complexity earning nothing. The
+keyboard keys are back on plain `noctalia msg volume-up`/`volume-down`.
+
+### The accepted trade-off, and the way out of it
+
+With no reachable hardware control, the host cannot know where the amplifier is,
+so Noctalia's OSD no longer follows the puck. That is how any speaker with a
+physical knob behaves, and it is the price of the kernel's decision.
+
+The realistic escape is analog rather than a kernel patch. The board's rear
+line-out is a Realtek ALCS1200A whose `Master` control is
+`min=0 max=87, dBscale-min=-65.25dB, step=0.75dB` — 88 uniform hardware steps
+with a dB TLV, which PipeWire will delegate to. Over the jack, with USB
+unplugged, the HID device does not exist, so the two-stage problem is
+structurally impossible, the software attenuation goes away, *and* the OSD
+tracks a real hardware control again. The cost is the PC's analog path (noise
+floor, possible ground-loop hum) in place of the speaker's own DAC. The analog
+profiles currently read `available: no` purely because nothing is plugged in.
+
+Do not plug both: with USB connected for the media keys, the puck drives two
+stages again and the hwdb rule is still required.
+
+A kernel patch to re-enable the Feature Unit was considered and rejected —
+`boot.kernelPatches` forces a from-source CachyOS build, losing the binary cache
+that host's own config exists to preserve, at every kernel bump, and it would
+only help if the unit is not genuinely inert, which is unknown. Revisit if
+upstream adds a quirk for 046d:0a4c.
+
+### The lesson worth keeping
+
+Two diagnoses were argued from how the device behaves on another OS. The
+question that settled it took about a minute: unbind the keys, freeze the host,
+turn the knob. When a peripheral's *wiring* is in question, measure the
+peripheral — another OS's behaviour is evidence about that OS's driver stack,
+not about what is connected to what.

@@ -51,6 +51,52 @@
   # from being a from-source kernel build.
   boot.kernelPackages = pkgs.linuxPackages_cachyos;
 
+  # Stop the Logitech Z407's control puck from also driving the host's volume.
+  #
+  # The speaker enumerates a HID consumer-control keyboard (046d:0a4c, event8)
+  # next to its audio interface. Turning the puck moves the speaker's own
+  # amplifier *and* sends KEY_VOLUMEUP/DOWN, which keybinds.kdl acts on — two
+  # independent gain stages for one gesture, while the keyboard's volume keys
+  # move only one. That mismatch is the symptom: dial and keyboard disagree.
+  #
+  # Verified on hardware, not inferred. With those two binds commented out so
+  # the host volume could not move, turning the puck still changed loudness —
+  # which is only possible if the puck reaches the amplifier directly. A
+  # capture of event8 during the same test shows one clean press/release per
+  # detent, so this is not key repeat or a double-firing device.
+  #
+  # Windows does not have this problem because it drives the speaker's UAC
+  # Feature Unit, so its slider and the puck converge on the *same* gain
+  # element. Linux cannot: kernel 7.1's check_sticky_volume_control() disables
+  # that unit at probe (`sticky mixer values ... disabling`), leaving the host
+  # with software attenuation that stacks on top of the amplifier instead of
+  # being it. See docs/decisions.md.
+  #
+  # A hwdb remap of the three volume usages rather than LIBINPUT_IGNORE_DEVICE
+  # on the whole node: the same HID interface also carries play/pause/next/prev
+  # (confirmed present in event8's keybits), and ignoring the device would take
+  # those with it. The codes are HID consumer-page usages — 0xE9 increment,
+  # 0xEA decrement, 0xE2 mute — not evdev keycodes. Mapping them to `reserved`
+  # clears the keybit, so nothing is emitted for niri to act on. It is matched
+  # on this speaker's own vendor:product, so a keyboard's volume keys are
+  # untouched and still reach volume-step.
+  #
+  # The trade-off, accepted: with no reachable hardware control, the host
+  # cannot know the amplifier's position, so Noctalia's OSD no longer tracks
+  # the puck. That is how any speaker with a physical knob behaves.
+  #
+  # Host-level for the same reason as the kernel and lact below: it describes a
+  # peripheral plugged into this machine, not a capability another host would
+  # opt into. hwdb is read at device enumeration, so a switch alone won't apply
+  # it to an already-connected speaker — replug it, or run
+  # `sudo udevadm trigger --subsystem-match=input --action=change`.
+  services.udev.extraHwdb = ''
+    evdev:input:b0003v046Dp0A4C*
+      KEYBOARD_KEY_c00e9=reserved
+      KEYBOARD_KEY_c00ea=reserved
+      KEYBOARD_KEY_c00e2=reserved
+  '';
+
   # Fan curves, clock and power limits for the Radeon RX 6600. amdgpu
   # itself needs nothing declared — the kernel driver and Mesa's RADV are
   # already the default — so this is the only GPU-specific config the
