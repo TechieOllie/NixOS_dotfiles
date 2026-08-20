@@ -2722,5 +2722,21 @@ preferences, and in three of the five carrying a real credential.
 (they are the ones `--no-build` skips). `nix build --dry-run` on the desktop
 closure names `idea-2026.2.0.1`, `claude-code-2.1.220`, `freecad-1.1.1`,
 `prismlauncher-11.0.3` and `kdeconnect.service`; the same dry-run on the VM
-and the laptop names none of them. Nothing has been launched on hardware —
-eval-only, like the rest of the desktop's application layer.
+and the laptop names none of them.
+
+Then confirmed live: the operator merged this to `main`, pulled it into the
+desktop's own `~/.dotfiles` clone and switched, and reported all five
+launching on the machine. That makes these the first pieces of the desktop's
+application layer verified on real hardware rather than by eval — the rest
+of Phase 7's gaming stack still has not been exercised there.
+
+One incidental finding from trying to drive that switch remotely: the
+desktop is not on the tailnet. `features.tailscale` installs and starts the
+daemon, but `tailscale up` is a one-time interactive login that nobody has
+run since the reinstall, so the node simply does not exist in
+`tailscale status` — the only desktop entry there is the old CachyOS
+`caos-desktop`. Worth knowing before assuming the desktop is reachable for
+anything else, Moonshine included: that module deliberately sets
+`openFirewall = false` because `modules/services/tailscale.nix` trusts
+`tailscale0`, which means streaming cannot work until the same login
+happens.
