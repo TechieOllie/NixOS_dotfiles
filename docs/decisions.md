@@ -3160,3 +3160,78 @@ question that settled it took about a minute: unbind the keys, freeze the host,
 turn the knob. When a peripheral's *wiring* is in question, measure the
 peripheral — another OS's behaviour is evidence about that OS's driver stack,
 not about what is connected to what.
+
+## "Zen crashes on start" was a window-geometry fight, not a crash
+
+Reported twice as Zen crashing on launch. It never crashed. The symptom, once
+described precisely, was: the window opens correctly maximized, flashes, and
+settles at half the screen width.
+
+### What it actually was
+
+Three things had to line up:
+
+1. `home/niri/cfg/rules.kdl`'s Zen window-rule set `open-maximized-to-edges
+   true`. That is the correctly-maximized window visible for the first frame.
+2. Zen then restores its own remembered window state from
+   `~/.config/zen/<profile>/xulstore.json`, which held `"main-window": {
+   "sizemode": "normal", "width": "1256", "height": "1374" }`. `sizemode:
+   "normal"` makes Gecko send `xdg_toplevel.unset_maximized`.
+3. niri honours that and drops the window to an ordinary tiled column at the
+   *default* column width. `home/niri/cfg/layout.kdl` sets `gaps 16` and
+   `preset-column-widths`, but never `default-column-width` — so it fell back
+   to niri's built-in `proportion 0.5`.
+
+The flash is step 2 → step 3.
+
+The arithmetic is what confirmed it rather than merely fitting it. DP-1 is 2560
+wide with `gaps 16`, so a half-proportion column is `(2560 − 3×16) / 2 = 1256`
+— byte-for-byte the width already sitting in `xulstore.json`. Zen had recorded
+the half-width niri gave it and was asking for it back on every launch.
+
+That is also why it recurred, and why it will recur for any app with the same
+shape: Zen rewrites `xulstore.json` with whatever geometry the window had when
+it closed, so being wrong once makes it wrong permanently. Clearing the
+`main-window` entry by hand fixes exactly one launch.
+
+### The fix, and why it is the better of the two
+
+The operator's fix was to drop `open-maximized-to-edges true` from the Zen rule
+entirely and add `default-column-width { proportion 1.0; }` in its place.
+
+The alternative on the table was to keep the maximize and *also* set
+`proportion 1.0`, so that the un-maximize landed on full width. That removes
+the half-sizing but not the flash, because the state transition still happens.
+Removing the maximize outright means there is no maximized state for Zen to
+un-maximize out of, so there is no transition at all.
+
+It also resolved a pre-existing conditional in that block's own comments. The
+`draw-border-with-background false` line had been carrying a note saying it was
+"already correct the moment `open-maximized-to-edges` is ever removed"; a
+full-width *column* still respects `gaps 16`, unlike maximized-to-edges, so the
+focus ring now has real gap space to draw into and the empty-transparent-gap
+artifact is gone. Nothing in the file uses `open-maximized-to-edges` any more,
+which made a stale `open-maximized-to-edges false` in the Picture-in-Picture
+rule dead code (it existed only to cancel the base rule); it was removed.
+
+### What the diagnosis cost, and the lesson
+
+Roughly the first half of the investigation was spent on the wrong question,
+because "crash" was taken at face value. Ruling that out was worth doing and
+was quick — `coredumpctl list | grep zen` was empty for the whole boot, there
+were no minidumps and no `Crash Reports/` in either profile, and no OOM kill in
+the journal — but it pointed nowhere, and neither did the two most
+suspicious-looking numbers in the profile. `toolkit.startup.recent_crashes = 1`
+turned out to be self-inflicted: a test launch had been killed by a 25-second
+`timeout`, which lands inside Gecko's 30-second startup-crash window, so Zen
+scored the investigation's own probe as a crash. A 28 MB `sessionstore.jsonlz4`
+looked like a plausible cause of a slow, crash-like start and was not related
+at all.
+
+The question that actually solved it — "what does it look like on screen?" —
+took one sentence to answer and should have been asked first. A user-supplied
+noun for a symptom ("crash") is a hypothesis, not an observation. This is the
+same lesson the Z407 investigation above ends on, arrived at from the opposite
+direction: there, three wrong answers came from reasoning about a device
+instead of measuring it; here, one wrong direction came from reasoning about a
+symptom instead of looking at it.
