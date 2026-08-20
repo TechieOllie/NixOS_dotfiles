@@ -18,6 +18,50 @@ Manual, one-time, not run by Nix or `nixos-anywhere` — automating a git
 clone of the same repo that's building the host would be circular. Do it
 once during or right after bootstrapping.
 
+### That SSH URL does not work yet on a freshly bootstrapped host
+
+The command above assumes the host's key is already registered on GitHub,
+and on a brand-new host it is not. `secrets.nix` provisions the private half
+(`~/.ssh/id_ed25519` → `/run/secrets/ssh-private-key`) during the install,
+but putting the *public* half on the GitHub account is a manual, GitHub-side
+step that nothing in this repo performs. Until it's done, the clone fails
+with:
+
+```
+git@github.com: Permission denied (publickey).
+```
+
+which is easy to misread as a broken sops deployment. It isn't — check
+`ssh -T git@github.com` before suspecting the key itself.
+
+Register the key, then clone as documented above:
+
+```bash
+ssh-keygen -y -f ~/.ssh/id_ed25519    # on the host; paste into GitHub → Settings → SSH keys
+```
+
+Note `gh ssh-key add` needs the `admin:public_key` scope, which a default
+`gh auth login` token does not carry — so this is usually a browser step,
+not a CLI one.
+
+If you'd rather have the host usable before dealing with GitHub, the repo is
+public, so HTTPS clones and pulls work with no credentials at all:
+
+```bash
+git clone https://github.com/TechieOllie/NixOS_dotfiles.git ~/.dotfiles
+```
+
+That is enough for everything `~/.dotfiles` is actually read for — wallpapers
+and niri's KDL are read-only from the host's point of view. Switch the remote
+once the key is registered, so the host can push too:
+
+```bash
+git -C ~/.dotfiles remote set-url origin git@github.com:TechieOllie/NixOS_dotfiles.git
+```
+
+The same gap applies to the `neovim_dotfiles` clone at the bottom of this
+document; it uses an SSH URL for the same reason and fails the same way.
+
 ## Keeping a host's clone up to date
 
 ```bash
@@ -121,3 +165,26 @@ B's content" relationship here, just a second, unrelated repo living at
 its own path. Keeping it up to date is `git pull` inside `~/.config/nvim`
 itself, same as any other git-cloned dotfiles setup, whether on this
 NixOS host or anywhere else.
+
+Two practical notes, both hit when the desktop was onboarded:
+
+- It needs the host's GitHub key registered, exactly like the `~/.dotfiles`
+  clone — see "That SSH URL does not work yet on a freshly bootstrapped
+  host" above. `neovim_dotfiles` is public too, so the same HTTPS fallback
+  applies.
+- **`~/.config/nvim` is usually not empty by the time you get there, and
+  `git clone` refuses a non-empty target.** Noctalia's template engine
+  writes `lua/matugen.lua` (the base16 palette the config reads) as soon as
+  a wallpaper is set, which can easily happen before you clone. That file is
+  *supposed* to be there — `neovim_dotfiles`' own `.gitignore` lists
+  `lua/matugen.lua`, since it's regenerated on every wallpaper change — so
+  preserve it rather than deleting it:
+
+  ```bash
+  git clone git@github.com:TechieOllie/neovim_dotfiles.git ~/.config/nvim.new
+  cp -p ~/.config/nvim/lua/matugen.lua ~/.config/nvim.new/lua/   # if present
+  mv ~/.config/nvim ~/.config/nvim.old && mv ~/.config/nvim.new ~/.config/nvim
+  ```
+
+  Then `nvim --headless "+Lazy! sync" +qa` to bootstrap lazy.nvim before
+  first interactive use, and remove `~/.config/nvim.old` once satisfied.
