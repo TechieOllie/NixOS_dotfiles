@@ -25,6 +25,11 @@
     ./feishin.nix
     ./obsidian.nix
     ./heroic.nix
+    ./prismlauncher.nix
+    ./kdeconnect.nix
+    ./freecad.nix
+    ./jetbrains.nix
+    ./claude-code.nix
   ];
 
   home.username = vars.user.name;

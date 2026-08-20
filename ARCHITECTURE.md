@@ -344,6 +344,8 @@ modules/
         tailscale.nix      # config.features.tailscale
         printing.nix       # config.features.printing
         moonshine.nix      # config.features.moonshine — remote streaming, desktop only
+        kdeconnect.nix     # config.features.kdeconnect — phone integration; the
+                           # firewall half, with the session half in home/kdeconnect.nix
 
     hardware/          # classes of hardware a machine may or may not have
         controllers.nix    # xone + xpadneo, config.features.gaming
@@ -371,8 +373,9 @@ stack instead, so there was nothing left for it to contain; Heroic and
 umu-launcher, the only other pieces, are user-level and live in
 `home/heroic.nix`.
 
-**Note that `features.gaming` gates three modules across two directories**
-(`programs/steam.nix`, `hardware/controllers.nix`, `home/heroic.nix`), exactly
+**Note that `features.gaming` gates four modules across two directories**
+(`programs/steam.nix`, `hardware/controllers.nix`, `home/heroic.nix`,
+`home/prismlauncher.nix`), exactly
 as `features.niri` gates all of `modules/desktop/`. One flag per *capability*,
 not one flag per file — a module owning one responsibility does not imply a
 capability owning one module.

@@ -2631,3 +2631,96 @@ accepted because CI could never build that derivation successfully in the
 first place. `ciClosure` is deliberately one small, self-describing
 function, to be deleted whole the day upstream's FOD stops being a build (or
 nixpkgs#382086 lands and Millennium comes from nixpkgs proper).
+## Five desktop-only apps: KDE Connect, FreeCAD, Prism Launcher, IntelliJ IDEA, Claude Code
+
+Requested for the desktop host specifically. Three questions had to be
+answered before any of them could be written down.
+
+### Where a "desktop-only app" goes when there is no per-host home entry point
+
+`home/default.nix` is machine-agnostic and every host's Home Manager user
+points at it (`lib/mkHost.nix`), so there is no file that means "packages for
+the desktop". The only mechanism that expresses "this machine and not the
+others" is a `features` flag the module self-gates on — which is the same
+mechanism `home/vscode.nix` and friends already use with `features.niri`.
+
+Reusing `features.niri` was rejected: it is on for the VM too, and the VM is
+the disposable verification host. FreeCAD and IntelliJ are large closures
+that would be built and fetched there for nothing.
+
+So three new flags, named for capabilities rather than for packages, per the
+one-flag-per-*capability* rule:
+
+- `features.kdeconnect` — phone integration. `modules/services/kdeconnect.nix`
+  (firewall + package) and `home/kdeconnect.nix` (the session daemon), the
+  same system/home split niri and Nautilus use.
+- `features.cad` — `home/freecad.nix`.
+- `features.development` — `home/jetbrains.nix` and `home/claude-code.nix`:
+  the tooling that sits on top of the terminal stack every host already gets.
+
+Prism Launcher got no flag at all. It rides `features.gaming` next to
+`home/heroic.nix` — same capability, same purely user-level shape — which is
+why that flag now gates four modules rather than three.
+
+### KDE Connect needs a system module, not just a package
+
+Upstream's `programs.kdeconnect` module (read in full) does exactly two
+things: install the package and open TCP **and** UDP 1714-1764. That range is
+the entire point — discovery and pairing happen over it, and
+`modules/system/networking.nix` leaves the firewall on, so a `home.packages`
+entry alone would install a daemon that never finds a phone.
+
+What that module does *not* do is start anything. Outside Plasma nothing
+does, so `home/kdeconnect.nix` adds a `systemd.user.services.kdeconnect`
+running `kdeconnect-indicator` — upstream's non-Plasma entry point, a
+StatusNotifierItem tray icon that D-Bus-activates `kdeconnectd` itself, so
+one unit covers both daemon and UI. It carries the same
+`After=noctalia.service` + `ExecStartPre=sleep 5` treatment as
+`home/vesktop.nix`, for the same already-diagnosed reason: Noctalia is a
+plain `Type=simple` unit, so "started" is not "tray host ready", and an SNI
+item registered too early is dropped in silence.
+
+### `jetbrains.idea-community` does not exist any more, and its successor is flagged insecure
+
+JetBrains discontinued the separate Community edition in 2025 and merged
+everything into one distribution. nixpkgs removed the attribute outright —
+evaluating `jetbrains.idea-community` now throws a "has been removed" error
+naming two replacements: `jetbrains.idea-oss` (the Apache-2.0 build, the
+literal Community successor) and `jetbrains.idea` (JetBrains' own unified
+binary, unfree).
+
+`idea-oss` was the obvious pick and does not work: nixpkgs pins it at
+2025.3.4 and marks that version insecure (NIXPKGS-2026-2269, multiple known
+vulnerabilities), so `nix flake check` refuses to evaluate it. Taking it
+would mean adding `permittedInsecurePackages`, which this repo has never
+needed and which is a worse trade than an unfree allow-list entry for a
+package the operator is entitled to run — the unified distribution starts in
+its free feature set and only asks for a subscription for the Ultimate
+features. So `jetbrains.idea`, with `"idea"` added to
+`modules/system/unfree.nix`. Revisit if nixpkgs bumps idea-oss past the
+advisory. (The dry-run closure names the artifact `ideaIU-…tar.gz`; that is
+the one binary JetBrains ships now, not a licensing claim.)
+
+`claude-code` is unfree too (Anthropic's commercial terms rather than an OSS
+license) and needed the same one-line allow-list entry. FreeCAD and Prism
+Launcher are LGPL/GPL and needed nothing.
+
+### Configuration: all five are package-only
+
+Each one keeps its own state in a file it rewrites itself — FreeCAD's
+`user.cfg` (window layout and per-workbench state in the same XML document),
+IDEA's versioned `~/.config/JetBrains/IntelliJIdea<version>` directory (with
+JetBrains' own Settings Sync already carrying it between machines), Prism
+Launcher's instances and Microsoft account token, Claude Code's
+`~/.claude.json` OAuth credentials, KDE Connect's paired-device keys. Same
+call as Obsidian, Feishin and Zen: app-owned mutable state, not declarative
+preferences, and in three of the five carrying a real credential.
+
+### Verified
+
+`driver.sh check` green, and the three lint/format check derivations built
+(they are the ones `--no-build` skips). `nix build --dry-run` on the desktop
+closure names `idea-2026.2.0.1`, `claude-code-2.1.220`, `freecad-1.1.1`,
+`prismlauncher-11.0.3` and `kdeconnect.service`; the same dry-run on the VM
+and the laptop names none of them. Nothing has been launched on hardware —
+eval-only, like the rest of the desktop's application layer.
