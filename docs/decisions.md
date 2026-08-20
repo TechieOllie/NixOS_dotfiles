@@ -2463,6 +2463,104 @@ not something inherent to Wayland compositors on amdgpu, and `output.name`
 is needed only for the greeter — niri's own `display.kdl` needs no
 corresponding exclusion.
 
+## Porting the laptop's real Zen setup, and the `policies.Preferences` allowlist
+
+The operator asked for Zen to be set up the way it actually is on their
+daily-driver CachyOS laptop (`the-entertaining-caos-laptop`, AUR
+`zen-browser-bin` 1.21.10b, profile `~/.config/zen/u7zjeytq.Default
+(release)`). That reverses one earlier decision and turned up one real bug
+in what was already there.
+
+### What was ported, and what deliberately wasn't
+
+Phase 6 recorded "no extension/policy porting" — the real profile is mutable
+Firefox-style state, out of scope. Extensions are now in scope; the rest of
+that decision stands, for a reason that only became visible on reading the
+live profile: **the laptop is signed into Firefox Sync**
+(`services.sync.username` in `prefs.js`, with the addons, prefs, forms,
+clients and `workspaces` engines all enabled). Bookmarks, history, logins,
+workspaces and pinned tabs already replicate to a new install through an
+account, and they are exactly the data Nix has no business holding. So the
+split is: Nix seeds the *browser*, Sync seeds the *profile*.
+
+Six add-ons are declared in `policies.ExtensionSettings`, matching the six
+enabled on the laptop: uBlock Origin, Dark Reader, Bitwarden, Obsidian Web
+Clipper, Chrome Mask, and the French language pack. `normal_installed`, not
+`force_installed` — it installs and keeps them updated but leaves them
+removable from `about:addons`, the same seed-don't-lock stance as
+`Status = "default"` on every pref. The three add-ons present but *disabled*
+on the laptop (the DarkMagic and Matte Black themes, Conex) are not
+declared. Install URLs use AMO's `/latest/` redirect rather than a versioned
+`/file/<id>/` URL, so the file doesn't need a bump per extension release;
+the cost is that the exact version isn't reproducible, which was already
+true of every other byte in a browser profile.
+
+Prefs were taken from `prefs.js` and filtered three ways: browser-written
+state and telemetry/sync bookkeeping dropped, machine-local paths dropped
+(`browser.download.lastDir`, `browser.backup.location` — they name
+directories that need not exist on a NixOS host), and then the allowlist
+below applied. `browser.newtabpage.activity-stream.showSponsoredTopSites` is
+deliberately *not* declared: it is still at its default on the laptop, so
+there was no operator choice there to reproduce, and asserting a value would
+have been inventing one.
+
+### `policies.Preferences` has a prefix allowlist, and `zen.*` is not on it
+
+Read out of the shipped browser rather than the docs —
+`/opt/zen-browser-bin/browser/omni.ja`, unzipped, then
+`modules/policies/Policies.sys.mjs`, `Preferences: onBeforeAddons`. The
+allowed prefixes are `accessibility.`, `alerts.`, `app.update.`, `browser.`,
+`datareporting.policy.`, `devtools.`, `dom.`, `extensions.`,
+`general.autoScroll`, `general.smoothScroll`, `geo.`, `gfx.`,
+`identity.fxaccounts.toolbar.`, `intl.`, `keyword.enabled`, `layers.`,
+`layout.`, `mathml.disabled`, `media.`, `network.`, `pdfjs.`, `places.`,
+`pref.`, `print.`, four specific `privacy.*` prefs, `sidebar.`, `signon.`,
+`spellchecker.`, two `svg.*`,
+`toolkit.legacyUserProfileCustomizations.stylesheets`, `ui.`, two `webgl.*`,
+`widget.`, and some `xpinstall.*`. `security.*` is an exact-match allow-list
+of its own, and there is a four-entry blocked list. Anything else is
+dropped with an `Unable to set preference X. Preference not allowed for
+stability reasons.` line in the browser console — no eval error, no visible
+failure, nothing that `nix flake check` could ever catch.
+
+Zen inherits that list unchanged; it does not add its own namespace. Two
+consequences:
+
+- **The transparency prefs written during "Making blur and transparency
+  actually render" were never applied.** `zen.widget.linux.transparency`,
+  `mod.sameerasw.zen_bg_color_enabled`, `mod.sameerasw.zen_transparency_color`
+  and `mod.sameerasw.zen_no_shadow` are all outside the allowlist. Only
+  `browser.tabs.allow_transparent_browser` in that block was ever reaching
+  the browser. This is currently harmless — `home/transparency.nix` is
+  `1.0`, so every one of them evaluates to `false`/inert anyway — and the
+  entries are kept rather than deleted so the intent isn't silently lost,
+  but **turning transparency back on will need another mechanism for them**
+  (`profiles.<name>.settings`, i.e. prefs.js, with the profile-ownership
+  cost described below). The live verification recorded in that earlier
+  entry presumably observed the mod's own settings panel, not a
+  policy-applied pref.
+- **None of the laptop's genuinely Zen-specific UI settings can be ported**:
+  `zen.view.compact.enable-at-startup`, `zen.view.use-single-toolbar`,
+  `zen.glance.activation-method`, `zen.tabs.ctrl-tab.ignore-essential-tabs`,
+  `zen.pinned-tab-manager.restore-pinned-tabs-to-pinned-url`,
+  `zen.swipe.is-fast-swipe`, `zen.workspaces.continue-where-left-off`. They
+  are left to the browser's settings UI rather than declared somewhere that
+  cannot apply them.
+
+### Why not `profiles.<name>.settings`
+
+That option does reach `prefs.js`, and would also unlock the flake's
+`profiles.<name>.mods` (which is how the laptop's one Zen mod, "Better
+Unloaded Tabs", `f7c71d9a-bce2-420f-ae44-a64bd92975ab`, would be declared).
+It is still declined, for the reason already in `home/zen-browser.nix`:
+declaring a profile hands the profile directory to Home Manager, which
+writes `profiles.ini`, and there is no guarantee a Nix-declared "default"
+lines up with the profile a host is actually using — the VM already carries
+an ad hoc one from earlier live testing. The failure mode is Home Manager
+creating and switching to a second, empty profile. `mods` also fetches from
+`raw.githubusercontent.com` at *activation* time, which makes a switch
+network-dependent. If this is ever revisited, do it on a host with no
+existing Zen profile and verify `profiles.ini` afterward.
 ## CI routes around Millennium's unreproducible Bun FOD
 
 Adding the desktop's `nixosConfigurations` entry made CI build the Phase 7
