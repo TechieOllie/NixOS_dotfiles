@@ -15,6 +15,9 @@
 # Self-gates on osConfig.features.niri, same convention as
 # home/nautilus.nix — a GUI viewer only means anything where there's a
 # graphical session.
+#
+# Verified live on the desktop 2026-08-21: an image opened from Nautilus
+# and via xdg-open lands in Loupe rather than the browser.
 {
   pkgs,
   lib,
