@@ -46,4 +46,12 @@ output "Dell Inc. DELL P2422HE 8QHXBX3" {
     }
 }
 
+output "Samsung Electric Company LS27CG51x H9JW901815" {
+    mode "2560x1440@144.000"
+    variable-refresh-rate
+    focus-at-startup
 
+    hot-corners {
+        top-right
+    }
+}

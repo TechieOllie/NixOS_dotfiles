@@ -2733,3 +2733,776 @@ that the validator warns but never fails, the `nix log` output is the part
 that carries the information, not the green build.
 
 Still not verified live: no host has been switched onto this config.
+
+## Porting the laptop's real Zen setup, and the `policies.Preferences` allowlist
+
+The operator asked for Zen to be set up the way it actually is on their
+daily-driver CachyOS laptop (`the-entertaining-caos-laptop`, AUR
+`zen-browser-bin` 1.21.10b, profile `~/.config/zen/u7zjeytq.Default
+(release)`). That reverses one earlier decision and turned up one real bug
+in what was already there.
+
+### What was ported, and what deliberately wasn't
+
+Phase 6 recorded "no extension/policy porting" — the real profile is mutable
+Firefox-style state, out of scope. Extensions are now in scope; the rest of
+that decision stands, for a reason that only became visible on reading the
+live profile: **the laptop is signed into Firefox Sync**
+(`services.sync.username` in `prefs.js`, with the addons, prefs, forms,
+clients and `workspaces` engines all enabled). Bookmarks, history, logins,
+workspaces and pinned tabs already replicate to a new install through an
+account, and they are exactly the data Nix has no business holding. So the
+split is: Nix seeds the *browser*, Sync seeds the *profile*.
+
+Six add-ons are declared in `policies.ExtensionSettings`, matching the six
+enabled on the laptop: uBlock Origin, Dark Reader, Bitwarden, Obsidian Web
+Clipper, Chrome Mask, and the French language pack. `normal_installed`, not
+`force_installed` — it installs and keeps them updated but leaves them
+removable from `about:addons`, the same seed-don't-lock stance as
+`Status = "default"` on every pref. The three add-ons present but *disabled*
+on the laptop (the DarkMagic and Matte Black themes, Conex) are not
+declared. Install URLs use AMO's `/latest/` redirect rather than a versioned
+`/file/<id>/` URL, so the file doesn't need a bump per extension release;
+the cost is that the exact version isn't reproducible, which was already
+true of every other byte in a browser profile.
+
+Prefs were taken from `prefs.js` and filtered three ways: browser-written
+state and telemetry/sync bookkeeping dropped, machine-local paths dropped
+(`browser.download.lastDir`, `browser.backup.location` — they name
+directories that need not exist on a NixOS host), and then the allowlist
+below applied. `browser.newtabpage.activity-stream.showSponsoredTopSites` is
+deliberately *not* declared: it is still at its default on the laptop, so
+there was no operator choice there to reproduce, and asserting a value would
+have been inventing one.
+
+### `policies.Preferences` has a prefix allowlist, and `zen.*` is not on it
+
+Read out of the shipped browser rather than the docs —
+`/opt/zen-browser-bin/browser/omni.ja`, unzipped, then
+`modules/policies/Policies.sys.mjs`, `Preferences: onBeforeAddons`. The
+allowed prefixes are `accessibility.`, `alerts.`, `app.update.`, `browser.`,
+`datareporting.policy.`, `devtools.`, `dom.`, `extensions.`,
+`general.autoScroll`, `general.smoothScroll`, `geo.`, `gfx.`,
+`identity.fxaccounts.toolbar.`, `intl.`, `keyword.enabled`, `layers.`,
+`layout.`, `mathml.disabled`, `media.`, `network.`, `pdfjs.`, `places.`,
+`pref.`, `print.`, four specific `privacy.*` prefs, `sidebar.`, `signon.`,
+`spellchecker.`, two `svg.*`,
+`toolkit.legacyUserProfileCustomizations.stylesheets`, `ui.`, two `webgl.*`,
+`widget.`, and some `xpinstall.*`. `security.*` is an exact-match allow-list
+of its own, and there is a four-entry blocked list. Anything else is
+dropped with an `Unable to set preference X. Preference not allowed for
+stability reasons.` line in the browser console — no eval error, no visible
+failure, nothing that `nix flake check` could ever catch.
+
+Zen inherits that list unchanged; it does not add its own namespace. Two
+consequences:
+
+- **The transparency prefs written during "Making blur and transparency
+  actually render" were never applied.** `zen.widget.linux.transparency`,
+  `mod.sameerasw.zen_bg_color_enabled`, `mod.sameerasw.zen_transparency_color`
+  and `mod.sameerasw.zen_no_shadow` are all outside the allowlist. Only
+  `browser.tabs.allow_transparent_browser` in that block was ever reaching
+  the browser. This is currently harmless — `home/transparency.nix` is
+  `1.0`, so every one of them evaluates to `false`/inert anyway — and the
+  entries are kept rather than deleted so the intent isn't silently lost,
+  but **turning transparency back on will need another mechanism for them**
+  (`profiles.<name>.settings`, i.e. prefs.js, with the profile-ownership
+  cost described below). The live verification recorded in that earlier
+  entry presumably observed the mod's own settings panel, not a
+  policy-applied pref.
+- **None of the laptop's genuinely Zen-specific UI settings can be ported**:
+  `zen.view.compact.enable-at-startup`, `zen.view.use-single-toolbar`,
+  `zen.glance.activation-method`, `zen.tabs.ctrl-tab.ignore-essential-tabs`,
+  `zen.pinned-tab-manager.restore-pinned-tabs-to-pinned-url`,
+  `zen.swipe.is-fast-swipe`, `zen.workspaces.continue-where-left-off`. They
+  are left to the browser's settings UI rather than declared somewhere that
+  cannot apply them.
+
+### Why not `profiles.<name>.settings`
+
+That option does reach `prefs.js`, and would also unlock the flake's
+`profiles.<name>.mods` (which is how the laptop's one Zen mod, "Better
+Unloaded Tabs", `f7c71d9a-bce2-420f-ae44-a64bd92975ab`, would be declared).
+It is still declined, for the reason already in `home/zen-browser.nix`:
+declaring a profile hands the profile directory to Home Manager, which
+writes `profiles.ini`, and there is no guarantee a Nix-declared "default"
+lines up with the profile a host is actually using — the VM already carries
+an ad hoc one from earlier live testing. The failure mode is Home Manager
+creating and switching to a second, empty profile. `mods` also fetches from
+`raw.githubusercontent.com` at *activation* time, which makes a switch
+network-dependent. If this is ever revisited, do it on a host with no
+existing Zen profile and verify `profiles.ini` afterward.
+## CI routes around Millennium's unreproducible Bun FOD
+
+Adding the desktop's `nixosConfigurations` entry made CI build the Phase 7
+gaming stack for the first time — and turned the `flake-check` workflow red
+on every push that touched anything, for a reason having nothing to do with
+the diff:
+
+```
+error: hash mismatch in fixed-output derivation '…-millennium-typescript-bun-deps.drv':
+         specified: sha256-BEupNhAlkAELGGLj6/SVUjj101hBm4JzJH9N5i1qM6A=
+            got:    sha256-FgPlXsAfLLsrvCn3AXqltUe2TvE0MgbuYmfTpVNTmSY=
+```
+
+### Why no re-pin can fix it
+
+Upstream's `millennium-typescript-bun-deps` runs a *build* inside a
+fixed-output derivation — `bun install --frozen-lockfile` plus a rollup
+bundle, with whole `node_modules` trees copied into `$out`. An FOD promises
+a stable output hash; a build of a JS dependency tree cannot make that
+promise. Three GitHub Actions runs of one unchanged revision produced three
+different hashes, while `nix build --rebuild` on the same `.drv` reproduces
+the expected hash locally. Bumping the `millennium` input doesn't help: at
+`cecdc95` (the newest revision as of this entry) the derivation has the same
+shape, only a different `outputHash`. Upstream publishes no binary cache
+either, so the CI substituter trick that already covers noctalia and
+chaotic-nyx has nothing to point at.
+
+That is what makes this different from the rolling-source rot that killed
+`update.yml`: upstream drift gives every failure the *same* wrong hash and a
+re-pin fixes it, this gives a different hash each time and no pin ever holds.
+
+### What was rejected
+
+- **Wait for upstream.** The honest answer, and the previous state — but it
+  leaves a permanently red gate on the one host that most needs building,
+  which trains everyone to ignore CI.
+- **Drop the desktop's `build-<host>` check.** Loses closure coverage for the
+  entire niri stack, proton-cachyos, the controller modules and Home Manager
+  on that host, to work around one package.
+- **Weaken the check to eval-only.** Redundant: `nix flake check` already
+  evaluates every `nixosConfigurations` attribute, so this would have been a
+  check that could not fail for any reason the existing pass wouldn't catch.
+- **Our own Cachix.** Would work, but it means credentials, a secret in the
+  repo's Actions config, and a cache to maintain — a lot of standing
+  machinery to paper over someone else's bug.
+
+### What was done
+
+`flake.nix` grew a `ciClosure` helper between `nixosConfigurations` and
+`checks`. For a host with `features.gaming` it returns
+`host.extendModules { … programs.steam.package = lib.mkForce pkgs.steam; }`'s
+toplevel; for every other host it returns the host's own toplevel unchanged.
+Only the `checks` attribute goes through it — `nixosConfigurations` itself,
+and therefore `just build`, `just switch` and `nixos-anywhere`, still get the
+Millennium-patched Steam.
+
+Verified before committing: the check's derivation closure
+(`nix-store -qR`) contains no `millennium` path at all, still contains
+`proton-cachyos` and a stock `steam-1.0.0.87`, and the vm and laptop check
+derivations hash identically to the ones the failing run built — so the
+substitution touches exactly one host and exactly one package. The real
+config still resolves `programs.steam.package` to Millennium's
+`steam-1.0.0.85`, the same store path that appears in the failure log.
+
+The cost, stated plainly: a build failure *inside* Millennium will no longer
+be caught by CI, only on the machine. That is a real reduction in coverage,
+accepted because CI could never build that derivation successfully in the
+first place. `ciClosure` is deliberately one small, self-describing
+function, to be deleted whole the day upstream's FOD stops being a build (or
+nixpkgs#382086 lands and Millennium comes from nixpkgs proper).
+## Five desktop-only apps: KDE Connect, FreeCAD, Prism Launcher, IntelliJ IDEA, Claude Code
+
+Requested for the desktop host specifically. Three questions had to be
+answered before any of them could be written down.
+
+### Where a "desktop-only app" goes when there is no per-host home entry point
+
+`home/default.nix` is machine-agnostic and every host's Home Manager user
+points at it (`lib/mkHost.nix`), so there is no file that means "packages for
+the desktop". The only mechanism that expresses "this machine and not the
+others" is a `features` flag the module self-gates on — which is the same
+mechanism `home/vscode.nix` and friends already use with `features.niri`.
+
+Reusing `features.niri` was rejected: it is on for the VM too, and the VM is
+the disposable verification host. FreeCAD and IntelliJ are large closures
+that would be built and fetched there for nothing.
+
+So three new flags, named for capabilities rather than for packages, per the
+one-flag-per-*capability* rule:
+
+- `features.kdeconnect` — phone integration. `modules/services/kdeconnect.nix`
+  (firewall + package) and `home/kdeconnect.nix` (the session daemon), the
+  same system/home split niri and Nautilus use.
+- `features.cad` — `home/freecad.nix`.
+- `features.development` — `home/jetbrains.nix` and `home/claude-code.nix`:
+  the tooling that sits on top of the terminal stack every host already gets.
+
+Prism Launcher got no flag at all. It rides `features.gaming` next to
+`home/heroic.nix` — same capability, same purely user-level shape — which is
+why that flag now gates four modules rather than three.
+
+### KDE Connect needs a system module, not just a package
+
+Upstream's `programs.kdeconnect` module (read in full) does exactly two
+things: install the package and open TCP **and** UDP 1714-1764. That range is
+the entire point — discovery and pairing happen over it, and
+`modules/system/networking.nix` leaves the firewall on, so a `home.packages`
+entry alone would install a daemon that never finds a phone.
+
+What that module does *not* do is start anything. Outside Plasma nothing
+does, so `home/kdeconnect.nix` adds a `systemd.user.services.kdeconnect`
+running `kdeconnect-indicator` — upstream's non-Plasma entry point, a
+StatusNotifierItem tray icon that D-Bus-activates `kdeconnectd` itself, so
+one unit covers both daemon and UI. It carries the same
+`After=noctalia.service` + `ExecStartPre=sleep 5` treatment as
+`home/vesktop.nix`, for the same already-diagnosed reason: Noctalia is a
+plain `Type=simple` unit, so "started" is not "tray host ready", and an SNI
+item registered too early is dropped in silence.
+
+### `jetbrains.idea-community` does not exist any more, and its successor is flagged insecure
+
+JetBrains discontinued the separate Community edition in 2025 and merged
+everything into one distribution. nixpkgs removed the attribute outright —
+evaluating `jetbrains.idea-community` now throws a "has been removed" error
+naming two replacements: `jetbrains.idea-oss` (the Apache-2.0 build, the
+literal Community successor) and `jetbrains.idea` (JetBrains' own unified
+binary, unfree).
+
+`idea-oss` was the obvious pick and does not work: nixpkgs pins it at
+2025.3.4 and marks that version insecure (NIXPKGS-2026-2269, multiple known
+vulnerabilities), so `nix flake check` refuses to evaluate it. Taking it
+would mean adding `permittedInsecurePackages`, which this repo has never
+needed and which is a worse trade than an unfree allow-list entry for a
+package the operator is entitled to run — the unified distribution starts in
+its free feature set and only asks for a subscription for the Ultimate
+features. So `jetbrains.idea`, with `"idea"` added to
+`modules/system/unfree.nix`. Revisit if nixpkgs bumps idea-oss past the
+advisory. (The dry-run closure names the artifact `ideaIU-…tar.gz`; that is
+the one binary JetBrains ships now, not a licensing claim.)
+
+`claude-code` is unfree too (Anthropic's commercial terms rather than an OSS
+license) and needed the same one-line allow-list entry. FreeCAD and Prism
+Launcher are LGPL/GPL and needed nothing.
+
+### Configuration: all five are package-only
+
+Each one keeps its own state in a file it rewrites itself — FreeCAD's
+`user.cfg` (window layout and per-workbench state in the same XML document),
+IDEA's versioned `~/.config/JetBrains/IntelliJIdea<version>` directory (with
+JetBrains' own Settings Sync already carrying it between machines), Prism
+Launcher's instances and Microsoft account token, Claude Code's
+`~/.claude.json` OAuth credentials, KDE Connect's paired-device keys. Same
+call as Obsidian, Feishin and Zen: app-owned mutable state, not declarative
+preferences, and in three of the five carrying a real credential.
+
+### Verified
+
+`driver.sh check` green, and the three lint/format check derivations built
+(they are the ones `--no-build` skips). `nix build --dry-run` on the desktop
+closure names `idea-2026.2.0.1`, `claude-code-2.1.220`, `freecad-1.1.1`,
+`prismlauncher-11.0.3` and `kdeconnect.service`; the same dry-run on the VM
+and the laptop names none of them.
+
+Then confirmed live: the operator merged this to `main`, pulled it into the
+desktop's own `~/.dotfiles` clone and switched, and reported all five
+launching on the machine. That makes these the first pieces of the desktop's
+application layer verified on real hardware rather than by eval — the rest
+of Phase 7's gaming stack still has not been exercised there.
+
+One incidental finding from trying to drive that switch remotely: the
+desktop is not on the tailnet. `features.tailscale` installs and starts the
+daemon, but `tailscale up` is a one-time interactive login that nobody has
+run since the reinstall, so the node simply does not exist in
+`tailscale status` — the only desktop entry there is the old CachyOS
+`caos-desktop`. Worth knowing before assuming the desktop is reachable for
+anything else, Moonshine included: that module deliberately sets
+`openFirewall = false` because `modules/services/tailscale.nix` trusts
+`tailscale0`, which means streaming cannot work until the same login
+happens.
+
+## The desktop's first day of use: no XWayland, and a keyring nobody unlocked
+
+Two unrelated complaints from the first real session on
+`the-entertaining-nios-desktop`: Steam refusing to start for want of an X
+server, and VS Code warning that it was falling back to weak/plaintext
+encryption for stored credentials. Both turned out to be one-line gaps, and
+one of them was a documented claim that was simply false.
+
+### Steam: there was no XWayland at all
+
+`programs.niri.enable` does not bring XWayland, and this repo never added it
+— `docs/decisions.md`'s Phase 3 notes recorded the "xwayland-satellite not
+found" line in niri's log as *expected*, which it was, right up until an
+X11-only app was actually installed. The Steam client has no Wayland backend
+of any kind, so it simply refuses to run without `DISPLAY`.
+
+What the fix is **not**: a systemd user unit for `xwayland-satellite`, a
+`spawn-at-startup` line, or an `xwayland-satellite {}` block in the KDL.
+Reading niri 26.04's own config defaults (`niri-config/src/lib.rs`) shows
+the integration is already on:
+
+```rust
+xwayland_satellite: XwaylandSatellite {
+    off: false,
+    path: "xwayland-satellite",
+},
+```
+
+`path` is a bare binary name, resolved on the compositor's PATH at startup.
+So the entire fix is `environment.systemPackages = [ pkgs.xwayland-satellite ];`
+in `modules/desktop/niri.nix`. It has to be system-level: niri is launched by
+greetd, whose PATH is `/run/current-system/sw/bin`, so a `home.packages`
+entry would not be visible at the moment niri looks.
+
+Two behaviours worth having written down, both read out of `src/main.rs`:
+niri sets `DISPLAY` from the satellite *before* calling `import_environment()`,
+and `DISPLAY` is one of the five variables that function passes to
+`systemctl --user import-environment` — so unlike the KDL `environment {}`
+block (the standing gotcha), this really does reach the systemd `--user`
+manager, and apps Noctalia launches as user services get it too. But
+`niri.rs`'s reload path is explicit that it doesn't repeat that
+(`// This won't change the systemd environment, but oh well.`), so the change
+lands on a fresh login, not on a config reload.
+
+`home/cursor.nix`'s comment about `x11.enable` was re-checked rather than
+flipped: home-manager's `home.pointerCursor` exports `XCURSOR_THEME` and
+`XCURSOR_SIZE` unconditionally, and `x11.enable` only adds an `xsetroot` call
+in `xsession.profileExtra` plus two Xresources properties — an xsession this
+repo never starts. Xwayland clients are covered by the env vars already, so
+the option stays off; only the comment's reasoning changed.
+
+### VS Code: two separate halves, and a false claim in ARCHITECTURE.md
+
+The warning is Chromium's, not VS Code's own: Electron's `safeStorage` picks
+a password store by sniffing `XDG_CURRENT_DESKTOP`, recognises GNOME and KDE
+and nothing else, and under `niri` falls back to "basic text encryption" —
+Settings Sync tokens and extension credentials written to disk in the clear.
+Pinning it is `--password-store=gnome-libsecret`, delivered through
+nixpkgs' own `code` wrapper hook:
+
+```bash
+if [[ -f $XDG_CONFIG_HOME/code-flags.conf ]]; then
+   CODE_USER_FLAGS="$(sed 's/#.*//' $XDG_CONFIG_HOME/code-flags.conf | tr '\n' ' ')"
+fi
+```
+
+`code-flags.conf` over `~/.vscode/argv.json` deliberately: all three of the
+package's `.desktop` entries exec that same wrapper (`Exec=code %F` and
+friends), so the flag applies from the launcher as well as from a shell,
+while `argv.json` is VS Code's own mutable state and gets rewritten — the
+app-owned-state conflict this repo keeps rediscovering. `libsecret` is
+already in `pkgs.vscode`'s closure, so nothing else needed installing.
+
+That flag alone would still not have been enough. Checking whether a keyring
+was actually available turned up the second half:
+
+```
+$ nix eval .#nixosConfigurations.the-entertaining-nios-desktop.config.security.pam.services.greetd.enableGnomeKeyring
+false
+```
+
+`ARCHITECTURE.md`'s SSH-agent section asserted that enabling
+`services.gnome.gnome-keyring` "in turn makes greetd's own module set
+`security.pam.services.greetd.enableGnomeKeyring = true`". It does not.
+Grepping nixpkgs, neither the greetd module nor the niri module touches that
+option — the only references are in `security/pam.nix`, where it is *read*.
+Both real hosts evaluated it `false`, meaning the keyring daemon has been
+running since Phase 3 with a login keyring that nothing ever unlocked. What
+made this hard to notice is that the one thing anyone tested — `ssh-add`
+followed by a real `git push` over the gcr agent — works either way for the
+lifetime of a session.
+
+`modules/desktop/greetd.nix` now sets it explicitly, alongside the greeter
+settings, since it describes the login path rather than one machine. The
+ARCHITECTURE.md paragraph is corrected in place with a dated note rather than
+silently rewritten.
+
+**Verified live, the Steam half** (2026-08-20, on the desktop after a switch
+and a fresh login): Steam starts and shows its window under the satellite.
+That is also the first time anything in Phase 7's gaming stack has actually
+run on hardware rather than merely evaluating — the launcher only, though; no
+game has been launched through Proton yet and no controller has been paired,
+so `xone`/`xpadneo` and `proton-cachyos` remain untested.
+
+**Still to verify live**: that VS Code stops warning, and that the login
+keyring is genuinely open after a greetd login (`secret-tool store`/`lookup`
+is the direct test, not `ssh-add -l`). The keyring half of this commit is the
+part with no live evidence at all yet — Steam working says nothing about it,
+since the two fixes are unrelated.
+
+
+### Follow-up: the keyring was fine, the flags file was read by nothing
+
+Live on the desktop after the switch and a fresh login, Steam worked and VS
+Code went on warning. Checked over SSH, in this order:
+
+```
+$ cat ~/.config/code-flags.conf
+--password-store=gnome-libsecret
+$ busctl --user --json=short call org.freedesktop.secrets \
+    /org/freedesktop/secrets/collection/login \
+    org.freedesktop.DBus.Properties Get ss org.freedesktop.Secret.Collection Locked
+{"type":"v","data":[{"type":"b","data":false}]}
+```
+
+So the keyring half of the previous commit works: the login collection
+exists and is **unlocked** after a greetd login, and its two items are
+Noctalia's own (`Noctalia encrypted storage key`, `Noctalia calendar refresh
+token`) — a real app storing real secrets through libsecret. `/etc/pam.d/greetd`
+turns out to be nothing but `include login`, and the `pam_gnome_keyring.so`
+auth/session lines live in `/etc/pam.d/login`, which the include pulls in
+with the entered password. Worth knowing before reading that file and
+concluding the option didn't apply.
+
+What was missing is a `Code Safe Storage` item — nothing VS Code had ever
+written. The reason was in the installed wrapper:
+
+```
+$ cat $(readlink -f $(which code))
+…
+exec -a "$0" "/nix/store/…-vscode-1.130.0/bin/.code-wrapped" \
+  ${NIXOS_OZONE_WL:+${WAYLAND_DISPLAY:+--ozone-platform-hint=auto …}} "$@"
+```
+
+No `code-flags.conf` handling anywhere in it. That hook is real, but it
+arrived in a *newer* nixpkgs than this flake pins — the wrapper it was read
+out of came from `nix build nixpkgs#vscode` on the laptop, which resolves the
+**registry's** nixpkgs (VS Code 1.133.0), not this flake's locked input (VS
+Code 1.130.0). A perfect example of the kind of check that cannot fail:
+`xdg.configFile` wrote the file, eval was green, `nix flake check` was green,
+and the feature was inert. Inspect wrapper-provided hooks through the flake's
+own locked nixpkgs, always.
+
+The fix is upstream's own supported argument, which exists at both revisions:
+
+```nix
+home.packages = [
+  (pkgs.vscode.override { commandLineArgs = "--password-store=gnome-libsecret"; })
+];
+```
+
+Verified by building it and reading the wrapper back, rather than by
+assuming a second time — the last line is now
+`… "$@"  --password-store=gnome-libsecret`. The cost is that vscode's
+derivation is rebuilt (an unpack and a wrapper, no compilation) instead of
+coming straight from cache.
+
+**Still to verify live**: that the warning is actually gone, and that a
+`Code Safe Storage` item appears in the login keyring once VS Code stores
+something. That item's presence is the unambiguous test — the notification
+can be dismissed, the keyring item can't be faked.
+
+
+### `extraCompatPackages` never reaches Heroic
+
+Reported live on the desktop (2026-08-20): Heroic's per-game compatibility
+dropdown offered no `proton-cachyos`, despite `modules/programs/steam.nix`
+declaring it. The two facts that explain it:
+
+`programs.steam.extraCompatPackages` is not a system-wide installation. It
+exports `STEAM_EXTRA_COMPAT_TOOLS_PATHS` into Steam's *own* FHS environment
+and nothing else — no directory is created anywhere on disk, and indeed
+`~/.steam/root/compatibilitytools.d` did not exist at all on a host that had
+already run Steam. Any other launcher is on its own.
+
+Heroic's search paths were read out of the shipped bundle rather than guessed
+at (`…-heroic-2.22.0-fhsenv-rootfs/opt/heroic/resources/app.asar`, which
+greps fine as plain text). It collects candidate directories:
+
+```
+~/.config/heroic/tools/proton/
+<steam lib>/steamapps/common          (only with showValveProton)
+<steam lib>/root/compatibilitytools.d
+<steam lib>/compatibilitytools.d
+```
+
+then, for each entry `b` in each, accepts it if `<dir>/<b>/proton` exists,
+naming the tool after the directory. So a Proton build is discovered by
+directory layout, not by any registry — which makes it something a symlink
+can satisfy:
+
+```nix
+home.file.".config/heroic/tools/proton/proton-cachyos".source =
+  "${pkgs.proton-cachyos}/bin";
+```
+
+`$out/bin`, not `$out`: this derivation puts the whole tool tree (`proton`,
+`toolmanifest.vdf`, `files/`, `protonfixes/`) under `bin`. That is the layout
+Steam expects of a *search path* entry, not of a tool — nixpkgs' steam module
+builds `STEAM_EXTRA_COMPAT_TOOLS_PATHS` with
+`lib.makeSearchPathOutput "steamcompattool" ""`, and this package has only an
+`out` output, so Steam is handed `$out` and finds the tool one level down in
+`bin/` (it takes the name from that directory's `compatibilitytool.vdf`,
+which says `Proton-CachyOS`; Heroic, by contrast, names it after the
+directory, hence the symlink's name).
+
+Choosing Heroic's own tools directory over `~/.steam/root/compatibilitytools.d`
+was deliberate. The latter would have to be created for Steam, which has no
+reason to want it — Steam already has the env var — and putting a
+Nix-managed symlink inside a directory Steam creates and manages on demand is
+the app-owned-mutable-state trap. Heroic's tools directory is only ever
+written by Heroic's downloader, one directory per build, so an extra entry
+alongside is exactly what the app expects. The host already had a
+hand-downloaded `GE-Proton-latest` sitting there — the very thing this repo
+avoids for Steam by declining protonup-qt — and it is left untouched.
+
+**Verified live** (2026-08-20, on the desktop after `nixos-rebuild switch`):
+`proton-cachyos` appears in Heroic's dropdown. Still not verified: that a
+game actually *runs* under it, from either launcher.
+
+
+### Phase 7 closes: a game under `proton-cachyos`, and a wired pad on `xone`
+
+Later the same day (2026-08-20), on the desktop, the two remaining eval-only
+claims in Phase 7 were exercised for real:
+
+- **Proton.** Sifu installed and played through Heroic. Heroic's `config.json`
+  default *and* that game's `GamesConfig/*.json` both name
+  `~/.config/heroic/tools/proton/proton-cachyos/proton` with
+  `"type": "proton"`, so the build that ran is the symlink from the section
+  above, not the hand-downloaded `GE-Proton-latest` sitting beside it. The
+  prefix under `~/Games/Heroic/Prefixes/Sifu` is the evidence it got as far as
+  actually running.
+- **Controller.** A wired Xbox pad enumerates as `Microsoft Xbox Controller`
+  on `js1`/`event23`, with `xone_wired` and `xone_gip_gamepad` bound (both via
+  `xone_gip`). So `modules/hardware/controllers.nix` does its job over USB
+  with nothing else declared — no udev rule of this repo's, no user
+  configuration.
+
+What is still untested is `xpadneo`, the *other* module that file enables:
+it is loaded, but with no device bound, because the pad was connected by
+cable. The Bluetooth path is the only part of the gaming stack that has never
+had hardware behind it.
+
+This retires "Phase 7 is eval-only" from `CLAUDE.md`. Worth keeping in view
+that the stack needed two live fixes before it worked at all — XWayland for
+Steam, and the Heroic Proton symlink — neither of which eval could have
+found.
+
+
+## Z407 volume: two gain stages, because the kernel disabled the hardware one
+
+The Logitech Z407 speakers on the desktop stepped volume unevenly, the puck and
+the keyboard's volume keys disagreed with each other, and the whole scale sat
+far quieter than the same speakers on Windows — "20% was more than loud enough
+there, here I can barely hear anything at 40%."
+
+This took two wrong diagnoses before the hardware was actually asked. Both are
+recorded because the reasoning that produced them was plausible and will be
+tempting again.
+
+### Wrong answer 1, and the question that broke it
+
+First diagnosis: two chained gain stages — the puck drives the speaker's own
+amplifier *and* sends HID volume keys the host acts on. A hwdb entry was written
+to stop the host half.
+
+Then: *why do they work on Windows?* A puck wired straight to the speaker's
+amplifier would misbehave under every OS, so the second stage looked impossible
+and the hwdb entry was reverted.
+
+### Wrong answer 2, and the test that broke it
+
+Second diagnosis: a single stage, made uneven by arithmetic. That part is real
+and is documented below, but it was treated as the *whole* explanation, and the
+Windows argument above was treated as proof that no second stage existed.
+
+The mistake was reasoning from Windows' behaviour to the device's wiring instead
+of measuring the device. The measurement is easy and should have come first:
+comment out the two volume binds in `keybinds.kdl` (niri auto-reloads), freeze
+the host volume, and turn the puck. If loudness changes, the host is not
+involved and the puck reaches the amplifier directly.
+
+It changes. **The second stage is real.** A capture of `/dev/input/event8`
+during the same test also shows exactly one press/release per detent, so it is
+not key repeat and not a double-firing device:
+
+```
+  KEY VOLUMEDOWN press
+  KEY VOLUMEDOWN release      (host volume held at 0.50 throughout)
+```
+
+### Why Windows does not have the problem
+
+The Z407 advertises a real UAC Feature Unit, and the kernel read its range
+successfully: min -13824, max -1024, res 256 in 1/256 dB units — **-54.0 dB to
+-4.0 dB in 50 steps of exactly 1.00 dB.**
+
+Windows drives that unit. So Windows' slider and the puck are two views of the
+*same* gain element: the puck moves the amplifier, the Feature Unit reports it,
+the slider tracks it. One stage, and it can never desync.
+
+Linux cannot do this, because kernel 7.1 refuses the control at probe:
+
+```
+usb 3-2.3: 9:1: sticky mixer values (-13824/-1024/256 => -1024), disabling
+```
+
+`check_sticky_volume_control()` in `sound/usb/mixer.c` writes the control's min
+and max, reads back, and if neither write moves the readback it decides the
+control does nothing and declines to register it. The Z407 keeps only
+`PCM Playback Switch`, the mute half of that same unit; the Yeti Nano on the
+same bus keeps both halves, which is the comparison that makes it obvious.
+
+There is no override — the call site is unguarded, `ignore_ctl_error` does not
+reach it, and no `QUIRK_FLAG_*` in `sound/usb/usbaudio.h` skips it. It is also
+new: `grep -c sticky sound/usb/mixer.c` gives 0 on 6.12.103 and 16 on the
+running 7.1.8-cachyos.
+
+So the host loses its one route to the amplifier and falls back to attenuating
+in software — which *stacks on top of* the amplifier instead of being it. That
+is the second stage, and the kernel's heuristic is what creates it. The device
+may well be sticky exactly as the kernel claims; the puck owning the amplifier
+directly is entirely consistent with the Feature Unit being inert.
+
+### The cubic scale, and why "40% here" is not "40% on Windows"
+
+PipeWire's volume is cubic — the number `wpctl` prints is the cube root of the
+gain. Verified: `wpctl` showed 0.59 while `pw-dump` showed
+`channelVolumes: [ 0.205375, ... ]`, and 0.59³ = 0.205379.
+
+If Windows' slider is roughly linear in amplitude, that is about a 10 dB gap:
+
+```
+  Windows  20%   ->  amplitude 0.200  = -14.0 dB
+  here     40%   ->  amplitude 0.064  = -23.9 dB
+  here     58.5% ->  amplitude 0.200  = -14.0 dB   (the matching position)
+```
+
+The same curve means a flat percentage step is not a constant loudness step.
+Noctalia steps 5% (measured: `volume-up` moved 0.49 to 0.54), which is 1.41 dB
+at 0.90 and 10.57 dB at 0.10.
+
+### The fix
+
+`services.udev.extraHwdb` in the desktop's `default.nix` remaps the puck's three
+volume usages to `reserved`, matched on this speaker's vendor:product so a
+keyboard is unaffected. The puck then drives the amplifier alone — one stage,
+uniform 1 dB steps, which is the Windows behaviour.
+
+A hwdb remap rather than `LIBINPUT_IGNORE_DEVICE` because the same HID interface
+carries play/pause/next/prev. The codes are HID consumer-page usages
+(`c00e9`/`c00ea`/`c00e2`), not evdev keycodes.
+
+With the amplifier as the volume control, **the sink belongs at 100%** —
+anything less is a software stage stacked under the hardware one, and it also
+throws away bit depth on a device that only accepts S16_LE. Raise it with the
+puck turned down first: at 40% the software stage is -24 dB, so going to 100% is
+a 24 dB jump.
+
+### Rejected: a dB-uniform stepping wrapper on the keyboard keys
+
+A `volume-step up|down [dB]` wrapper was written, bound to the volume keys, and
+verified on hardware (+1.000 dB at -18.6 dB, +1.001 dB at -55.2 dB, +3.000 dB
+when asked for 3, and down-then-up returning to the exact starting value). Its
+one non-obvious detail is worth keeping even though the code is gone: it read
+via `pw-dump`, not `wpctl get-volume`, because wpctl rounds its *display* to two
+decimals, and below ~0.26 on the cubic scale a 1 dB step is smaller than 0.01 —
+a two-decimal read quantizes the step away and the volume sticks near the
+bottom.
+
+It was removed at the operator's request once the hwdb rule landed. With the
+amplifier as the volume control and the sink parked at 100%, the keyboard keys
+are a software trim that should not normally be used at all, so a second,
+better-behaved way to drive that trim is complexity earning nothing. The
+keyboard keys are back on plain `noctalia msg volume-up`/`volume-down`.
+
+### The accepted trade-off, and the way out of it
+
+With no reachable hardware control, the host cannot know where the amplifier is,
+so Noctalia's OSD no longer follows the puck. That is how any speaker with a
+physical knob behaves, and it is the price of the kernel's decision.
+
+The realistic escape is analog rather than a kernel patch. The board's rear
+line-out is a Realtek ALCS1200A whose `Master` control is
+`min=0 max=87, dBscale-min=-65.25dB, step=0.75dB` — 88 uniform hardware steps
+with a dB TLV, which PipeWire will delegate to. Over the jack, with USB
+unplugged, the HID device does not exist, so the two-stage problem is
+structurally impossible, the software attenuation goes away, *and* the OSD
+tracks a real hardware control again. The cost is the PC's analog path (noise
+floor, possible ground-loop hum) in place of the speaker's own DAC. The analog
+profiles currently read `available: no` purely because nothing is plugged in.
+
+Do not plug both: with USB connected for the media keys, the puck drives two
+stages again and the hwdb rule is still required.
+
+A kernel patch to re-enable the Feature Unit was considered and rejected —
+`boot.kernelPatches` forces a from-source CachyOS build, losing the binary cache
+that host's own config exists to preserve, at every kernel bump, and it would
+only help if the unit is not genuinely inert, which is unknown. Revisit if
+upstream adds a quirk for 046d:0a4c.
+
+### The lesson worth keeping
+
+Two diagnoses were argued from how the device behaves on another OS. The
+question that settled it took about a minute: unbind the keys, freeze the host,
+turn the knob. When a peripheral's *wiring* is in question, measure the
+peripheral — another OS's behaviour is evidence about that OS's driver stack,
+not about what is connected to what.
+
+## "Zen crashes on start" was a window-geometry fight, not a crash
+
+Reported twice as Zen crashing on launch. It never crashed. The symptom, once
+described precisely, was: the window opens correctly maximized, flashes, and
+settles at half the screen width.
+
+### What it actually was
+
+Three things had to line up:
+
+1. `home/niri/cfg/rules.kdl`'s Zen window-rule set `open-maximized-to-edges
+   true`. That is the correctly-maximized window visible for the first frame.
+2. Zen then restores its own remembered window state from
+   `~/.config/zen/<profile>/xulstore.json`, which held `"main-window": {
+   "sizemode": "normal", "width": "1256", "height": "1374" }`. `sizemode:
+   "normal"` makes Gecko send `xdg_toplevel.unset_maximized`.
+3. niri honours that and drops the window to an ordinary tiled column at the
+   *default* column width. `home/niri/cfg/layout.kdl` sets `gaps 16` and
+   `preset-column-widths`, but never `default-column-width` — so it fell back
+   to niri's built-in `proportion 0.5`.
+
+The flash is step 2 → step 3.
+
+The arithmetic is what confirmed it rather than merely fitting it. DP-1 is 2560
+wide with `gaps 16`, so a half-proportion column is `(2560 − 3×16) / 2 = 1256`
+— byte-for-byte the width already sitting in `xulstore.json`. Zen had recorded
+the half-width niri gave it and was asking for it back on every launch.
+
+That is also why it recurred, and why it will recur for any app with the same
+shape: Zen rewrites `xulstore.json` with whatever geometry the window had when
+it closed, so being wrong once makes it wrong permanently. Clearing the
+`main-window` entry by hand fixes exactly one launch.
+
+### The fix, and why it is the better of the two
+
+The operator's fix was to drop `open-maximized-to-edges true` from the Zen rule
+entirely and add `default-column-width { proportion 1.0; }` in its place.
+
+The alternative on the table was to keep the maximize and *also* set
+`proportion 1.0`, so that the un-maximize landed on full width. That removes
+the half-sizing but not the flash, because the state transition still happens.
+Removing the maximize outright means there is no maximized state for Zen to
+un-maximize out of, so there is no transition at all.
+
+It also resolved a pre-existing conditional in that block's own comments. The
+`draw-border-with-background false` line had been carrying a note saying it was
+"already correct the moment `open-maximized-to-edges` is ever removed"; a
+full-width *column* still respects `gaps 16`, unlike maximized-to-edges, so the
+focus ring now has real gap space to draw into and the empty-transparent-gap
+artifact is gone. Nothing in the file uses `open-maximized-to-edges` any more,
+which made a stale `open-maximized-to-edges false` in the Picture-in-Picture
+rule dead code (it existed only to cancel the base rule); it was removed.
+
+### What the diagnosis cost, and the lesson
+
+Roughly the first half of the investigation was spent on the wrong question,
+because "crash" was taken at face value. Ruling that out was worth doing and
+was quick — `coredumpctl list | grep zen` was empty for the whole boot, there
+were no minidumps and no `Crash Reports/` in either profile, and no OOM kill in
+the journal — but it pointed nowhere, and neither did the two most
+suspicious-looking numbers in the profile. `toolkit.startup.recent_crashes = 1`
+turned out to be self-inflicted: a test launch had been killed by a 25-second
+`timeout`, which lands inside Gecko's 30-second startup-crash window, so Zen
+scored the investigation's own probe as a crash. A 28 MB `sessionstore.jsonlz4`
+looked like a plausible cause of a slow, crash-like start and was not related
+at all.
+
+The question that actually solved it — "what does it look like on screen?" —
+took one sentence to answer and should have been asked first. A user-supplied
+noun for a symptom ("crash") is a hypothesis, not an observation. This is the
+same lesson the Z407 investigation above ends on, arrived at from the opposite
+direction: there, three wrong answers came from reasoning about a device
+instead of measuring it; here, one wrong direction came from reasoning about a
+symptom instead of looking at it.

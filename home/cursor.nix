@@ -5,9 +5,14 @@
 # greeter runs outside any user's Home Manager profile) lives in
 # modules/desktop/theming.nix + greetd.nix's own settings.cursor.
 #
-# x11.enable is deliberately omitted — niri runs without XWayland and nothing
-# in this repo enables it (see docs/decisions.md's Phase 3 notes), so there's
-# no X11 cursor consumer to configure here.
+# x11.enable stays deliberately omitted even now that XWayland exists here
+# (modules/desktop/niri.nix installs xwayland-satellite, so Steam and other
+# X11-only apps run). All that option adds is an `xsetroot` line in
+# xsession.profileExtra and two Xresources properties — an xsession this repo
+# never starts. Xwayland clients pick the theme up from XCURSOR_THEME and
+# XCURSOR_SIZE instead, which home.pointerCursor exports unconditionally
+# (read out of home-manager's own modules/config/home-cursor.nix), so they
+# are already covered by the block below.
 #
 # home/niri/cfg/misc.kdl already sets its own `cursor { xcursor-theme
 # "Bibata-Modern-Classic"; xcursor-size 22; }` block — niri renders its own

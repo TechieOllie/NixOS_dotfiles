@@ -76,26 +76,43 @@
     // background-effect block at the top of this file for why the two are
     // not the same mechanism. GTK gives us no client-side alpha to work
     // with, so tinting is the whole of what Nautilus can have here.
-    // UNLIKE Zen, focus-ring stays enabled here rather than
-    // off: niri's own default-config.kdl explains the focus-ring/border
-    // "solid background rectangle" bleed-through only happens because it
-    // has nowhere else to go for windows with no room around them — Zen is
-    // open-maximized-to-edges (zero gap, fills the whole output, so
-    // draw-border-with-background false left an empty gap with nothing to
-    // render into), but Nautilus is a normal tiled window with real gap
-    // space (layout.kdl's gaps 16) for the ring to draw into. So
-    // draw-border-with-background false here should give a real,
+    // focus-ring stays enabled here rather than off: niri's own
+    // default-config.kdl explains the focus-ring/border "solid background
+    // rectangle" bleed-through only happens because it has nowhere else to
+    // go for windows with no room around them, and Nautilus is a normal
+    // tiled window with real gap space (layout.kdl's gaps 16) for the ring
+    // to draw into. So draw-border-with-background false here gives a real,
     // correctly-colored ring in that gap space instead of bleeding through
-    // the translucent content — not the "off" treatment Zen needed.
+    // the translucent content. Zen used to be the counter-example that made
+    // this contrast worth drawing (open-maximized-to-edges, zero gap,
+    // nowhere for the ring to go); it isn't any more — see its block below.
     window-rule {
         match app-id="org.gnome.Nautilus"
         // opacity 0.80  // OFF: see the blur banner above
         draw-border-with-background false
     }
 
+    // Zen is a normal tiled window at full column width, deliberately NOT
+    // open-maximized-to-edges. It was the latter until 2026-08-21, and that
+    // was the whole of a long-standing "Zen crashes on start" report: niri
+    // opened it maximized, then Zen restored its own remembered window
+    // state from ~/.config/zen/<profile>/xulstore.json, whose main-window
+    // sizemode was "normal". That sends xdg_toplevel.unset_maximized, niri
+    // drops the window to an ordinary tiled column, and layout.kdl defines
+    // preset-column-widths but no default-column-width — so it landed on
+    // niri's built-in proportion 0.5, i.e. half the screen. The visible
+    // "crash" was that transition; the half-width geometry then got written
+    // back to xulstore.json on close, which is what made it recur. Fixing
+    // it here rather than in xulstore.json is the point: Zen owns that file
+    // and rewrites it every time it closes, so an edit there is undone.
+    // See docs/decisions.md.
     window-rule {
         match app-id=r#"^zen(-\w+)?$"#
-        open-maximized-to-edges true
+        // Full width, but as a normal column — so unlike
+        // open-maximized-to-edges it still respects layout.kdl's gaps 16.
+        // That surrounding gap space is what makes
+        // draw-border-with-background false correct below.
+        default-column-width { proportion 1.0; }
         // Compositor-level opacity, independent of Transparent Zen's own
         // CSS-based transparency (which needs Zen/Gecko to actually render
         // an alpha-channel surface — niri isn't in that mod's confirmed-
@@ -109,31 +126,28 @@
         // hand, same as misc.kdl's duplicated cursor block.
         // opacity 0.80  // OFF: see the blur banner above
         // prefer-no-csd (misc.kdl) already asks Zen to drop its own
-        // decorations. Matches Nautilus's fix (below/rules.kdl) rather than
-        // disabling focus-ring/border outright — deliberately, even though
-        // it currently reintroduces the empty-transparent-gap bug this
-        // exact line previously fixed (`focus-ring { off } border { off
-        // }`): niri's own default-config.kdl explains the ring/border
-        // "solid background" bleed-through only happens because it has
-        // nowhere else to render for a window with no surrounding space,
-        // and Zen is currently open-maximized-to-edges (zero gap, fills
-        // the whole output) — there's genuinely nowhere for the ring to go
-        // as long as that stays true. Kept as draw-border-with-background
-        // false anyway, at the operator's explicit request, so this is
-        // already correct the moment open-maximized-to-edges is ever
-        // removed (making Zen a normal tiled window with real gap space,
-        // like Nautilus) — revert to focus-ring/border off if
-        // maximized-to-edges stays and the gap artifact bothers you before
-        // then.
+        // decorations. Same treatment as Nautilus above rather than
+        // disabling focus-ring/border outright. This line used to
+        // reintroduce an empty-transparent-gap bug that `focus-ring { off }
+        // border { off }` had previously fixed — niri's own
+        // default-config.kdl explains the ring/border "solid background"
+        // bleed-through only happens when there is nowhere else to render,
+        // which was exactly Zen's situation while it was maximized to edges
+        // with zero surrounding space. It now has real gap space like
+        // Nautilus, so the ring draws where it should and the artifact is
+        // gone. Keep this as-is unless open-maximized-to-edges ever comes
+        // back, in which case revert to focus-ring/border off.
         draw-border-with-background false
     }
 
-    // Same treatment as Nautilus (opacity matching transparency.nix,
-    // draw-border-with-background false, focus-ring stays enabled) rather
-    // than Zen's — Vesktop uses plain open-maximized below, not
-    // open-maximized-to-edges, which per niri's own docs still respects
-    // gaps/struts, so it has real gap space for the ring to draw into,
-    // same as Nautilus. Pairs with Vesktop's own VencordSettings.store.transparent
+    // Same treatment as Nautilus and Zen (opacity matching transparency.nix,
+    // draw-border-with-background false, focus-ring stays enabled).
+    // Vesktop uses plain open-maximized below, which per niri's own docs
+    // still respects gaps/struts, so it has real gap space for the ring to
+    // draw into. Since 2026-08-21 every window in this file does — nothing
+    // uses open-maximized-to-edges any more (see the Zen block above), so
+    // this is no longer the contrast it once was.
+    // Pairs with Vesktop's own VencordSettings.store.transparent
     // (home/vesktop.nix) as a compositor-level fallback independent of
     // whether Electron's own transparency renders correctly here.
     // `transparent` is currently false there (Phase 6 dropped the whole
@@ -160,7 +174,10 @@
 
     window-rule {
        match app-id=r#"^zen(-\w+)?$"# title="^Picture-in-Picture$"
-       open-maximized-to-edges false
+       // An `open-maximized-to-edges false` used to sit here purely to
+       // cancel the base Zen rule above; that rule no longer sets it, so the
+       // line was dead and is gone. The fixed sizes below still override
+       // that rule's default-column-width.
        open-floating true
        default-floating-position x=32 y=32 relative-to="bottom-right"
        default-column-width { fixed 480; }

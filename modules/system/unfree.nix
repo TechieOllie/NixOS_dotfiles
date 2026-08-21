@@ -29,6 +29,13 @@
     builtins.elem (lib.getName pkg) [
       "vscode"
       "obsidian"
+      # Anthropic's commercial terms rather than an OSS license — see
+      # home/claude-code.nix, which installs it.
+      "claude-code"
+      # IntelliJ IDEA's unified distribution. Its Apache-2.0 sibling
+      # (idea-oss) would need permittedInsecurePackages instead — see
+      # home/jetbrains.nix.
+      "idea"
       # Steam and the pieces the NixOS steam module pulls in around it.
       # Millennium's own `millennium-steam` is built inside that flake's
       # pinned nixpkgs (which sets allowUnfree itself), but the module

@@ -33,6 +33,21 @@
           default = false;
           description = "Enable CUPS printing and Avahi-based network printer/scanner discovery.";
         };
+        kdeconnect = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Enable KDE Connect phone integration: the daemon and its tray indicator, plus the 1714-1764 firewall range pairing needs.";
+        };
+        cad = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Enable the CAD stack: FreeCAD, on the Home Manager side.";
+        };
+        development = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Enable developer tooling beyond the universal terminal stack: IntelliJ IDEA and the Claude Code CLI, both on the Home Manager side.";
+        };
         moonshine = lib.mkOption {
           type = lib.types.bool;
           default = false;
