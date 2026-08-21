@@ -49,6 +49,27 @@ let
         -o "$out" \
         ${pkgs.papirus-icon-theme}/share/icons/Papirus-Dark/${iconPath}
     '';
+
+  # Where the streamed user's per-launcher data lives. Read off the user
+  # rather than written out, so this can't drift from modules/system/users.nix.
+  # Moonshine does expand $HOME in these paths itself, but only because the
+  # daemon happens to run as this user — the path is a fact about the config,
+  # not about the process, so it is stated outright.
+  homeDir = config.users.users.${vars.user.name}.home;
+
+  # Steam is single-instance per user, so any steam:// URL handed to a Steam
+  # that is already running is forwarded to *it* — the game opens on the
+  # physical screen and the stream fails with a 503. Upstream's recommended
+  # workaround (TIPS.md, issue #134): ask a running Steam to quit, then wait up
+  # to ~30s for it to actually go away. Needed identically by the Big Picture
+  # entry and by every game the Steam scanner finds, hence a binding.
+  steamShutdown = [
+    [
+      "/run/current-system/sw/bin/bash"
+      "-c"
+      "if pgrep -x steam >/dev/null; then /run/current-system/sw/bin/steam -shutdown &>/dev/null; for i in $(seq 1 30); do ! pgrep -x steam >/dev/null && break; sleep 1; done; fi"
+    ]
+  ];
 in
 {
   imports = [
@@ -140,19 +161,8 @@ in
               "/run/current-system/sw/bin/steam"
               "steam://open/bigpicture"
             ];
-            # Steam is single-instance per user, so with a desktop Steam
-            # already running the steam:// URL is forwarded to *it* and Big
-            # Picture opens on the physical screen while the stream fails
-            # with a 503. Upstream's recommended workaround (TIPS.md, issue
-            # #134): ask any running Steam to quit and wait up to ~30s for
-            # it to actually go away before launching ours.
-            pre_command = [
-              [
-                "/run/current-system/sw/bin/bash"
-                "-c"
-                "if pgrep -x steam >/dev/null; then /run/current-system/sw/bin/steam -shutdown &>/dev/null; for i in $(seq 1 30); do ! pgrep -x steam >/dev/null && break; sleep 1; done; fi"
-              ]
-            ];
+            # See steamShutdown above for why this is needed.
+            pre_command = steamShutdown;
             stdout = "journal";
             stderr = "journal";
           }
@@ -200,6 +210,80 @@ in
               "/run/current-system/sw/bin/systemctl"
               "poweroff"
               "-i"
+            ];
+            stdout = "journal";
+            stderr = "journal";
+          }
+        ];
+
+        # The entries above are the two launchers' own front ends — Big
+        # Picture and Heroic's console mode — which are what you want when
+        # you don't know yet what you're playing. These scanners add the
+        # library itself: one Moonlight card per installed game, launched
+        # directly, so a stream can start in the game rather than three
+        # menus away from it. Moonshine merges scanned entries into the
+        # static list at startup and de-duplicates on (title, command), so
+        # the two can't collide.
+        #
+        # Gated on features.gaming for the same reason the launcher entries
+        # are: on a host streaming without the gaming stack these would
+        # point at binaries that were never installed.
+        #
+        # Scanning happens in the daemon at startup, not at build time — the
+        # generated TOML names the libraries, and installing or removing a
+        # game changes the app list on the next `systemctl restart
+        # moonshine`, with no rebuild.
+        application_scanner = lib.optionals config.features.gaming [
+          {
+            type = "steam";
+
+            # One entry covers both libraries on this machine: steamlocate
+            # reads libraryfolders.vdf from the library named here and then
+            # walks every library it lists, so the games on /mnt/storage are
+            # found too. Box art is deliberately still looked up under
+            # *this* path (appcache/librarycache), which is where Steam
+            # caches art for every library, so the second one needs nothing.
+            library = "${homeDir}/.local/share/Steam";
+
+            # -bigpicture alongside the game, as upstream's own example
+            # does: without it Steam brings up the desktop client window in
+            # the stream's compositor next to the game, and the two compete
+            # for focus. {game_id} is substituted per app by the scanner.
+            command = [
+              "/run/current-system/sw/bin/steam"
+              "-bigpicture"
+              "steam://rungameid/{game_id}"
+            ];
+            pre_command = steamShutdown;
+            stdout = "journal";
+            stderr = "journal";
+          }
+          {
+            type = "heroic";
+
+            # Explicit rather than left to the default. Upstream's default
+            # picks between the native and Flatpak config directories by
+            # probing which exists, from the daemon's own process context —
+            # a runtime guess where this repo can state the answer.
+            config_dir = "${homeDir}/.config/heroic";
+
+            # --no-gui plus a heroic:// URL is Heroic's own launch protocol:
+            # it starts the game without ever drawing the library window.
+            # {app_name} is Heroic's internal game id and {runner} the store
+            # it came from (legendary/gog/nile/sideload), both substituted
+            # per app. Same per-user profile path as the Heroic entry above,
+            # and for the same reason.
+            #
+            # No pre_command counterpart to Steam's: Heroic is also
+            # single-instance, so launching a game while a desktop Heroic is
+            # open will hand the URL to that one and start the game on the
+            # physical screen. It has no graceful `-shutdown` to ask with,
+            # and killing an Electron app mid-download is worse than the
+            # problem — so close Heroic before streaming a game.
+            command = [
+              "/etc/profiles/per-user/${vars.user.name}/bin/heroic"
+              "--no-gui"
+              "heroic://launch?appName={app_name}&runner={runner}"
             ];
             stdout = "journal";
             stderr = "journal";

@@ -2294,6 +2294,59 @@ green. **Render the icon and look at it before picking one** — an icon name
 that reads correctly says nothing about whether it will be visible against
 the client's background.
 
+### Scanners: the library, not just the launchers
+
+The four entries above are front ends — Big Picture, Heroic's console mode, a
+desktop and a power button. They get you to a machine, not to a game: from
+Moonlight you land in a launcher UI and navigate it over the stream. Moonshine
+also has *application scanners*, which read a launcher's own library and emit
+one app entry per installed game, so a stream can start in the game itself.
+`modules/services/moonshine.nix` now configures two of the four upstream
+supports (Steam and Heroic; Lutris and the generic `.desktop` scanner aren't
+relevant on this host), on `features.gaming` alongside the launcher entries
+they complement.
+
+Scanning happens in the daemon at startup, not at build time — the generated
+TOML only names the libraries. Installing a game therefore changes the app
+list at the next `systemctl restart moonshine`, with no rebuild. Scanned
+entries are merged into the static list and de-duplicated on
+`(title, command)`, so the manual launcher entries can't collide with them.
+
+**Steam.** One scanner covers both of this host's libraries: `steamlocate`
+reads `libraryfolders.vdf` from the path given and then walks every library it
+lists, so the games on `/mnt/storage/SteamLibrary` are found from the
+`~/.local/share/Steam` entry. Box art is read from
+`appcache/librarycache/<appid>` — under the *configured* library, which is
+also where Steam caches art for games installed elsewhere, so the second
+library needs no entry of its own. The command carries `-bigpicture` next to
+`steam://rungameid/{game_id}`, as upstream's own example does: without it
+Steam draws the desktop client window in the stream's compositor beside the
+game and the two compete for focus. The `-shutdown` pre-command the Big
+Picture entry already needed applies identically here — a `steam://` URL
+handed to a running Steam is forwarded to *it*, so the game opens on the
+physical screen and the stream 503s — so that workaround is now a `let`
+binding shared by both.
+
+**Heroic.** `--no-gui` plus `heroic://launch?appName={app_name}&runner={runner}`
+is Heroic's own launch protocol; it starts the game without drawing the
+library window. `{runner}` is the store (`legendary`/`gog`/`nile`/`sideload`).
+`config_dir` is stated rather than left to the default, which probes for the
+native and Flatpak directories from the daemon's process context — a runtime
+guess where this repo knows the answer. The command uses
+`/etc/profiles/per-user/`, for the same reason the launcher entry does.
+
+Heroic is single-instance too, and gets **no** equivalent of Steam's
+pre-command: it has no graceful `-shutdown` to ask with, and killing an
+Electron app that might be mid-download is worse than the problem. So closing
+Heroic before streaming one of its games is a manual step, by choice.
+
+Box art for scanned games comes from each launcher's own cache — Steam's
+`library_600x900.jpg`/`library_capsule.jpg`, Heroic's `images-cache/`. A game
+whose art the launcher never downloaded falls through to
+`resolve_missing_boxart()`, which as established above cannot resolve
+anything on NixOS, and will show as a blank card. The fix is to open the
+launcher once so it fetches the art, not anything repo-side.
+
 ### Status
 
 No longer eval-only — the desktop has been installed and booted since this
