@@ -2249,11 +2249,57 @@ to, which is what lets Moonshine hold a block-type sleep inhibitor for the
 duration of a stream; without it streaming works but the host may suspend
 mid-session.
 
+### Box art: declared, not resolved
+
+Moonlight showed all four entries as blank cards. Moonshine does try to fill
+that in by itself — `resolve_missing_boxart()` in `moonshine-core`'s
+`app_scanner` walks the XDG icon directories for a file whose stem matches
+the app's own lowercased title — but that can never fire here, for two
+independent reasons:
+
+- **The search path is empty on NixOS.** The resolver builds its roots from
+  `XDG_DATA_HOME` and `XDG_DATA_DIRS`, falling back to `/usr/local/share`
+  and `/usr/share` when the latter is unset. A systemd *system* service gets
+  no `XDG_DATA_DIRS` — upstream's own module says so in a comment, which is
+  why it installs the Vulkan WSI layer into `/run/opengl-driver` rather than
+  relying on the variable — and neither of the fallbacks exists on NixOS.
+  Setting `XDG_DATA_DIRS` on the unit would fix this half, but only this
+  half.
+- **Half the titles aren't application names.** "Desktop" and "Shutdown"
+  describe what the entry *does*; no icon is named after them. Even with the
+  search path repaired, the resolver would light up Steam and Heroic and
+  leave the other two blank.
+
+So each entry declares its `boxart` outright. The path is pinned per entry
+rather than scored by a resolver, and the two non-application entries get an
+icon chosen for what they mean.
+
+Papirus-Dark, the same theme `home/gtk.nix` sets for the session, so a
+streamed machine looks like itself. It ships SVG only and Moonshine's
+decoder handles raster formats only (`png`/`jpg`/`jpeg`/`webp`/`bmp`/`ico`),
+so a small `runCommand` rasterizes each with `rsvg-convert` at build time.
+600px square, because 600 is Moonshine's own `BOXART_WIDTH`: it letterboxes
+anything that isn't 600x801 onto a transparent canvas of that size, so
+rendering at the width means it centres the icon without rescaling it.
+Interpolating the results into `settings` puts store references in the
+generated config TOML, which is part of the system closure — they can't be
+garbage-collected out from under a running daemon.
+
+Steam, Heroic and Shutdown map to `steam`, `heroic` and `system-shutdown`.
+"Desktop" was going to be `devices/video-display`, the obvious generic, but
+rendering it first showed why that was wrong: it is a near-black monitor on
+a transparent background, which vanishes into Moonlight's own dark app grid.
+`apps/preferences-desktop-remote-desktop` says the same thing in blue and
+green. **Render the icon and look at it before picking one** — an icon name
+that reads correctly says nothing about whether it will be visible against
+the client's background.
+
 ### Status
 
-Eval-only, like the rest of the desktop's stack — the machine still runs
-CachyOS and has never been booted into this configuration. Pairing is at
-`http://<host>:47989/pin` once it is.
+No longer eval-only — the desktop has been installed and booted since this
+was written, and a paired Moonlight client lists the four entries above,
+which is how the blank box art was noticed. Pairing is at
+`http://<host>:47989/pin`.
 
 ## Turning on `home-manager.useUserPackages`
 
