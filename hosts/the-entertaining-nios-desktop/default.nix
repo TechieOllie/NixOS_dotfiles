@@ -1,4 +1,39 @@
 { pkgs, vars, ... }:
+let
+  # What the Pi's key is pinned to, in place of a bare `systemctl poweroff`.
+  #
+  # The point of the grace period is that "Alexa, turn off Desktop" is said by
+  # someone in another room, who cannot see whether anyone is sitting at the
+  # machine. Ten seconds is enough to notice the warning and cancel it —
+  # `pkill -f alexa-poweroff` — and short enough that nobody stands there
+  # wondering whether Alexa heard.
+  #
+  # Two channels, because there are two kinds of user to warn: `wall` reaches
+  # TTYs and SSH sessions, notify-send reaches the graphical session, which is
+  # the one that actually matters here — a niri user sees nothing of a wall
+  # banner. The bus address is spelled out rather than inherited: this runs
+  # from an sshd session, which knows nothing of the graphical session's bus.
+  # Both are best-effort; a missing notification daemon must not cost us the
+  # shutdown, hence `|| true` on each.
+  alexa-poweroff = pkgs.writeShellScript "alexa-poweroff" ''
+    grace=10
+    msg="Powering off in $grace seconds (asked for via Alexa). Cancel with: pkill -f alexa-poweroff"
+
+    ${pkgs.util-linux}/bin/wall "$msg" || true
+    DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(${pkgs.coreutils}/bin/id -u)/bus" \
+      ${pkgs.libnotify}/bin/notify-send -u critical "Shutting down" "$msg" || true
+
+    sleep "$grace"
+    exec ${pkgs.systemd}/bin/systemctl poweroff -i --no-block
+  '';
+
+  # The forced command: fork that script off and return immediately. fauxmo
+  # gives the command 15 seconds and Alexa is waiting on the answer, so the
+  # connection has to close with status 0 now, not in half a minute. setsid
+  # and nohup put the sleep in a session of its own, where the SIGHUP from
+  # the closing SSH session cannot reach it.
+  alexa-poweroff-cmd = "${pkgs.util-linux}/bin/setsid ${pkgs.coreutils}/bin/nohup ${alexa-poweroff} >/dev/null 2>&1 &";
+in
 {
   imports = [
     ./features.nix
@@ -89,6 +124,30 @@
   # flag set across reboots, which ethtool otherwise forgets.
   networking.interfaces.enp4s0.wakeOnLan.enable = true;
 
+  # ...and the .link file above is applied by udev on device *add*, which is
+  # boot and nothing else. Pulling the ethernet cable and putting it back
+  # re-activates the NetworkManager connection but fires no add event, so
+  # nothing re-arms the flag. Pinning the profile default to `magic` means
+  # every activation programs it, rather than merely inheriting whatever the
+  # last one left. NM's own default is "don't touch", so this is strictly
+  # more re-arming, never less.
+  networking.networkmanager.settings.connection."ethernet.wake-on-lan" = "magic";
+
+  # PME has to travel from the NIC up to the root complex, and every bridge on
+  # the path has to be armed to pass it on. The path here is
+  #
+  #   00:01.2  ->  02:00.2  ->  03:08.0  ->  04:00.0 (enp4s0)
+  #
+  # and 02:00.2 — a downstream port of the chipset switch, which ACPI does not
+  # list in /proc/acpi/wakeup and so nothing else ever enables — came up
+  # `disabled`, breaking the chain one hop below the NIC. This matters most
+  # for wake from suspend; wake from S5 is mainly the firmware's business.
+  # Matching by slot rather than by ID because the ID is shared by the switch's
+  # other ports, which have no business being armed.
+  services.udev.extraRules = ''
+    ACTION=="add", SUBSYSTEM=="pci", KERNEL=="0000:02:00.2", ATTR{power/wakeup}="enabled"
+  '';
+
   # The Pi's key, pinned to exactly one command. `restrict` drops port, agent
   # and X11 forwarding plus PTY allocation; the forced command overrides
   # whatever the client asks to run. Together they mean a compromised Pi can
@@ -98,12 +157,18 @@
   # Merges with the key set in modules/system/ssh.nix rather than replacing
   # it: authorizedKeys.keys is a list option.
   #
+  # The command is the wrapper defined above rather than systemctl itself, so
+  # that anyone actually sitting at the machine gets warned and has a few
+  # seconds to stop it; see the comments there.
+  #
   # -i for the reason moonshine's Shutdown app documents — systemd otherwise
   # refuses while another session or inhibitor is present. --no-block is the
   # SSH-specific half: without it systemctl waits on a job that only finishes
   # as the machine dies, the connection drops before an exit status is sent,
   # and fauxmo reports failure, which Alexa relays as "something went wrong"
-  # after a long pause.
+  # after a long pause. Backgrounding the wrapper does not make --no-block
+  # redundant: the systemctl call is still the last thing in a session
+  # systemd is tearing down around it.
   #
   # Authorization comes from the polkit rule in modules/services/moonshine.nix,
   # which already grants this user the two power-off actions from exactly this
@@ -111,7 +176,7 @@
   # features.moonshine off would leave this key authenticated but unauthorized,
   # failing with InteractiveAuthorizationRequired.
   users.users.${vars.user.name}.openssh.authorizedKeys.keys = [
-    ''restrict,command="/run/current-system/sw/bin/systemctl poweroff -i --no-block" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHxwuZAw0GuGTMfyukGCt4KDOx8AY6LBGV3tpfJv7Wft fauxmo@wakeonlan''
+    ''restrict,command="${alexa-poweroff-cmd}" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHxwuZAw0GuGTMfyukGCt4KDOx8AY6LBGV3tpfJv7Wft fauxmo@wakeonlan''
   ];
 
   # Provisional: the latest released stable at scaffold time. Reconfirm
