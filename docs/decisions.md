@@ -2665,13 +2665,19 @@ unless the intent is to reset the wallpaper.
 Neither was introduced here; both were found by reading the export against
 upstream's schema, and both were declared as-found rather than silently
 "fixed", since fixing either is a visible change that is the operator's to
-make. The operator has since resolved the second.
+make. The operator has since resolved both — in each case by deleting the
+dead setting rather than by supplying the missing half that would have made
+it live.
 
-- **`shell.app_icon_color` is inert.** `example.toml` documents it as a color
-  role "when colorize is enabled", and `appIconColorize` defaults to `false`
-  (`config_types.h`). The desktop sets the color and never set the switch, so
-  it has never had any effect. Still as-found: the color is declared, the
-  switch is not.
+- **`shell.app_icon_color` was inert.** `example.toml` documents it as a
+  color role "when colorize is enabled", and `appIconColorize` defaults to
+  `false` (`config_types.h`). The desktop set the color and never set the
+  switch, so it never had any effect. Resolved by removing the key: enabling
+  `app_icon_colorize` would have been a visible recolor of every app icon in
+  the shell, which is not what the exported state was asking for — the color
+  was set once in the UI and left stranded. Same sidecar caveat as below,
+  though this one is harmless: a host that still has `shell.app_icon_color`
+  in its `settings.toml` keeps a value nothing reads.
 - **The bar's `bar_2` slot pointed at a plugin that is not installed.**
   `widget.bar_2.type = "icefish/phone-connect:bar"`, but `plugins.enabled`
   lists only `8bury/mini-docker` and `rylos/tailnet`, so the slot rendered

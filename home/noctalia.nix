@@ -128,16 +128,6 @@ in
           # the machine.
           screen_time_enabled = true;
 
-          # Recolor app icons to a palette role rather than leaving them at
-          # their shipped colors. NOTE: this key is inert on its own —
-          # example.toml documents it as "ColorSpec role or #hex *when
-          # colorize is enabled*", and `app_icon_colorize` defaults to false
-          # (config_types.h: `bool appIconColorize = false`). Declared as the
-          # exported state has it, deliberately without switching colorize
-          # on: turning it on is a visible appearance change across the whole
-          # shell, and is the operator's call to make in the UI first.
-          app_icon_color = "on_surface_variant";
-
           # Anonymous startup ping to Noctalia's own endpoint. Upstream
           # defaults it to false (config_types.h: `bool telemetryEnabled =
           # false`); Noctalia's *setup wizard* asks about it on first run and
