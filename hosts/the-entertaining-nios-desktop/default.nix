@@ -121,6 +121,45 @@
     "L+ /home/${vars.user.name}/Storage - - - - /mnt/storage"
   ];
 
+  # Wake-on-LAN, and the shutdown path that pairs with it.
+  #
+  # A Raspberry Pi on the LAN emulates a Wemo smart plug (fauxmo), so "Alexa,
+  # turn on Desktop" sends a magic packet to this NIC and "turn off" makes the
+  # Pi SSH in and power the machine down. Host-level for the same reason as
+  # the kernel and lact above: it names *this* machine's NIC and trusts *one*
+  # specific Pi's key, neither of which another host should inherit.
+  #
+  # The firmware half is not expressible here. "Wake on PCI-E" (or equivalent)
+  # has to be set once in the BIOS, or the NIC loses standby power at S5 and
+  # the magic packet is never seen. This option only keeps the driver-side
+  # flag set across reboots, which ethtool otherwise forgets.
+  networking.interfaces.enp4s0.wakeOnLan.enable = true;
+
+  # The Pi's key, pinned to exactly one command. `restrict` drops port, agent
+  # and X11 forwarding plus PTY allocation; the forced command overrides
+  # whatever the client asks to run. Together they mean a compromised Pi can
+  # power this machine off and do nothing else — worth the care, because
+  # fauxmo's whole job is running commands named in a config file.
+  #
+  # Merges with the key set in modules/system/ssh.nix rather than replacing
+  # it: authorizedKeys.keys is a list option.
+  #
+  # -i for the reason moonshine's Shutdown app documents — systemd otherwise
+  # refuses while another session or inhibitor is present. --no-block is the
+  # SSH-specific half: without it systemctl waits on a job that only finishes
+  # as the machine dies, the connection drops before an exit status is sent,
+  # and fauxmo reports failure, which Alexa relays as "something went wrong"
+  # after a long pause.
+  #
+  # Authorization comes from the polkit rule in modules/services/moonshine.nix,
+  # which already grants this user the two power-off actions from exactly this
+  # kind of non-interactive session. That is a real coupling: turning
+  # features.moonshine off would leave this key authenticated but unauthorized,
+  # failing with InteractiveAuthorizationRequired.
+  users.users.${vars.user.name}.openssh.authorizedKeys.keys = [
+    ''restrict,command="/run/current-system/sw/bin/systemctl poweroff -i --no-block" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHxwuZAw0GuGTMfyukGCt4KDOx8AY6LBGV3tpfJv7Wft fauxmo@wakeonlan''
+  ];
+
   # Provisional: the latest released stable at scaffold time. Reconfirm
   # against the actually-released version when this host is bootstrapped for
   # real, then leave it untouched — it only marks the compatibility baseline
