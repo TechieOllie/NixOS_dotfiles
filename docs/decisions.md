@@ -2732,7 +2732,37 @@ exactly this kind of line and none appeared for them. Per this repo's rule
 that the validator warns but never fails, the `nix log` output is the part
 that carries the information, not the green build.
 
-Still not verified live: no host has been switched onto this config.
+### Verified live on the desktop (2026-08-21)
+
+The desktop was switched onto this config and the one-time sidecar cleanup
+run. Confirmed on the running system rather than by eval:
+
+- `/run/current-system` is the closure built from this branch.
+- Merging `origin/main` in first was necessary, not cosmetic: the branch was
+  19 commits behind, and switching as-is would have reverted live fixes
+  (Zen's remembered geometry, the Z407 volume puck). `home/noctalia.nix` has
+  no overlap with main, so the merge conflicted only where both sides had
+  appended sections to this file.
+- Four sidecar keys shadowed the new declarations and were cleared:
+  `bar.default.end` (which still listed `bar_2`, and would otherwise have
+  kept the removed slot on screen), `theme.templates.community_ids`,
+  `shell.app_icon_color` and `[widget.bar_2]`. Nothing else was touched — the
+  six-widget lockscreen canvas and both `wallpaper.monitors` entries survive.
+  This is the concrete case the sidecar gotcha warns about: **deleting a key
+  from Nix does not delete it from a provisioned host**, so a removal needs a
+  matching sidecar clear or it simply does not take effect.
+- The effective merge (base + sidecar, recomputed the way Noctalia does it)
+  now has no `bar_2` or `phone-connect` anywhere, no `app_icon_color`, and
+  `bar.default.end` is the declared eight-widget list.
+- Noctalia restarted clean: both plugins loaded, two outputs detected (no
+  writeback connector), a bar created on each, polkit agent registered,
+  telemetry disabled, `lockscreen_widgets.enabled = true` with all six stored
+  widgets intact. **Zero warnings from the running instance** — the
+  `unknown widget "bar_2"` line appears only in the pre-cleanup instance's
+  log, which is what proves the clear was the operative step.
+
+The `theme.templates.user.niri-style.input_path` store path changed again
+across the merge; `cmp` again confirms byte-identical contents.
 
 ## Porting the laptop's real Zen setup, and the `policies.Preferences` allowlist
 
