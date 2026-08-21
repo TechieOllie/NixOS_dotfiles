@@ -2463,6 +2463,307 @@ not something inherent to Wayland compositors on amdgpu, and `output.name`
 is needed only for the greeter — niri's own `display.kdl` needs no
 corresponding exclusion.
 
+## Auditing the VM's Noctalia sidecar into declarative config
+
+The VM had been configured through Noctalia's own settings pages for some
+months, and nothing in this repo recorded what had been changed that way. The
+question was what of it belonged in `home/noctalia.nix` so every host would
+follow it.
+
+### What the sidecar actually held
+
+`~/.local/state/noctalia/settings.toml` on `the-entertaining-nios-vm`, read
+in full, contained five things beyond `config_version`:
+
+| key | value | verdict |
+| --- | --- | --- |
+| `shell.telemetry_enabled` | `true` | declared, as `false` — see below |
+| `theme.templates.builtin_ids` | same five ids as Nix, reordered | already declarative; the sidecar copy is a redundant shadow |
+| `lockscreen_widgets.*` | `enabled = false` + a `lockscreen-login-box@Virtual-1` placement | only the switch is portable |
+| `wallpaper.default` / `.last` / `.monitors.Virtual-1` | the black-hole wallpaper | `default.path` declared |
+| `config_version` | `12` | Noctalia's own migration marker, not a setting |
+
+That is the whole delta. The settings pages had touched far less than the
+size of the file suggested — most of its bulk is one lockscreen widget's
+geometry.
+
+### Telemetry was a setup-wizard click, not a decision
+
+`telemetry_enabled` defaults to `false` upstream (`config_types.h`), and the
+*setup wizard* is what put `true` in the VM's sidecar: `setup_wizard_panel.cpp`
+calls `setOverride({"shell", "telemetry_enabled"})` with whatever the toggle
+was left on. Propagating the VM's value verbatim would have switched an
+anonymous startup ping on for the desktop and laptop on the strength of a
+first-run click on a disposable machine. The operator chose `false`, and it is
+now stated explicitly rather than left to the next host's wizard.
+
+### Correction: `wallpaper.default.path` is not inert
+
+`home/noctalia.nix` carried a note saying Noctalia reads the active wallpaper
+only from its own state and never from `config.toml`, and that declaring a
+default would therefore do nothing. That is half right, and the half it gets
+wrong matters.
+
+The key is real and documented — `example.toml` describes
+`[wallpaper.default] path` as the "optional initial/default wallpaper path",
+and Noctalia's own settings UI writes it. What the old note correctly
+identified is the *precedence*. `wallpaper.cpp` says so in a comment on
+`applyResolvedWallpaper`:
+
+```
+// Match wallpaper panel "All monitors": per-output overrides win over default in
+// getWallpaperPath(), so set every connected output plus default or the image never updates.
+```
+
+Picking a wallpaper in the UI writes `[wallpaper.monitors.<connector>]`, and
+that beats `default`. So the declared value is the wallpaper a host that has
+never picked one comes up on, and a host that has picked one keeps its
+choice. Both halves are wanted, and the feared failure mode — re-pinning the
+wallpaper on every login and overwriting the user's choice — cannot happen,
+because Nix writes only the base layer and never touches the sidecar.
+
+### The lockscreen widget placement is not portable
+
+The VM's widget id is `lockscreen-login-box@Virtual-1` and its position is
+`cx = 640.0, cy = 618.0` — absolute pixels on that machine's single output.
+Widget ids embed a connector name, which is machine cabling, the same reason
+the greeter's `output.name` pin is host-level rather than in a module. Only
+`lockscreen_widgets.enabled = false` was taken; the placement was left behind.
+
+### The sidecar shadows the base config permanently
+
+Worth stating plainly, because it bounds what this change can achieve.
+Noctalia deep-merges the sidecar over `config.toml` at load, and there is no
+compare-against-base pruning anywhere in `config_overrides.cpp` — the only
+erase path is `eraseOverridePath`, called when a setting is explicitly reset.
+So a value set once in the UI shadows this repo forever on that host, even
+after it is declared here and even if the declared value is identical.
+
+Making the VM and the desktop actually follow the declared values is a
+one-time manual step per host: delete the corresponding sections from
+`~/.local/state/noctalia/settings.toml` and restart the shell.
+
+```bash
+# per host, after a switch that carries the new config.toml
+systemctl --user stop noctalia
+$EDITOR ~/.local/state/noctalia/settings.toml   # drop shell.telemetry_enabled,
+                                                # theme.templates.builtin_ids,
+                                                # lockscreen_widgets.*, wallpaper.*
+systemctl --user start noctalia
+```
+
+An activation script that pruned those keys automatically was considered and
+rejected. That file is also where Noctalia keeps genuinely runtime-learned
+state — the active wallpaper, clipboard history position, widget placements —
+and a `nixos-rebuild switch` that silently reverted a choice made in the UI
+would be a worse surprise than a stale key that can be found by reading one
+file. It is the same reasoning that keeps the wallpaper *selection* out of
+Nix while the wallpaper *default* goes in.
+
+### Verification
+
+`driver.sh check` passes for all three hosts, and the generated
+`config.toml` validates clean under Noctalia's own build-time validator (the
+`noctalia-config` derivation, which the home module runs because
+`validateConfig` defaults to `true`).
+
+That validator needed a canary before it could be trusted, per this repo's
+own rule. It does **not** fail the build on a bad key — a junk
+`canary_junk_section.nope` still produced `✓ Config is valid`, exit 0, with
+the problem reported only as `WARN canary_junk_section: unknown section` in
+the build log. So it is a real check, but reading its `nix log` output is the
+part that matters; a green build alone says nothing about whether a key was
+recognised. With the canary removed, the log is warning-free, which is what
+confirms `lockscreen_widgets.enabled` and `wallpaper.default.path` are
+spelled the way Noctalia expects.
+
+Not yet verified live: no host has been switched onto this config, and no
+sidecar has been cleaned. The standing rule that eval passing is not
+verification applies here as everywhere.
+
+## Rebasing the Noctalia declarative config on the desktop's effective export
+
+The section above audited the *VM's* sidecar. That was the wrong host to
+generalise from: the VM is disposable, its Noctalia had been barely touched,
+and its whole delta was five keys. The desktop — the machine actually used —
+had months of settings-page work in its sidecar that this repo had never
+recorded. This pass replaces the VM-derived guesses with the desktop's real
+state.
+
+### The input: an effective-config export, not a sidecar
+
+The source was Noctalia's own export of the *merged* configuration
+(`~/Downloads/noctalia-config.toml`), not the sidecar alone. That matters,
+and it is the better artifact to work from: the sidecar is a diff against a
+base you then have to reconstruct by hand, whereas the export is what the
+operator actually sees on screen. Folding it back in is a straight
+"everything in this file should be declared", with one filter applied.
+
+### The filter: display independence
+
+The one editorial rule was that nothing tied to a particular display may be
+declared. Dropped on that basis:
+
+| dropped | why |
+| --- | --- |
+| `lockscreen_widgets.widget.*` (6 tables) | ids are `lockscreen-login-box@<connector>`; every widget carries `output`, `cx`/`cy`, `placement_width`/`placement_height` in absolute pixels |
+| `lockscreen_widgets.widget_order`, `.grid`, `.schema_version` | the same canvas's bookkeeping, meaningless without the placements |
+| `wallpaper.last`, `wallpaper.monitors.<connector>` | per-output runtime selection, and the thing that deliberately beats `wallpaper.default` |
+
+Everything else in the export is display-independent and was declared —
+including the bar layout, which is a list of widget *ids* and identical on
+every host. Upstream does offer per-monitor bar overrides
+(`[bar.<name>.monitor.<key>]`, matching on a connector); they are
+deliberately unused, so one bar description serves the desktop's two outputs
+and the laptop's one.
+
+### `lockscreen_widgets.enabled = true` is safe without placements
+
+This was the one genuinely risky call, since `enabled = true` with an empty
+widget list could plausibly mean a lock screen with no login box — an
+unlockable machine. It does not, and this was confirmed by reading upstream
+rather than by reasoning about it. `LockscreenWidgetsController::normalizeSnapshot`
+calls `lockscreen_login_box::ensureWidgets`, which walks the live Wayland
+outputs and, for every connected output without a login box, *inserts* one
+with `defaultPanelCenter`/`defaultPanelSize`, then force-enables one if none
+is enabled:
+
+```cpp
+for (const auto& output : wayland.outputs()) {
+  ...
+  if (outputsWithLoginBox.contains(outputKey)) { continue; }
+  DesktopWidgetState widget;
+  widget.id = widgetIdForOutput(outputKey);
+  ...
+  widgets.insert(widgets.begin(), std::move(widget));
+}
+```
+
+So a fresh host comes up with a centered, correctly-sized login box per
+monitor. The cost is that the widget *arrangement* is per-host runtime state
+this repo does not back up — accepted, because the alternative is hard-coding
+one machine's cabling.
+
+### Correction to the previous section's runbook
+
+The runbook above tells the operator to delete `lockscreen_widgets.*` from a
+host's sidecar. **Do not do that on the desktop.** That host's sidecar holds a
+hand-built six-widget lockscreen canvas — two login boxes, a clock, a
+calendar and two media players, individually positioned — and deleting the
+section would destroy it with nothing in this repo to restore it from, by
+design (see the filter above). The keys that are safe to clear on an
+already-provisioned host are the ones this repo now declares and whose
+sidecar copy is a redundant shadow: `theme.*`, `shell.*`, `bar.*`,
+`calendar.*`, `control_center.*`, `location.*`, `notification.*`,
+`plugins.*`, `widget.*`, `desktop_widgets.*`, `lockscreen.*`, and
+`lockscreen_widgets.enabled` *only* — never `lockscreen_widgets.widget`,
+`.grid` or `.widget_order`, and never `wallpaper.monitors`/`wallpaper.last`
+unless the intent is to reset the wallpaper.
+
+### Two things the export surfaced that were already broken
+
+Neither was introduced here; both were found by reading the export against
+upstream's schema, and both were declared as-found rather than silently
+"fixed", since fixing either is a visible change that is the operator's to
+make. The operator has since resolved both — in each case by deleting the
+dead setting rather than by supplying the missing half that would have made
+it live.
+
+- **`shell.app_icon_color` was inert.** `example.toml` documents it as a
+  color role "when colorize is enabled", and `appIconColorize` defaults to
+  `false` (`config_types.h`). The desktop set the color and never set the
+  switch, so it never had any effect. Resolved by removing the key: enabling
+  `app_icon_colorize` would have been a visible recolor of every app icon in
+  the shell, which is not what the exported state was asking for — the color
+  was set once in the UI and left stranded. Same sidecar caveat as below,
+  though this one is harmless: a host that still has `shell.app_icon_color`
+  in its `settings.toml` keeps a value nothing reads.
+- **The bar's `bar_2` slot pointed at a plugin that is not installed.**
+  `widget.bar_2.type = "icefish/phone-connect:bar"`, but `plugins.enabled`
+  lists only `8bury/mini-docker` and `rylos/tailnet`, so the slot rendered
+  nothing. Resolved by removing the slot rather than by installing the
+  plugin — the operator does not use `icefish/phone-connect`, so the id had
+  come along in the export only as leftover state from having tried it. The
+  `"bar_2"` entry in `bar.default.end` and the `[widget.bar_2]` block are
+  both gone. Note this is a case where the sidecar keeps the old value alive:
+  an already-provisioned host that set the slot through the UI still has
+  `widget.bar_2` in its `settings.toml`, and removing it from Nix does not
+  remove it there — add `widget.bar_2` to the safe-to-clear list for any host
+  that shows a stray empty slot after the switch.
+
+### Verification
+
+`nix flake check --no-build` passes for all three hosts. The generated
+`config.toml` was built directly out of the desktop's evaluated Home Manager
+config and diffed key-by-key (flattened, via `tomllib`) against the operator's
+export. After the pass the only differences are the deliberate drops in the
+table above, plus three explainable items:
+
+- `shell.telemetry_enabled` exists in the generated file and not in the
+  export. This is an artifact of *when* the export was taken, not a
+  disagreement: the export is the desktop's current base (built from `main`,
+  which has no such key) merged with its sidecar (which has none either), so
+  the key could not have appeared in it.
+- `theme.templates.community_ids` holds the same ten ids in a different
+  order. Order is apply order for template ids and carries no meaning; the
+  existing list order was kept and the three new gaming ids appended.
+- `theme.templates.user.niri-style.input_path` names a different store path.
+  `cmp` confirms the two files are byte-identical — a derivation-name
+  difference, not a content one.
+
+Noctalia's own build-time validator reports three warnings and no errors:
+
+```
+WARN  widget.bar: unrecognized widget type "rylos/tailnet:bar"
+WARN  widget.mini-docker: unrecognized widget type "8bury/mini-docker:mini-docker"
+✓ Config is valid (2 warning(s))
+```
+
+(A third, for `widget.bar_2`, was present until that slot was removed.)
+
+These are expected and permanent: plugin widget types are resolved from
+plugins Noctalia fetches at runtime into `~/.local/state/noctalia/plugins`,
+which a build-time validator running in a sandbox cannot see. Their presence
+is also useful — it means the validator *is* reading the `[widget.*]` blocks,
+and that every other new section here (`bar.default`'s layout, `calendar`,
+`control_center`, `location`, `lockscreen`, `notification`, `plugins`, the
+`shell.*` additions) was recognised, since an unknown section or key produces
+exactly this kind of line and none appeared for them. Per this repo's rule
+that the validator warns but never fails, the `nix log` output is the part
+that carries the information, not the green build.
+
+### Verified live on the desktop (2026-08-21)
+
+The desktop was switched onto this config and the one-time sidecar cleanup
+run. Confirmed on the running system rather than by eval:
+
+- `/run/current-system` is the closure built from this branch.
+- Merging `origin/main` in first was necessary, not cosmetic: the branch was
+  19 commits behind, and switching as-is would have reverted live fixes
+  (Zen's remembered geometry, the Z407 volume puck). `home/noctalia.nix` has
+  no overlap with main, so the merge conflicted only where both sides had
+  appended sections to this file.
+- Four sidecar keys shadowed the new declarations and were cleared:
+  `bar.default.end` (which still listed `bar_2`, and would otherwise have
+  kept the removed slot on screen), `theme.templates.community_ids`,
+  `shell.app_icon_color` and `[widget.bar_2]`. Nothing else was touched — the
+  six-widget lockscreen canvas and both `wallpaper.monitors` entries survive.
+  This is the concrete case the sidecar gotcha warns about: **deleting a key
+  from Nix does not delete it from a provisioned host**, so a removal needs a
+  matching sidecar clear or it simply does not take effect.
+- The effective merge (base + sidecar, recomputed the way Noctalia does it)
+  now has no `bar_2` or `phone-connect` anywhere, no `app_icon_color`, and
+  `bar.default.end` is the declared eight-widget list.
+- Noctalia restarted clean: both plugins loaded, two outputs detected (no
+  writeback connector), a bar created on each, polkit agent registered,
+  telemetry disabled, `lockscreen_widgets.enabled = true` with all six stored
+  widgets intact. **Zero warnings from the running instance** — the
+  `unknown widget "bar_2"` line appears only in the pre-cleanup instance's
+  log, which is what proves the clear was the operative step.
+
+The `theme.templates.user.niri-style.input_path` store path changed again
+across the merge; `cmp` again confirms byte-identical contents.
+
 ## Porting the laptop's real Zen setup, and the `policies.Preferences` allowlist
 
 The operator asked for Zen to be set up the way it actually is on their
