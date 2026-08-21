@@ -2299,7 +2299,9 @@ the client's background.
 No longer eval-only — the desktop has been installed and booted since this
 was written, and a paired Moonlight client lists the four entries above,
 which is how the blank box art was noticed. Pairing is at
-`http://<host>:47989/pin`.
+`http://<host>:47989/pin`. The declared box art is **verified live
+2026-08-21**: switched on the desktop, all four PNGs resolved in the running
+daemon's config, and the operator confirmed the icons render in Moonlight.
 
 ## Turning on `home-manager.useUserPackages`
 
