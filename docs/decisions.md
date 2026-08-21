@@ -3513,6 +3513,20 @@ throws away bit depth on a device that only accepts S16_LE. Raise it with the
 puck turned down first: at 40% the software stage is -24 dB, so going to 100% is
 a 24 dB jump.
 
+### Reverted 2026-08-21: the hwdb remap is gone
+
+At the operator's request, `services.udev.extraHwdb` was removed from the
+desktop's `default.nix`. The puck's three consumer-page usages reach niri again,
+so turning it moves both the amplifier and the host's software stage — the
+two-stage behaviour described above, knowingly reaccepted. What is gained back
+is Noctalia's OSD following the puck, and the puck being able to drive the host
+volume at all.
+
+Everything else in this entry still holds: the sink is still a software stage
+stacked under the amplifier, the scale is still cubic, and the kernel still
+refuses the Feature Unit. If uneven stepping or a dial/keyboard mismatch is
+reported again, this is the cause and the block above is the fix to restore.
+
 ### Rejected: a dB-uniform stepping wrapper on the keyboard keys
 
 A `volume-step up|down [dB]` wrapper was written, bound to the volume keys, and
