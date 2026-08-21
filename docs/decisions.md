@@ -2663,18 +2663,27 @@ unless the intent is to reset the wallpaper.
 ### Two things the export surfaced that were already broken
 
 Neither was introduced here; both were found by reading the export against
-upstream's schema, and both are declared as-found rather than silently
+upstream's schema, and both were declared as-found rather than silently
 "fixed", since fixing either is a visible change that is the operator's to
-make.
+make. The operator has since resolved the second.
 
 - **`shell.app_icon_color` is inert.** `example.toml` documents it as a color
   role "when colorize is enabled", and `appIconColorize` defaults to `false`
   (`config_types.h`). The desktop sets the color and never set the switch, so
-  it has never had any effect.
-- **The bar's `bar_2` slot points at a plugin that is not installed.**
+  it has never had any effect. Still as-found: the color is declared, the
+  switch is not.
+- **The bar's `bar_2` slot pointed at a plugin that is not installed.**
   `widget.bar_2.type = "icefish/phone-connect:bar"`, but `plugins.enabled`
-  lists only `8bury/mini-docker` and `rylos/tailnet`. That slot renders
-  nothing until the plugin is added.
+  lists only `8bury/mini-docker` and `rylos/tailnet`, so the slot rendered
+  nothing. Resolved by removing the slot rather than by installing the
+  plugin — the operator does not use `icefish/phone-connect`, so the id had
+  come along in the export only as leftover state from having tried it. The
+  `"bar_2"` entry in `bar.default.end` and the `[widget.bar_2]` block are
+  both gone. Note this is a case where the sidecar keeps the old value alive:
+  an already-provisioned host that set the slot through the UI still has
+  `widget.bar_2` in its `settings.toml`, and removing it from Nix does not
+  remove it there — add `widget.bar_2` to the safe-to-clear list for any host
+  that shows a stray empty slot after the switch.
 
 ### Verification
 
@@ -2700,12 +2709,13 @@ Noctalia's own build-time validator reports three warnings and no errors:
 
 ```
 WARN  widget.bar: unrecognized widget type "rylos/tailnet:bar"
-WARN  widget.bar_2: unrecognized widget type "icefish/phone-connect:bar"
 WARN  widget.mini-docker: unrecognized widget type "8bury/mini-docker:mini-docker"
-✓ Config is valid (3 warning(s))
+✓ Config is valid (2 warning(s))
 ```
 
-These three are expected and permanent: plugin widget types are resolved from
+(A third, for `widget.bar_2`, was present until that slot was removed.)
+
+These are expected and permanent: plugin widget types are resolved from
 plugins Noctalia fetches at runtime into `~/.local/state/noctalia/plugins`,
 which a build-time validator running in a sandbox cannot see. Their presence
 is also useful — it means the validator *is* reading the `[widget.*]` blocks,

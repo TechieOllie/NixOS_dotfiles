@@ -307,12 +307,10 @@ in
           # that is the same everywhere is one less thing that can differ
           # between the desktop's two outputs and the laptop's one.
           #
-          # Four of these ids resolve through [widget.*] blocks near the end
-          # of this file rather than being built-ins: "bar" and "bar_2" are
-          # generic plugin widget slots, and "mini-docker" is a plugin widget
-          # named after its plugin. See the plugins note there — "bar_2"'s
-          # plugin is not currently in plugins.enabled, so that slot renders
-          # nothing until it is.
+          # Two of these ids resolve through [widget.*] blocks near the end
+          # of this file rather than being built-ins: "bar" is a generic
+          # plugin widget slot, and "mini-docker" is a plugin widget named
+          # after its plugin.
           start = [
             "launcher"
             "wallpaper"
@@ -329,7 +327,6 @@ in
           ];
           end = [
             "media"
-            "bar_2"
             "tray"
             "notifications"
             "bluetooth"
@@ -452,10 +449,7 @@ in
         #
         # Deliberately not gated on features.docker/features.tailscale: these
         # are shell widgets, not the services themselves, and one whose
-        # backend is missing renders empty rather than failing. Note that
-        # the bar's "bar_2" slot above points at `icefish/phone-connect`,
-        # which is *not* in this list — that slot stays blank until the
-        # plugin is added here.
+        # backend is missing renders empty rather than failing.
         plugins.enabled = [
           "8bury/mini-docker"
           "rylos/tailnet"
@@ -471,15 +465,14 @@ in
             title_scroll = "always";
           };
 
-          # The two generic plugin slots. `type` is what binds a slot to a
+          # The generic plugin slot. `type` is what binds a slot to a
           # plugin's exported widget (`<author>/<name>:<widget>`); without
-          # it the slot is empty, which is why these blocks exist at all
+          # it the slot is empty, which is why this block exists at all
           # rather than the bar list being enough.
           bar = {
             type = "rylos/tailnet:bar";
             show_count = false;
           };
-          bar_2.type = "icefish/phone-connect:bar";
 
           "mini-docker" = {
             type = "8bury/mini-docker:mini-docker";
