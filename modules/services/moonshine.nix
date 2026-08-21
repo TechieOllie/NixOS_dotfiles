@@ -160,6 +160,83 @@ let
       "if pgrep -x steam >/dev/null; then /run/current-system/sw/bin/steam -shutdown &>/dev/null; for i in $(seq 1 30); do ! pgrep -x steam >/dev/null && break; sleep 1; done; fi"
     ]
   ];
+
+  # Heroic's counterpart, needed for the same reason and shaped differently
+  # because Heroic gives less to work with. It is single-instance too — its
+  # main process takes Electron's `requestSingleInstanceLock()` and the
+  # `second-instance` handler forwards a later invocation's argv to the
+  # running copy and shows its window (read out of 2.22.0's `app.asar`, not
+  # assumed). So `heroic --console` or a `heroic://launch?...` URL sent while
+  # a desktop Heroic is open acts on *that* instance: the launcher or the
+  # game appears on the physical screen and the stream gets a compositor with
+  # no client in it.
+  #
+  # Unlike Steam there is no `-shutdown` to ask politely with, so this asks
+  # the main process with SIGTERM — the browser process handles it and shuts
+  # down the way a window close would. Two guards around that, because the
+  # thing being terminated may be doing real work:
+  #
+  #   * If any of Heroic's own helper binaries are running (`legendary`,
+  #     `gogdl`, `nile`, `comet`) then something is downloading, installing,
+  #     or actually playing — Heroic drives all four as child processes. This
+  #     refuses rather than terminating, which is the case the old "close it
+  #     by hand" note was really protecting.
+  #   * Only the *main* process is signalled, identified as a `heroic`
+  #     process whose parent is not itself one; the renderer, GPU and zygote
+  #     children share the name and go away with it.
+  #
+  # Refusing means exiting non-zero, and that aborts the launch: Moonshine
+  # builds pre-commands into the transient unit's ExecStartPre with the
+  # ignore-failure flag off, so a failed one fails the unit and the app never
+  # starts. That is the point — a visible failure on the client beats a game
+  # silently starting on the machine's own screen.
+  heroicShutdown = [
+    [
+      "${pkgs.writeShellScript "moonshine-heroic-shutdown" ''
+        export PATH=/run/current-system/sw/bin:$PATH
+
+        pgrep -x heroic >/dev/null || exit 0
+
+        for helper in legendary gogdl nile comet; do
+          if pgrep -x "$helper" >/dev/null; then
+            echo "moonshine: Heroic is busy ($helper is running — a download," \
+                 "install or game). Refusing to close it; finish or stop that" \
+                 "first, or close Heroic by hand." >&2
+            exit 1
+          fi
+        done
+
+        # The main process is the one Electron holds the single-instance lock
+        # in; its children (renderer, GPU, zygote) carry the same name, so
+        # pick out the processes whose parent is not also a heroic.
+        mains=""
+        for pid in $(pgrep -x heroic); do
+          ppid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
+          [ -n "$ppid" ] || continue
+          if [ "$(ps -o comm= -p "$ppid" 2>/dev/null | tr -d ' ')" != "heroic" ]; then
+            mains="$mains $pid"
+          fi
+        done
+
+        if [ -z "$mains" ]; then
+          echo "moonshine: heroic processes are running but none looks like the" \
+               "main process; not signalling anything." >&2
+          exit 1
+        fi
+
+        kill -TERM $mains 2>/dev/null || true
+
+        for _ in $(seq 1 30); do
+          pgrep -x heroic >/dev/null || exit 0
+          sleep 1
+        done
+
+        echo "moonshine: Heroic did not exit within 30s of SIGTERM. Not" \
+             "escalating to SIGKILL — close it by hand." >&2
+        exit 1
+      ''}"
+    ]
+  ];
 in
 {
   imports = [
@@ -284,6 +361,10 @@ in
                 "/etc/profiles/per-user/${vars.user.name}/bin/heroic"
                 "--console"
               ];
+              # See heroicShutdown above: without this, a Heroic already open
+              # on the physical screen swallows this invocation and the stream
+              # gets an empty compositor.
+              pre_command = heroicShutdown;
               stdout = "journal";
               stderr = "journal";
             }
@@ -366,17 +447,18 @@ in
             # per app. Same per-user profile path as the Heroic entry above,
             # and for the same reason.
             #
-            # No pre_command counterpart to Steam's: Heroic is also
-            # single-instance, so launching a game while a desktop Heroic is
-            # open will hand the URL to that one and start the game on the
-            # physical screen. It has no graceful `-shutdown` to ask with,
-            # and killing an Electron app mid-download is worse than the
-            # problem — so close Heroic before streaming a game.
+            # Same single-instance problem Steam has, so the same shape of
+            # answer: a heroic:// URL handed to a Heroic that is already
+            # running is forwarded to *it*, and the game starts on the
+            # physical screen while the stream shows an empty compositor. See
+            # heroicShutdown above for why this asks with SIGTERM and why it
+            # refuses outright when Heroic is mid-download.
             command = [
               "/etc/profiles/per-user/${vars.user.name}/bin/heroic"
               "--no-gui"
               "heroic://launch?appName={app_name}&runner={runner}"
             ];
+            pre_command = heroicShutdown;
             stdout = "journal";
             stderr = "journal";
           }
