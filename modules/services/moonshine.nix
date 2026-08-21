@@ -50,6 +50,96 @@ let
         ${pkgs.papirus-icon-theme}/share/icons/Papirus-Dark/${iconPath}
     '';
 
+  # The Desktop entry's command, and the reason it is not just
+  # `niri-session`. niri picks its backend by sniffing the environment:
+  # WAYLAND_DISPLAY or DISPLAY set means "render nested, into that
+  # compositor", neither set means "take over a DRM device". Moonshine sets
+  # both when it launches an app — that is how an app reaches the
+  # per-stream compositor — so nesting is exactly what should happen.
+  #
+  # But `--session` *deletes* those two variables before the backend is
+  # chosen, unconditionally: it exists for the display-manager case, where
+  # a leaked WAYLAND_DISPLAY would be a bug, and niri's own --help says
+  # "Do not set when running as a nested window". So niri logged `running
+  # as a session but WAYLAND_DISPLAY is set, removing it`, fell through to
+  # the TTY backend, found it did not own the seat (`session is not
+  # active, starting libinput in paused state`) and drew nothing anywhere.
+  # Moonshine's compositor had no client, and the stream was a blank frame
+  # with only Moonshine's own cursor on it. The `niri-session` wrapper is
+  # no escape: Moonshine launches apps as transient *user* units, so the
+  # wrapper takes its `MANAGERPID` branch and execs `niri --session`
+  # anyway.
+  #
+  # So run plain `niri`, which keeps Moonshine's WAYLAND_DISPLAY and
+  # nests, and do by hand the session wiring `--session` would otherwise
+  # have done. That wiring has to run from niri's own startup command
+  # (`niri -- <cmd>`) rather than before it, because the values it must
+  # publish — the *nested* instance's WAYLAND_DISPLAY and NIRI_SOCKET, not
+  # Moonshine's — don't exist until niri is up, and niri exports them into
+  # that child's environment for exactly this purpose.
+
+  # The variables `niri --session` imports, verbatim. Publishing them is
+  # what makes graphical-session.target's units — Noctalia above all —
+  # attach to the streamed compositor instead of nothing.
+  sessionEnv = "WAYLAND_DISPLAY DISPLAY XDG_CURRENT_DESKTOP NIRI_SOCKET";
+
+  # Run inside the nested niri, as its startup command, and only when the
+  # wrapper below decided this stream owns the session (see there).
+  desktopStartup = pkgs.writeShellScript "moonshine-desktop-startup" ''
+    export PATH=/run/current-system/sw/bin:$PATH
+
+    if [ "''${MOONSHINE_OWNS_SESSION:-}" != "1" ]; then
+      echo "moonshine: graphical-session.target already belongs to a local" \
+           "login; streaming a bare niri without the shell. Log out locally" \
+           "for a full desktop." >&2
+      exit 0
+    fi
+
+    # niri sets XDG_CURRENT_DESKTOP for its children only in session mode,
+    # which is the mode we can't use; state it so the import below has
+    # something to import and portals resolve to the niri backend.
+    export XDG_CURRENT_DESKTOP=niri
+
+    systemctl --user import-environment ${sessionEnv}
+
+    # D-Bus's activation environment is separate from systemd's, and not
+    # every activatable service is SystemdService=.
+    dbus-update-activation-environment --systemd ${sessionEnv}
+
+    # niri.service would pull this in via BindsTo=, but the compositor is
+    # deliberately not running as that unit here.
+    systemctl --user start graphical-session.target
+  '';
+
+  desktopSession = pkgs.writeShellScript "moonshine-desktop" ''
+    export PATH=/run/current-system/sw/bin:$PATH
+
+    # Whether this stream is allowed to drive the session, decided *before*
+    # niri starts. graphical-session.target is per-user, not per-seat, so a
+    # local login already owns it; taking it over would move Noctalia to the
+    # stream, and tearing it down at the end of the stream would kill the
+    # session on the physical screen. Neither is ours to do, so when it is
+    # already active this degrades to a bare nested niri — no shell, but a
+    # compositor that renders, which is still a usable remote desktop.
+    # Headless — the case lingering exists for — takes the other branch and
+    # gets the full session.
+    if systemctl --user -q is-active graphical-session.target; then
+      export MOONSHINE_OWNS_SESSION=0
+    else
+      export MOONSHINE_OWNS_SESSION=1
+      # Tear the session down when the stream ends, the way niri-session
+      # does: niri-shutdown.target Conflicts= graphical-session.target, so
+      # one job stops everything attached to it. Not `exec niri` below,
+      # precisely so this trap still has a shell to run in.
+      trap '
+        systemctl --user start --job-mode=replace-irreversibly niri-shutdown.target || true
+        systemctl --user unset-environment ${sessionEnv} || true
+      ' EXIT
+    fi
+
+    niri -- ${desktopStartup}
+  '';
+
   # Where the streamed user's per-launcher data lives. Read off the user
   # rather than written out, so this can't drift from modules/system/users.nix.
   # Moonshine does expand $HOME in these paths itself, but only because the
@@ -120,101 +210,103 @@ in
         # point at binaries that were never installed — an app that fails
         # with no diagnostics, which is exactly the failure mode the
         # stdout/stderr settings below exist to avoid.
-        application = [
-          {
-            # The full remote desktop. niri is a Smithay compositor with a
-            # supported nested (Winit) backend, which is what makes it a fit
-            # for Moonshine's isolated-compositor model — it auto-detects
-            # nesting with no flag. GNOME is not an option here: Mutter
-            # grabs the DRM device rather than nesting, and GNOME 49 removed
-            # --nested outright.
-            #
-            # niri-session rather than bare niri: launched as one of
-            # Moonshine's transient units it detects that and execs
-            # `niri --session`, which does the systemd/D-Bus session setup a
-            # display manager would normally provide. greetd never sees this
-            # session, so nothing else would do it.
-            #
-            # Note the consequence: `niri --session` drives
-            # graphical-session.target in the *same* user manager as a local
-            # login. Streaming the desktop while also logged in at the
-            # machine means two niri instances contending over that target
-            # and over WAYLAND_DISPLAY. Headless — the case lingering exists
-            # for — is clean.
-            title = "Desktop";
-            # niri ships no icon of its own. Papirus' generic
-            # devices/video-display is the obvious stand-in but is a
-            # near-black monitor on a transparent background, which
-            # disappears into Moonlight's own dark app grid; this one says
-            # "remote desktop" and is legible there.
-            boxart = boxart "desktop" "64x64/apps/preferences-desktop-remote-desktop.svg";
-            command = [ "/run/current-system/sw/bin/niri-session" ];
-            stdout = "journal";
-            stderr = "journal";
-          }
-        ]
-        ++ lib.optionals config.features.gaming [
-          {
-            title = "Steam";
-            boxart = boxart "steam" "64x64/apps/steam.svg";
-            command = [
-              "/run/current-system/sw/bin/steam"
-              "steam://open/bigpicture"
-            ];
-            # See steamShutdown above for why this is needed.
-            pre_command = steamShutdown;
-            stdout = "journal";
-            stderr = "journal";
-          }
-          {
-            # The other half of the library — Epic, GOG and Amazon, which
-            # Steam doesn't cover. `--console` is Heroic's console mode: a
-            # controller-driven, TV-shaped UI that replaces the normal
-            # sidebar layout with a full-viewport one, which is what you
-            # want on the end of a stream. Verified as a real CLI flag
-            # rather than assumed — Heroic's main process reads it as
-            # `process.argv.includes("--console")`, alongside `--fullscreen`
-            # and `--no-gui`. Add `--fullscreen` here too if the window ever
-            # comes up smaller than the stream.
-            #
-            # A different profile from the entries above, not a different
-            # kind of path. Heroic is a Home Manager package
-            # (home/heroic.nix), so it isn't in `environment.systemPackages`
-            # and never appears in /run/current-system/sw/bin —
-            # /etc/profiles/per-user is where `home.packages` land, which is
-            # true only because lib/mkHost.nix sets
-            # `home-manager.useUserPackages`. With that off this would have
-            # to be a store path, since the packages would live in the
-            # user's own ~/.nix-profile and no system unit could name it.
-            title = "Heroic";
-            boxart = boxart "heroic" "64x64/apps/heroic.svg";
-            command = [
-              "/etc/profiles/per-user/${vars.user.name}/bin/heroic"
-              "--console"
-            ];
-            stdout = "journal";
-            stderr = "journal";
-          }
-        ]
-        ++ [
-          {
-            # Remote poweroff, so the machine doesn't have to be left on
-            # after a session. -i is not optional here: without it systemd
-            # refuses while any other session is logged in or holding an
-            # inhibitor ("Please retry after closing inhibitors"). The
-            # polkit rule below is a separate matter — it grants the
-            # *authorization*; -i governs whether other sessions block it.
-            title = "Shutdown";
-            boxart = boxart "shutdown" "64x64/apps/system-shutdown.svg";
-            command = [
-              "/run/current-system/sw/bin/systemctl"
-              "poweroff"
-              "-i"
-            ];
-            stdout = "journal";
-            stderr = "journal";
-          }
-        ];
+        # The Desktop entry is gated for the same reason the two launcher
+        # entries below are: features.moonshine and features.niri are
+        # independent flags, and a streaming host with no compositor would
+        # otherwise advertise a card whose command isn't installed.
+        application =
+          lib.optionals config.features.niri [
+            {
+              # The full remote desktop. niri is a Smithay compositor with a
+              # supported nested (Winit) backend, which is what makes it a fit
+              # for Moonshine's isolated-compositor model. GNOME is not an
+              # option here: Mutter grabs the DRM device rather than nesting,
+              # and GNOME 49 removed --nested outright.
+              #
+              # See desktopSession above for why this is a wrapper rather than
+              # `niri-session` — the short version is that `--session` strips
+              # the very variable that selects the nested backend.
+              #
+              # Note the consequence of doing that session wiring at all:
+              # graphical-session.target lives in the *same* user manager as a
+              # local login. Streaming the desktop while also logged in at the
+              # machine means two niri instances contending over that target
+              # and over WAYLAND_DISPLAY. Headless — the case lingering exists
+              # for — is clean.
+              title = "Desktop";
+              # niri ships no icon of its own. Papirus' generic
+              # devices/video-display is the obvious stand-in but is a
+              # near-black monitor on a transparent background, which
+              # disappears into Moonlight's own dark app grid; this one says
+              # "remote desktop" and is legible there.
+              boxart = boxart "desktop" "64x64/apps/preferences-desktop-remote-desktop.svg";
+              command = [ "${desktopSession}" ];
+              stdout = "journal";
+              stderr = "journal";
+            }
+          ]
+          ++ lib.optionals config.features.gaming [
+            {
+              title = "Steam";
+              boxart = boxart "steam" "64x64/apps/steam.svg";
+              command = [
+                "/run/current-system/sw/bin/steam"
+                "steam://open/bigpicture"
+              ];
+              # See steamShutdown above for why this is needed.
+              pre_command = steamShutdown;
+              stdout = "journal";
+              stderr = "journal";
+            }
+            {
+              # The other half of the library — Epic, GOG and Amazon, which
+              # Steam doesn't cover. `--console` is Heroic's console mode: a
+              # controller-driven, TV-shaped UI that replaces the normal
+              # sidebar layout with a full-viewport one, which is what you
+              # want on the end of a stream. Verified as a real CLI flag
+              # rather than assumed — Heroic's main process reads it as
+              # `process.argv.includes("--console")`, alongside `--fullscreen`
+              # and `--no-gui`. Add `--fullscreen` here too if the window ever
+              # comes up smaller than the stream.
+              #
+              # A different profile from the entries above, not a different
+              # kind of path. Heroic is a Home Manager package
+              # (home/heroic.nix), so it isn't in `environment.systemPackages`
+              # and never appears in /run/current-system/sw/bin —
+              # /etc/profiles/per-user is where `home.packages` land, which is
+              # true only because lib/mkHost.nix sets
+              # `home-manager.useUserPackages`. With that off this would have
+              # to be a store path, since the packages would live in the
+              # user's own ~/.nix-profile and no system unit could name it.
+              title = "Heroic";
+              boxart = boxart "heroic" "64x64/apps/heroic.svg";
+              command = [
+                "/etc/profiles/per-user/${vars.user.name}/bin/heroic"
+                "--console"
+              ];
+              stdout = "journal";
+              stderr = "journal";
+            }
+          ]
+          ++ [
+            {
+              # Remote poweroff, so the machine doesn't have to be left on
+              # after a session. -i is not optional here: without it systemd
+              # refuses while any other session is logged in or holding an
+              # inhibitor ("Please retry after closing inhibitors"). The
+              # polkit rule below is a separate matter — it grants the
+              # *authorization*; -i governs whether other sessions block it.
+              title = "Shutdown";
+              boxart = boxart "shutdown" "64x64/apps/system-shutdown.svg";
+              command = [
+                "/run/current-system/sw/bin/systemctl"
+                "poweroff"
+                "-i"
+              ];
+              stdout = "journal";
+              stderr = "journal";
+            }
+          ];
 
         # The entries above are the two launchers' own front ends — Big
         # Picture and Heroic's console mode — which are what you want when

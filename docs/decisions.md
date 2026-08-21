@@ -3637,3 +3637,152 @@ same lesson the Z407 investigation above ends on, arrived at from the opposite
 direction: there, three wrong answers came from reasoning about a device
 instead of measuring it; here, one wrong direction came from reasoning about a
 symptom instead of looking at it.
+
+## Moonshine's Desktop entry streamed a blank frame: `--session` vs. nesting
+
+Reported as "the desktop entry for moonshine doesn't work — it opens and is
+just blank, the only thing visible is the mouse". Following the lesson the Zen
+investigation above ends on, that one sentence was taken as the primary
+evidence rather than as a hypothesis, and it is what identified the failure
+class immediately: a live cursor over nothing is the *greeter's `Writeback-1`*
+shape — a compositor that is up and drawing a pointer but has no client
+content — not a GPU, theming or codec problem.
+
+### What was actually happening
+
+`journalctl --user -u moonshine-session.service` had it in two lines, logged
+every time the entry was launched:
+
+```
+WARN niri: running as a session but WAYLAND_DISPLAY is set, removing it
+WARN niri: running as a session but DISPLAY is set, removing it
+...
+DEBUG niri::backend::tty: session is not active, starting libinput in paused state
+```
+
+niri chooses its backend by sniffing the environment: `WAYLAND_DISPLAY` or
+`DISPLAY` set means the nested Winit backend, neither set means take over a DRM
+device through the TTY backend. Moonshine's `make_envs()`
+(`moonshine-core/src/session/application.rs`) sets both, plus
+`MOONSHINE_WAYLAND_DISPLAY`, when it launches an app — that is the entire
+mechanism by which an app reaches the per-stream compositor.
+
+`niri --session` deletes both, unconditionally, *before* the backend is chosen.
+That is not a bug: `--session` exists for the display-manager case, where a
+leaked `WAYLAND_DISPLAY` from the greeter would be the bug, and niri's own
+`--help` says so outright — "Do not set when running as a nested window".
+
+So niri took the TTY backend, discovered it did not own seat0 (the local login
+did), started libinput paused and rendered nothing anywhere. Moonshine's
+compositor had no client at all, and the stream was a blank frame with only
+Moonshine's own cursor composited onto it.
+
+The `niri-session` shell wrapper was no escape, and was in fact how the bug got
+in: its first branch is
+
+```sh
+if [ -n "${MANAGERPID:-}" ] && [ "${SYSTEMD_EXEC_PID:-}" = "$$" ]; then
+    case "$(ps -p "$MANAGERPID" -o cmd=)" in
+    *systemd*--user*) exec niri --session ;;
+    esac
+fi
+```
+
+Moonshine launches apps as transient units in the *user* manager, so that
+branch always matches. The module's comment claimed this was the desirable
+behaviour ("launched as one of Moonshine's transient units it detects that and
+execs `niri --session`, which does the systemd/D-Bus session setup a display
+manager would normally provide"). The setup half was right; the cost of getting
+it was not noticed.
+
+Confirmed rather than assumed, before any edit — running plain `niri` inside
+the existing session, with `WAYLAND_DISPLAY=wayland-1` set:
+
+```
+INFO niri::niri: putting output winit at x=0 y=0
+```
+
+against the `niri::backend::tty` line from the stream. Backend selection, one
+variable, no ambiguity.
+
+### The fix
+
+Run plain `niri`, and do by hand the session wiring `--session` would have
+done. `modules/services/moonshine.nix` grows two `writeShellScript`s.
+
+The wiring cannot run *before* niri, which is the non-obvious part. The values
+that have to be published are the **nested** instance's `WAYLAND_DISPLAY` and
+`NIRI_SOCKET` — not Moonshine's — and those do not exist until niri is up. They
+do exist in the environment of niri's own startup command, which niri spawns as
+a child specifically so it inherits them. So the wiring is
+`niri -- <startup-script>`, and the script does exactly what niri's session mode
+does, verified against the strings in the binary rather than from memory:
+
+```
+systemctl --user import-environment WAYLAND_DISPLAY DISPLAY XDG_CURRENT_DESKTOP NIRI_SOCKET
+dbus-update-activation-environment --systemd <same four>
+```
+
+with `XDG_CURRENT_DESKTOP=niri` exported first, since niri only sets it for
+children in session mode — the mode that cannot be used here — and the import
+would otherwise have nothing to import.
+
+One addition over what `--session` does: `systemctl --user start
+graphical-session.target`. In a normal login that target is pulled in by
+`niri.service`'s `BindsTo=`, and the compositor is deliberately not running as
+that unit here. Without it nothing starts Noctalia, and the stream would be a
+*nested* blank screen instead of a TTY-backend one — the same symptom, one
+layer over, which is worth stating because it would have looked like the fix
+had failed.
+
+### The guard that matters more than the fix
+
+`graphical-session.target` is per-**user**, not per-seat. A local login already
+owns it, and the naive version of this fix is actively destructive in two
+directions: taking the target over moves Noctalia off the physical screen and
+onto the stream, and the teardown at the end of the stream
+(`niri-shutdown.target`, which `Conflicts=` the session target) kills the
+local session outright. Ending a remote stream should not log the user out of
+the machine they are sitting at.
+
+So the wrapper decides *before* starting niri:
+
+```sh
+if systemctl --user -q is-active graphical-session.target; then
+  export MOONSHINE_OWNS_SESSION=0     # a local login owns it; touch nothing
+else
+  export MOONSHINE_OWNS_SESSION=1     # headless: drive it, and tear it down
+  trap '...niri-shutdown.target...' EXIT
+fi
+```
+
+and the startup script exits early, with a journal line saying why, when it
+does not own the session. The degraded result — a nested niri with no bar and
+no wallpaper — is still a working remote desktop, since keybinds and window
+management are niri's own, and it is a far better outcome than either of the
+two failure modes above. Headless, the case lingering exists for, takes the
+other branch and gets the full session.
+
+The trap is registered with `trap ... EXIT` on a shell that does **not** `exec
+niri`, which is the reason the wrapper ends in a plain `niri -- ...` call: an
+`exec` would replace the shell and the trap would never fire.
+
+### Also changed
+
+The Desktop entry moved under `lib.optionals config.features.niri`, matching
+what the two launcher entries already do for `features.gaming`.
+`features.moonshine` and `features.niri` are independent flags, and a streaming
+host without a compositor was advertising a Moonlight card whose command is not
+installed — the exact failure the module's own comment says the split exists to
+prevent.
+
+### Not verified live yet
+
+Everything above is eval-clean, closure-builds, and both generated scripts were
+read and syntax-checked; the backend claim at the heart of it was confirmed by
+running niri nested. But per this repo's own rule, that is not verification: the
+Desktop entry has not been streamed from a Moonlight client since the change,
+and the branch that matters most — the headless one, where the session wiring
+actually runs — cannot be exercised while anyone is logged in at the machine.
+It needs a stream taken with no local login, checking that Noctalia's bar and
+wallpaper appear and that ending the stream leaves the host healthy.
