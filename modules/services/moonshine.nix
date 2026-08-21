@@ -14,10 +14,42 @@
 {
   config,
   lib,
+  pkgs,
   vars,
   moonshine,
   ...
 }:
+let
+  # Box art for the entries below. Moonshine will guess one for an app that
+  # declares none, but the guess can't work here for two independent reasons:
+  # it looks the app's own lowercased title up in the XDG icon directories,
+  # and (a) the moonshine daemon is a systemd *system* service, which on
+  # NixOS gets no XDG_DATA_DIRS at all — so the lookup falls back to
+  # /usr/local/share and /usr/share, neither of which exists here — and (b)
+  # two of the four titles ("Desktop", "Shutdown") are not application names
+  # and would match nothing even with the search path fixed. Declaring the
+  # path outright sidesteps both, and pins which icon each entry gets rather
+  # than leaving it to whatever the resolver scores highest.
+  #
+  # Papirus-Dark, the same theme home/gtk.nix sets for the session, so a
+  # streamed machine looks like itself. It ships SVG only and Moonshine
+  # decodes raster formats only (png/jpg/webp/bmp/ico — no SVG), so each icon
+  # is rasterized here at build time. 600px square is Moonshine's own box art
+  # *width*: it letterboxes anything that isn't 600x801 onto a transparent
+  # canvas of that size, so rendering at the width means it centres the icon
+  # without rescaling it.
+  #
+  # Interpolating the result into settings puts a store reference in the
+  # generated config TOML, which is part of the system closure — so these
+  # can't be garbage-collected out from under a running daemon.
+  boxart =
+    name: iconPath:
+    pkgs.runCommand "moonshine-boxart-${name}.png" { nativeBuildInputs = [ pkgs.librsvg ]; } ''
+      rsvg-convert -w 600 -h 600 \
+        -o "$out" \
+        ${pkgs.papirus-icon-theme}/share/icons/Papirus-Dark/${iconPath}
+    '';
+in
 {
   imports = [
     # Imported here, in the one module that consumes it, rather than in
@@ -89,6 +121,12 @@
             # and over WAYLAND_DISPLAY. Headless — the case lingering exists
             # for — is clean.
             title = "Desktop";
+            # niri ships no icon of its own. Papirus' generic
+            # devices/video-display is the obvious stand-in but is a
+            # near-black monitor on a transparent background, which
+            # disappears into Moonlight's own dark app grid; this one says
+            # "remote desktop" and is legible there.
+            boxart = boxart "desktop" "64x64/apps/preferences-desktop-remote-desktop.svg";
             command = [ "/run/current-system/sw/bin/niri-session" ];
             stdout = "journal";
             stderr = "journal";
@@ -97,6 +135,7 @@
         ++ lib.optionals config.features.gaming [
           {
             title = "Steam";
+            boxart = boxart "steam" "64x64/apps/steam.svg";
             command = [
               "/run/current-system/sw/bin/steam"
               "steam://open/bigpicture"
@@ -138,6 +177,7 @@
             # to be a store path, since the packages would live in the
             # user's own ~/.nix-profile and no system unit could name it.
             title = "Heroic";
+            boxart = boxart "heroic" "64x64/apps/heroic.svg";
             command = [
               "/etc/profiles/per-user/${vars.user.name}/bin/heroic"
               "--console"
@@ -155,6 +195,7 @@
             # polkit rule below is a separate matter — it grants the
             # *authorization*; -i governs whether other sessions block it.
             title = "Shutdown";
+            boxart = boxart "shutdown" "64x64/apps/system-shutdown.svg";
             command = [
               "/run/current-system/sw/bin/systemctl"
               "poweroff"
