@@ -2335,10 +2335,58 @@ native and Flatpak directories from the daemon's process context — a runtime
 guess where this repo knows the answer. The command uses
 `/etc/profiles/per-user/`, for the same reason the launcher entry does.
 
-Heroic is single-instance too, and gets **no** equivalent of Steam's
-pre-command: it has no graceful `-shutdown` to ask with, and killing an
-Electron app that might be mid-download is worse than the problem. So closing
-Heroic before streaming one of its games is a manual step, by choice.
+Heroic is single-instance too, and now gets an equivalent of Steam's
+pre-command — `heroicShutdown`, shared by the Heroic launcher entry and every
+game the scanner emits, the same way `steamShutdown` is. This reverses the
+earlier decision to leave closing Heroic as a manual step ("it has no
+graceful `-shutdown` to ask with, and killing an Electron app that might be
+mid-download is worse than the problem"); both hazards named there are real,
+and the script is built around them rather than in spite of them.
+
+The problem is the same as Steam's, confirmed in 2.22.0's `app.asar` rather
+than assumed: the main process takes Electron's
+`requestSingleInstanceLock()`, and the `second-instance` handler forwards a
+later invocation's argv to the running copy and shows its window. So
+`heroic --console`, or a `heroic://launch?...` URL, sent while a desktop
+Heroic is open acts on *that* instance — the launcher or the game appears on
+the physical screen, and the stream gets a compositor with no client in it.
+That is the same blank-frame-with-a-live-cursor symptom as the greeter's
+`Writeback-1` bug and the `niri --session` one, from a third cause.
+
+What Heroic lacks is Steam's `-shutdown`, so there is nothing to ask politely
+with and the script signals the process instead. Two guards make that
+acceptable:
+
+- **It refuses outright while Heroic is busy.** Heroic drives `legendary`,
+  `gogdl`, `nile` and `comet` as child processes, so any of those running
+  means a download, an install, or a game actually being played. That is the
+  case the old "close it by hand" note was protecting, and it is now detected
+  rather than left to the operator to remember.
+- **Only the main process is signalled.** Electron's renderer, GPU and zygote
+  children all share the name `heroic`, so the script picks out the processes
+  whose parent is *not* also a `heroic` and sends SIGTERM only to those; the
+  children go away with the parent. There is no SIGKILL escalation — if the
+  process is still there 30 seconds later the script gives up and says so.
+
+Refusing means exiting non-zero, and that aborts the launch rather than
+merely logging it: Moonshine builds pre-commands into the transient unit's
+`ExecStartPre` with the ignore-failure flag off (`build_exec_entry` returns
+`false` for it), so a failed pre-command fails the unit and the app never
+starts. That is deliberate — a visible failure on the Moonlight client beats
+a game silently starting on the machine's own screen, which is the failure
+this exists to prevent. The messages go to stderr, so they land in
+`journalctl --user -u moonshine-session.service` like everything else an app
+entry prints.
+
+One environment note behind the process detection: Heroic is an FHS-env
+package and its wrapper runs it under `bwrap`, but that wrapper passes no
+`--unshare-pid`, so the Electron processes are ordinary entries in the host's
+PID namespace and `pgrep -x heroic` sees them. The bash wrapper itself is
+*not* matched — a script's `comm` is its interpreter's name, so it reads as
+`bash`, which is also why the real main process is correctly identified as
+one whose parent is not a `heroic`. The parent/child split was verified
+against a synthetic tree of same-named processes, not reasoned about alone;
+the live path (a real Heroic open while a stream starts) is still untested.
 
 Box art for scanned games comes from each launcher's own cache — Steam's
 `library_600x900.jpg`/`library_capsule.jpg`, Heroic's `images-cache/`. A game
