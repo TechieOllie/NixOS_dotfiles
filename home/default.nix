@@ -20,6 +20,7 @@
     ./zen-browser.nix
     ./vesktop.nix
     ./nautilus.nix
+    ./loupe.nix
     ./xdg-user-dirs.nix
     ./xdg-mime-apps.nix
     ./feishin.nix
