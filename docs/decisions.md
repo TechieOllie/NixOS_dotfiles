@@ -3848,3 +3848,77 @@ and the branch that matters most — the headless one, where the session wiring
 actually runs — cannot be exercised while anyone is logged in at the machine.
 It needs a stream taken with no local login, checking that Noctalia's bar and
 wallpaper appear and that ending the stream leaves the host healthy.
+
+## `nix fmt` and the format check disagreed about which files exist
+
+CI went red on `1e39492` (the Realtek/WoL commit) with a single line from
+`check-format.drv`:
+
+```
+./hosts/the-entertaining-nios-desktop/default.nix: not formatted
+```
+
+Three `nixos-system-*` derivations were named alongside it in the failure
+output, which is misleading: they were collateral in the same build set, not
+independent failures. The whole of it was one file whose attrset argument
+pattern had been left on one line, which nixfmt splits:
+
+```nix
+{ config, pkgs, vars, ... }:
+```
+
+Fixed by running the formatter and keeping only that hunk.
+
+### The reason it slipped through, and the actual bug
+
+`nix fmt` was `pkgs.nixfmt` bare, and it did not work at all: invoked with no
+arguments, Nix hands the formatter no paths, so nixfmt read empty stdin and
+died with `unexpected end of input expecting expression`. Invoked as
+`nix fmt .` it did run — and reformatted all three generated
+`hardware-configuration.nix` files, which `handWrittenNix` deliberately
+excludes from the `format` and `deadnix` checks (and `statix.toml` from
+statix). So the one command that fixes a format failure produced a diff the
+checks did not ask for, every single time, and the habit that grows out of
+that is to not run it.
+
+Two exclusions for the same set of files, only one of which the formatter
+knew about, is the "second source of truth" that ARCHITECTURE.md warns about,
+in miniature.
+
+### The fix
+
+`formatter.${system}` is now a `pkgs.writeShellApplication` wrapping nixfmt:
+it defaults to `.` when given no paths, expands a directory argument through
+the same `find … -not -name 'hardware-configuration.nix'` the checks use, and
+drops a generated file that is named explicitly on the command line. Both of
+`nix fmt` and `nix fmt .` now work, and neither touches a generated file.
+
+`writeShellApplication` rather than `writeShellScriptBin` for the shellcheck
+pass and `set -euo pipefail`. Two Nix-side details worth remembering: every
+bash `${...}` in the script body needs `''${...}`, and `read -r -d ''''` is
+ambiguous inside an indented string — `read -r -d ""` is what bash wants
+anyway, since both mean a NUL delimiter.
+
+### Verified
+
+Per this repo's rule that a check which cannot fail is worse than none, both
+directions were tested rather than just the happy one:
+
+- *Negative:* a deliberately misformatted `hardware-configuration.nix`
+  survived both `nix fmt <that file>` and `nix fmt .` untouched, then was
+  restored with `git checkout --`.
+- *Positive:* a scratch file containing `let x  =  {a=1;   }; in x`, passed by
+  path, was rewritten to multi-line RFC 166 style — so the wrapper is not
+  simply excluding everything.
+
+The first attempt at that positive control was worthless and was redone: it
+appended lines to `modules/system/fonts.nix` and produced a two-line diff that
+proved nothing about which files were in scope. A file-selection expression
+that silently matches nothing passes just as green as one that works, and the
+same is true of a test that would pass either way.
+
+`nix flake check --no-build` is clean and all three lint checks build. Both
+commits went green in CI on 2026-08-22 (19m6s and 20m38s), which matters here
+beyond the usual: the formatter is a derivation now, so a shellcheck failure
+or a bad Nix escape in it is a build failure rather than something only the
+operator's machine would notice.
