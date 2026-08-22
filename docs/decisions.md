@@ -4105,3 +4105,52 @@ something".
 
 Verified live on the desktop 2026-08-23: GoPro clips open and play through
 `xdg-open`.
+
+## An audio player, and why a desktop entry's `MimeType=` is not the list to claim
+
+Decibels closes the last of the four file-type gaps (`home/loupe.nix` images,
+`home/papers.nix` PDFs, `home/celluloid.nix` video). It is GNOME's own audio
+player — GTK4/libadwaita, so it inherits the existing theming — and
+deliberately a *single-file* player with no queue and no library, which is
+exactly the handler role. `home/feishin.nix` stays the library/streaming
+client; the two don't overlap. Amberol was the alternative: a queue player
+that will play a folder through, but its desktop entry also claims
+`inode/directory`, which would have had to be left unclaimed anyway so
+Nautilus keeps owning folders.
+
+The part worth remembering is the MIME list. Every previous module in this
+family took the app's own packaged `MimeType=` line as the set to claim.
+That would have quietly failed here. Decibels' entry is written almost
+entirely in legacy aliases, and shared-mime-info at this flake's pin resolves
+real files to the canonical names instead:
+
+| file | entry claims | `globs2` actually returns |
+| --- | --- | --- |
+| `.flac` | `audio/x-flac` | `audio/flac` |
+| `.mp3` | `audio/x-mp3`, `audio/x-mpg` | `audio/mpeg` |
+| `.ogg` / `.oga` / `.opus` | `audio/x-vorbis+ogg`, `audio/x-opus+ogg` | `audio/ogg` |
+| `.m4a` | `audio/x-m4a` | `audio/mp4` |
+| `.aac` | `audio/x-aac` | `audio/aac` |
+| `.wav` | `audio/wav`, `audio/x-pn-wav` | `audio/vnd.wave` |
+
+So claiming the entry's list verbatim would have registered defaults under
+names nothing on this system produces, and left most of a real music library
+with no default at all — passing eval, passing activation, and only showing
+up as "the music still opens in the browser". The list in `home/decibels.nix`
+is built from `shared-mime-info`'s `globs2` instead, keeping the
+specific-alias spellings (`audio/x-vorbis+ogg`, `audio/x-opus+ogg`,
+`audio/x-wav`) that content sniffing can still return alongside the canonical
+ones. A default set in `mimeapps.list` is honoured by GIO whether or not the
+target entry declares that type, which is what makes claiming the canonical
+names work.
+
+`.m3u` (`audio/x-mpegurl`, `application/vnd.apple.mpegurl`) is deliberately
+left unclaimed: Decibels has no playlist support, so it would open the first
+track and silently drop the rest.
+
+Verified live on the desktop 2026-08-23: music opens in Decibels.
+
+**Generalisation for the next handler module:** read `MimeType=` to learn
+what the app *can* open, then check what the files themselves resolve to
+before deciding what to claim. The two lists are not the same document, and
+the failure mode of trusting the first one is silent.

@@ -23,6 +23,7 @@
     ./loupe.nix
     ./papers.nix
     ./celluloid.nix
+    ./decibels.nix
     ./xdg-user-dirs.nix
     ./xdg-mime-apps.nix
     ./feishin.nix

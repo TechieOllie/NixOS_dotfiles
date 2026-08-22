@@ -40,10 +40,9 @@ let
   # The video/* half of Celluloid's own packaged desktop entry MimeType= line
   # (read out of this flake's locked nixpkgs, not guessed).
   #
-  # Its audio/* half — some 60 types — is deliberately not claimed. Nothing in
-  # this repo currently owns an audio default, and quietly making the video
-  # player the system's music handler is a bigger decision than "videos should
-  # open in something"; Feishin is the audio app here. Same for the entry's
+  # Its audio/* half — some 60 types — is deliberately not claimed here:
+  # home/decibels.nix owns the audio defaults, and a video player quietly
+  # becoming the system's music handler would fight it. Same for the entry's
   # x-scheme-handler/rtsp and friends: a streaming-protocol handler is not
   # what was asked for.
   playableTypes = [
