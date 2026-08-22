@@ -1,4 +1,9 @@
-{ config, pkgs, vars, ... }:
+{
+  config,
+  pkgs,
+  vars,
+  ...
+}:
 let
   # What the Pi's key is pinned to, in place of a bare `systemctl poweroff`.
   #
