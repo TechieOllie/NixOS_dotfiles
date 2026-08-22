@@ -158,6 +158,7 @@
         match app-id="vesktop"
         // opacity 0.80  // OFF: see the blur banner above
         draw-border-with-background false
+        open-on-output "Samsung Electric Company C27F390 H4ZR113985"
     }
 
     window-rule {
