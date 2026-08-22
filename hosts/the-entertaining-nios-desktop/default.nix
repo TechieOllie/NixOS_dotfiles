@@ -1,4 +1,4 @@
-{ pkgs, vars, ... }:
+{ config, pkgs, vars, ... }:
 let
   # What the Pi's key is pinned to, in place of a bare `systemctl poweroff`.
   #
@@ -118,6 +118,24 @@ in
   # the kernel and lact above: it names *this* machine's NIC and trusts *one*
   # specific Pi's key, neither of which another host should inherit.
   #
+  # Wake after the AC has actually been pulled is a *driver* question, not a
+  # BIOS one. The in-kernel r8169 only programs the chip's volatile WoL
+  # registers, and those die with the +5VSB rail; the Realtek vendor module
+  # writes the EEPROM-backed config instead, so the NIC comes up armed from
+  # cold power with no OS in the picture. That is the whole difference between
+  # waking after a normal shutdown (r8169 manages it, via the flag below) and
+  # waking after the plug has been out (it does not). This machine ran the
+  # vendor module under CachyOS for exactly this reason; the setting was lost
+  # in the move to NixOS and the symptom came back with it.
+  #
+  # The blacklist is not optional: both drivers match this PCI ID and r8169
+  # normally wins. r8168 is out-of-tree, so if it ever stops building against
+  # linuxPackages_cachyos the rebuild fails outright rather than quietly
+  # booting without it — at which point the choice is the vendor driver or
+  # that kernel, not both.
+  boot.extraModulePackages = [ config.boot.kernelPackages.r8168 ];
+  boot.blacklistedKernelModules = [ "r8169" ];
+
   # The firmware half is not expressible here. "Wake on PCI-E" (or equivalent)
   # has to be set once in the BIOS, or the NIC loses standby power at S5 and
   # the magic packet is never seen. This option only keeps the driver-side
