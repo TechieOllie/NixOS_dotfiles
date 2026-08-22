@@ -43,7 +43,7 @@ check:
 check-fast:
     nix flake check --no-build
 
-# Format every .nix file in place.
+# Format every hand-written .nix file in place.
 fmt:
     nix fmt
 

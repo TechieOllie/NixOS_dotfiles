@@ -37,7 +37,7 @@ nix flake check                          # the full gate: format + statix + dead
                                          # nixosConfigurations attribute and package, AND a real
                                          # closure build per host. Expensive — see --no-build below.
 nix flake check --no-build               # `just check-fast`, and what driver.sh check runs.
-nix fmt                                  # nixfmt (RFC 166), in place
+nix fmt                                  # nixfmt (RFC 166), in place; skips generated hardware-configuration.nix
 nix develop                              # just/nixfmt/statix/deadnix/nixd/nil/sops/age
 nix build .#nixosConfigurations.<host>.config.system.build.toplevel
 nix build .#installer-iso

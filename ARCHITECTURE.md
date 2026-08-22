@@ -705,7 +705,7 @@ This is deliberately last in the roadmap, not first — wrapping commands before
 
 **Implemented in Phase 8.** Formatting and static analysis run as `nix flake check` checks, not as a separate ad hoc script, so `nix flake check` is the single command that gates a commit both locally and in CI. The checks in `flake.nix`:
 
-- `format` — `nixfmt`, i.e. RFC 166 style. **Not `alejandra`**, which earlier drafts of this document recommended: the repo was already hand-written in RFC 166 style, so alejandra would have reformatted every file to gain nothing. (`nixpkgs` now calls this formatter plain `nixfmt`; `nixfmt-rfc-style` is an alias that warns.) Also exposed as `formatter.${system}`, so `nix fmt` formats in place.
+- `format` — `nixfmt`, i.e. RFC 166 style. **Not `alejandra`**, which earlier drafts of this document recommended: the repo was already hand-written in RFC 166 style, so alejandra would have reformatted every file to gain nothing. (`nixpkgs` now calls this formatter plain `nixfmt`; `nixfmt-rfc-style` is an alias that warns.) Also exposed as `formatter.${system}`, so `nix fmt` formats in place — as a wrapper script rather than the bare `nixfmt` package, so that it applies the same `hardware-configuration.nix` exclusion the `format` check does. A bare formatter reformatted generated files the checks then ignored, leaving every `nix fmt` with a spurious diff.
 - `statix` — static analysis / anti-pattern detection, configured by `statix.toml`.
 - `deadnix` — dead code detection.
 - `build-<hostname>` — one per entry in `nixosConfigurations`, built by `lib.mapAttrs'` over `self.nixosConfigurations` rather than listed by hand, so a host cannot be added without also being checked.

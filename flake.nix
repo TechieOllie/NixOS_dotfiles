@@ -218,7 +218,37 @@
       # ARCHITECTURE.md's original alejandra suggestion because the repo was
       # already hand-written in this style — adopting alejandra would have
       # reformatted every .nix file to gain nothing. See docs/decisions.md.
-      formatter.${system} = pkgs.nixfmt;
+      # Wrapped rather than bare, so that `nix fmt` honours the same
+      # hardware-configuration.nix exclusion the format check does —
+      # otherwise the formatter reformats generated files the checks then
+      # ignore, and every `nix fmt` produces a spurious diff. Nix hands the
+      # formatter the paths to format (none at all when invoked bare, which
+      # left plain nixfmt reading stdin and erroring); directories are
+      # expanded here, and a generated file named explicitly is skipped too.
+      formatter.${system} = pkgs.writeShellApplication {
+        name = "nixfmt-repo";
+        runtimeInputs = [
+          pkgs.nixfmt
+          pkgs.findutils
+        ];
+        text = ''
+          targets=( "$@" )
+          [ ''${#targets[@]} -gt 0 ] || targets=( . )
+
+          files=()
+          for target in "''${targets[@]}"; do
+            if [ -d "$target" ]; then
+              while IFS= read -r -d "" file; do
+                files+=( "$file" )
+              done < <(find "$target" -name '*.nix' -not -name 'hardware-configuration.nix' -print0)
+            elif [ "$(basename "$target")" != hardware-configuration.nix ]; then
+              files+=( "$target" )
+            fi
+          done
+
+          [ ''${#files[@]} -eq 0 ] || nixfmt "''${files[@]}"
+        '';
+      };
 
       # `nix develop` — the tools this repo is maintained with, so a fresh
       # clone needs nothing installed globally. direnv (already part of the
