@@ -29,6 +29,7 @@
     ./prismlauncher.nix
     ./kdeconnect.nix
     ./freecad.nix
+    ./kicad.nix
     ./jetbrains.nix
     ./claude-code.nix
     ./gh.nix
