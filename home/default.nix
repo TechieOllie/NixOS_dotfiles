@@ -21,6 +21,7 @@
     ./vesktop.nix
     ./nautilus.nix
     ./loupe.nix
+    ./papers.nix
     ./xdg-user-dirs.nix
     ./xdg-mime-apps.nix
     ./feishin.nix
