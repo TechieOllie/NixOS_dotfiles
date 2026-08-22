@@ -22,6 +22,7 @@
     ./nautilus.nix
     ./loupe.nix
     ./papers.nix
+    ./celluloid.nix
     ./xdg-user-dirs.nix
     ./xdg-mime-apps.nix
     ./feishin.nix

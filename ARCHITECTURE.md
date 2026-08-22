@@ -755,7 +755,7 @@ general-purpose tool in its own right.)
 
 ## Applications
 
-Zen Browser, Visual Studio Code (official build), Vesktop, Nautilus, Loupe, Papers
+Zen Browser, Visual Studio Code (official build), Vesktop, Nautilus, Loupe, Papers, Celluloid
 (image viewer), Feishin, Obsidian.
 
 ## Gaming

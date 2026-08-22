@@ -3970,3 +3970,138 @@ dirs, run `apply.sh` under the same explicit PATH — printing `readlink -f` of
 `folder-bluegrey-documents.svg`, with no `gtk-update-icon-cache` warning. This
 is the same lesson as every other entry in this file: the missing `getent`
 would have shipped green through eval, a full closure build and CI alike.
+
+## A video player, and Showtime's deadlock on GoPro telemetry tracks
+
+Nothing in this repo could open a video: no module claimed a single `video/*`
+default, so `xdg-open` fell through `mimeinfo.cache` to whatever happened to
+be listed — the same gap `home/loupe.nix` closed for images and
+`home/papers.nix` for PDFs, one week and one file type apart.
+
+GNOME's **Showtime** was chosen first, on the same reasoning that picked
+Papers over Zathura and Okular: it is GTK4/libadwaita like Nautilus, Loupe and
+Papers, so it inherits the existing Papirus/Bibata/adw-gtk3 theming with
+nothing new to declare. Celluloid, bare mpv and VLC were the alternatives.
+`home/showtime.nix` was written, evaluated clean, and switched onto the
+desktop — and then the operator reported that videos still would not open.
+
+### The symptom, and why it is not what it looks like
+
+`xdg-open` on a GoPro `.MP4` produced **no window at all**. Not a black
+window, not an error — `niri msg windows` listed nothing, and a
+`WAYLAND_DEBUG=1` trace showed **zero `xdg_surface` traffic**: the client
+connected to the compositor, bound its globals, created GL contexts, and never
+created a toplevel. Meanwhile the process kept running and the audio played.
+
+The mime wiring was not at fault and was ruled out first:
+`xdg-mime query default video/mp4` returned `org.gnome.Showtime.desktop`, the
+entry was on `/etc/profiles/per-user/ol/share/applications`, and Showtime's own
+journal showed it receiving the file (`Playing video: file:///…005.MP4`).
+
+Ruling out a GTK-level problem took a control: a minimal PyGObject
+`Adw.ApplicationWindow` run against Showtime's *own* interpreter, typelibs and
+site-packages presented and mapped fine. So GTK4, libadwaita, PyGObject and
+the compositor were all working.
+
+Instrumenting the app itself is what found it. A `sitecustomize.py` on
+`PYTHONPATH` (the wrapper does not set that variable, so it passes through)
+patched `Window.present`, `Application.do_activate` and `do_open` to log:
+`do_activate` ran, a `Window` was constructed — and `present()` was never
+called. A timeout source added to the main loop from the same patch **never
+ticked**, which said the GLib main loop was not running at all; the playback
+log lines were coming from GStreamer's own threads.
+
+`faulthandler.register(signal.SIGUSR1)` then dumped the stack of the wedged
+process, and named the line:
+
+```
+File ".../showtime/widgets/window.py", line 784 in _on_missing_plugin
+File ".../showtime/play.py", line 136 in _on_pipeline_bus_message
+```
+
+```python
+if partially_missing := (
+    self.pipeline.get_state(Gst.CLOCK_TIME_NONE)[0]   # infinite timeout, main thread
+    != Gst.StateChangeReturn.FAILURE
+):
+```
+
+A missing-plugin bus message, handled on the main thread with an *infinite*
+`get_state` timeout, deadlocks the main loop before `win.present()` is ever
+reached. Stubbing out that one handler made the window appear immediately
+(`mapped=True`), which confirmed the causal chain rather than inferring it.
+
+### The missing "codec" is not a codec, and not HEVC
+
+The obvious next thought — install the codec — was tested and is wrong. Run
+with Showtime's complete plugin set (all seven of base/good/bad/ugly/rs/libav/
+core; an early run with a truncated `GST_PLUGIN_SYSTEM_PATH_1_0` falsely
+showed H.264 and AAC missing too, which is a warning about how easy this
+variable is to get wrong):
+
+```
+container #0: Quicktime
+  video #1: H.264 (High Profile)
+  audio #2: MPEG-4 AAC
+  unknown #3: meta/x-gst-fourcc-gpmd
+Missing plugins
+ (…|meta/x-gst-fourcc-gpmd decoder|…)          ← the only one
+```
+
+Both a 2015 and a 2024 GoPro clip are H.264 + AAC with no missing media
+decoder — the footage is not HEVC, which was the operator's guess. The one
+"missing decoder" is for `gpmd`, GoPro's GPMF telemetry track (GPS,
+accelerometer, gyro). `meta/x-gst-fourcc-<fourcc>` is not a codec name at all:
+it is the placeholder caps `qtdemux` invents for any track type it does not
+recognise. Grepping the whole plugin set, the only binary containing the
+string `x-gst-fourcc` is `libgstisomp4.so` — the demuxer that *produces* the
+label — and nothing anywhere contains `gpmd`. There is no plugin to install,
+here or in any distro, because the track is sensor data rather than media.
+
+The trap is broader than one camera: the same unknown-side-track shape is
+`mett` in Pixel/iPhone video (upstream issue #277) and `djmd`/`dbgi` in DJI
+footage (#299). A non-GoPro phone video played in Showtime perfectly.
+
+### Upstream state, checked before deciding
+
+- [#299](https://gitlab.gnome.org/GNOME/showtime/-/issues/299), opened
+  2026-08-03, **still open**, no comments, no linked MR — the same deadlock,
+  reported against DJI files. It also names a consequence not yet hit here:
+  the hung process keeps the `org.gnome.Showtime` D-Bus name, so later
+  launches fail to register until `pkill -9`.
+- [MR !96 "Set timeout for get_state()"](https://gitlab.gnome.org/GNOME/showtime/-/merge_requests/96),
+  opened 2026-07-27, not a draft, no conflicts, **unmerged**. One line:
+  `Gst.CLOCK_TIME_NONE` → `Gst.SECOND`. `main` still carries the blocking call.
+
+That MR was applied to a scratch copy and tested on the offending file. The
+deadlock does go away — the window opens and sizes itself — but it lands on a
+**"Missing Plugin" / "Unable to Play Video" status page, paused**, needing a
+"Try Anyway" click. Read out of the live widget tree rather than guessed:
+`placeholder_child=StatusPage:Missing Plugin … paused=True`. That is upstream
+issues #298 and #277 in their own right. So the patch fixes the hang and not
+the experience.
+
+### Decision
+
+**Celluloid**, in `home/celluloid.nix`. GTK4/libadwaita, so the theming
+argument that picked Showtime still holds, but mpv underneath, which ignores
+the telemetry track entirely — verified live on the exact file that deadlocks
+Showtime.
+
+Rejected: keeping Showtime as-is (unusable on most of the operator's library);
+carrying MR !96 as a local patch (would need an `overlays/` directory this
+repo does not have, to buy a per-file "Try Anyway" click).
+
+**Revisit condition**, also recorded at the top of `home/celluloid.nix`: this
+is about one upstream bug, not about mpv vs. GStreamer. If !96 lands *and* a
+GoPro clip plays without the missing-plugin prompt, Showtime is the better fit
+for the rest of the session and this should be switched back.
+
+Only the `video/*` half of Celluloid's desktop entry is claimed. Its ~60
+`audio/*` types and its `x-scheme-handler/rtsp` family are left alone: no
+module in this repo owns an audio default today, and making the video player
+the system's music handler is a separate decision from "videos should open in
+something".
+
+Verified live on the desktop 2026-08-23: GoPro clips open and play through
+`xdg-open`.
