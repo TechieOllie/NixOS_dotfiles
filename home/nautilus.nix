@@ -1,4 +1,5 @@
-# User half of Nautilus (dconf preferences) — the system half (package,
+# User half of Nautilus (dconf preferences, archive mime defaults) — the
+# system half (package,
 # dconf/gvfs/tumbler wiring) lives in modules/desktop/nautilus.nix. No
 # Noctalia template exists for Nautilus (confirmed — not in the
 # community-templates catalog), and it's a plain GTK4 app, so it already
@@ -17,7 +18,54 @@
   osConfig,
   ...
 }:
+let
+  # Archives. Nothing in this repo could open one: no archive manager is
+  # installed, so .zip/.tar/.7z/.rar and friends had no default at all —
+  # found by the 2026-08-23 audit of common extensions against
+  # shared-mime-info (docs/decisions.md).
+  #
+  # No new package is needed, because Nautilus already extracts archives
+  # itself (gnome-autoar, built in since 3.32) and already *declares* every
+  # one of these types in its own packaged desktop entry. It was a
+  # candidate handler the whole time with no default pointing at it — the
+  # same "declared but not default" gap home/loupe.nix and home/papers.nix
+  # closed for their formats. This list is that entry's own archive types,
+  # read out of this flake's locked nixpkgs, so it can't claim something
+  # Nautilus won't take.
+  #
+  # Opening one lands in Nautilus' extract flow rather than a browsable
+  # archive view; a real archive manager (file-roller) would be a separate
+  # decision, and wasn't wanted. Verified live on the desktop 2026-08-23:
+  # `xdg-open a.zip` extracted it to a sibling directory and opened that
+  # folder in Nautilus.
+  archiveTypes = [
+    "application/zip"
+    "application/gzip"
+    "application/bzip2"
+    "application/zstd"
+    "application/vnd.rar"
+    "application/x-7z-compressed"
+    "application/x-7z-compressed-tar"
+    "application/x-bzip"
+    "application/x-bzip-compressed-tar"
+    "application/x-bzip2-compressed-tar"
+    "application/x-compress"
+    "application/x-compressed-tar"
+    "application/x-gzip"
+    "application/x-lzip"
+    "application/x-lzip-compressed-tar"
+    "application/x-lzma-compressed-tar"
+    "application/x-tar"
+    "application/x-tarz"
+    "application/x-xz"
+    "application/x-xz-compressed-tar"
+    "application/x-zstd-compressed-tar"
+  ];
+in
 lib.mkIf osConfig.features.niri {
+  # Needs home/xdg-mime-apps.nix enabled to reach disk at all.
+  xdg.mimeApps.defaultApplications = lib.genAttrs archiveTypes (_: "org.gnome.Nautilus.desktop");
+
   # Sidebar pinned locations. Confirmed live (on the operator's real,
   # currently-used Nautilus 50.2.2) that this legacy gtk-3.0 path is still
   # exactly what present-day GTK4 Nautilus reads for this — one

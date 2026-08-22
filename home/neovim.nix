@@ -48,6 +48,34 @@ let
     "text/x-c++hdr"
     "text/x-java"
     "text/x-tex"
+
+    # Second pass (2026-08-23), from an audit of every common extension
+    # against shared-mime-info's globs2: these all have a MIME type of
+    # their own, so they never fell back to text/plain and had no default
+    # at all. Same silent-gap shape as home/decibels.nix's alias problem.
+    "text/rust" # .rs
+    "text/x-go" # .go
+    "text/x-lua" # .lua
+    "text/javascript" # .js
+    "text/css" # .css
+    "text/x-scss" # .scss
+    "text/x-patch" # .patch, .diff
+    "text/x-rst" # .rst
+    "text/x-bibtex" # .bib
+    "text/x-kotlin" # .kt
+    "text/x-csharp" # .cs
+    "application/sql" # .sql
+    "application/x-php" # .php
+    "application/x-ruby" # .rb
+    "application/x-perl" # .pl
+    # Verified live on the desktop 2026-08-23: a .rs opens in Neovim inside
+    # Ghostty via xdg-open, and every type above resolves through
+    # `xdg-mime query default` to nvim.desktop.
+    #
+    # .ts is NOT here on purpose: shared-mime-info resolves it to
+    # text/vnd.trolltech.linguist, a Qt translation file, not TypeScript.
+    # Claiming it would be claiming the wrong format. TypeScript sources
+    # reach Neovim through text/plain like .nix and .conf do.
   ];
 in
 {

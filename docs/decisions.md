@@ -4154,3 +4154,59 @@ Verified live on the desktop 2026-08-23: music opens in Decibels.
 what the app *can* open, then check what the files themselves resolve to
 before deciding what to claim. The two lists are not the same document, and
 the failure mode of trusting the first one is silent.
+
+## The 2026-08-23 handler audit: what is claimed, and what is deliberately not
+
+With images, PDFs, video and audio all handled, the remaining question was
+what else a common file could be. Answered by method rather than memory:
+resolve ~120 common extensions through `shared-mime-info`'s `globs2`, diff
+the result against the defaults `home/xdg-mime-apps.nix` actually generates,
+then check which *installed* apps already declare the leftovers in their own
+desktop entries. Two of the gaps closed with no new package.
+
+**Source files (`home/neovim.nix`).** Neovim owned 19 text types, but
+shared-mime-info gives most languages a type of their own — so `.py`, `.c`
+and `.tex` opened in an editor while `.rs`, `.go`, `.lua`, `.js`, `.css`,
+`.scss`, `.sql`, `.php`, `.rb`, `.pl`, `.kt`, `.cs`, `.rst`, `.bib` and
+`.patch`/`.diff` had no default. They never fell back to `text/plain`,
+because they *do* match a glob; they simply matched a name nothing claimed.
+Fifteen types added.
+
+`.ts` is excluded on purpose and is worth knowing about: shared-mime-info
+resolves it to `text/vnd.trolltech.linguist`, a Qt translation format, not
+TypeScript. Claiming it would register the editor for the wrong thing.
+TypeScript sources reach Neovim through `text/plain`, like `.nix` and
+`.conf`.
+
+**Archives (`home/nautilus.nix`).** `.zip`, `.tar`, `.gz`, `.7z`, `.rar`,
+`.xz`, `.zst` had no default, and the reflex is to add an archive manager.
+Not needed: Nautilus extracts archives itself via gnome-autoar and already
+declares all 21 of those types in its packaged desktop entry. It was a
+candidate handler the whole time with nothing pointing at it — the
+declared-but-not-default gap again. Registering it adds nothing to the
+closure. Opening an archive lands in Nautilus' extract flow, not a browsable
+archive view; file-roller would be a separate decision and wasn't wanted.
+
+Both verified live on the desktop 2026-08-23, and not by resolution alone —
+`xdg-mime query filetype` was checked against real sample files for each new
+type, then `xdg-open` was run and the resulting window confirmed in
+`niri msg windows`. A `.rs` opened Neovim in Ghostty; `a.zip` extracted to a
+sibling directory and opened it in Nautilus. Resolution being right is not
+the same as a window appearing — that is the whole lesson of the Showtime
+entry above.
+
+**Left unhandled, deliberately.** Each of these needs an application this
+repo does not install, so they are a "do you want this app" question rather
+than a wiring gap. Recorded so the next audit doesn't re-derive the list:
+
+| Types | Would need |
+| --- | --- |
+| `.docx .xlsx .pptx .odt .ods .odp .doc .xls .ppt .rtf` | LibreOffice (~1 GB closure) or OnlyOffice |
+| `.epub .mobi .azw3` | Foliate — Papers is PDF/DjVu/comics only and cannot do ebooks |
+| `.ttf .otf .woff .woff2` | `gnome-font-viewer` (small) |
+| `.stl .3mf .step` | FreeCAD is installed and already declares `model/stl`, but is slow for a double-click preview |
+| `.ics .vcf` | a calendar/contacts app; nothing in this stack is close |
+
+Not flagged at all, and not worth revisiting: `.iso .deb .rpm .exe .msi
+.apk .torrent .psd .xcf .blend .ai`. Either meaningless on NixOS or needing
+an application well outside this stack.
