@@ -232,11 +232,12 @@ new this phase:
   `home/gtk.nix`'s own `home.activation.seedPapirusIcons`, which seeds a
   *writable* copy from the Nix-store package so the template's own check
   always finds the directory already there and never hits that fallback.
-  **Accepted trade-off**: since a mutable copy is required (`papirus-folders`
-  rewrites the SVGs in place — a store symlink wouldn't work), the seed
-  script re-copies on every Home Manager activation, resetting folder colors
-  to Papirus' default blue after every `nixos-rebuild switch` until
-  Noctalia's next automatic re-theme pass repaints them.
+  A mutable copy is required (`papirus-folders` rewrites the SVGs in place —
+  a store symlink wouldn't work), so the seed re-copies on every Home Manager
+  activation. That used to be recorded here as an accepted trade-off ("folder
+  colors go back to default blue until Noctalia's next re-theme pass"); it
+  was not acceptable in practice and has since been fixed — see *Papirus
+  folders reverted to default blue on every activation* below.
 - **GTK modernization** — `home/gtk.nix` also sets `gtk.gtk3.theme` to
   `pkgs.adw-gtk3` / `"adw-gtk3-dark"` (both folder names confirmed via a live
   build) for a modern, libadwaita-like rounded look on GTK3 apps. GTK4 gets
@@ -3922,3 +3923,50 @@ commits went green in CI on 2026-08-22 (19m6s and 20m38s), which matters here
 beyond the usual: the formatter is a derivation now, so a shellcheck failure
 or a bad Nix escape in it is a build failure rather than something only the
 operator's machine would notice.
+
+## Papirus folders reverted to default blue on every activation
+
+**Reported** (2026-08-22, desktop): "I don't think nautilus folders are being
+themed correctly (papirus folder theme)."
+
+The Phase 6 fix above — symlinking Papirus-Dark's whole `places` directory at
+the writable, recolorable `Papirus` copy — was still working exactly as
+written. The bug was **timing**, not plumbing. `home/gtk.nix`'s
+`seedPapirusIcons` re-copies the pristine store tree on *every* Home Manager
+activation, which resets every folder icon to Papirus' default blue, and
+Noctalia only runs a template when the theme actually changes. So folders sat
+blue from one `nixos-rebuild switch` until the next wallpaper change. Confirmed
+live rather than reasoned about: every `places` icon on the desktop resolved to
+`folder-blue.svg` while the template's own cached `colors-final` said
+`bluegrey`. This was recorded here as an "accepted trade-off" when the seed was
+written; it wasn't acceptable, and that paragraph has been corrected.
+
+**Fix**: the seed now ends by re-running Noctalia's *own* cached
+`~/.local/state/noctalia/community-templates/papirus-icons/apply.sh`.
+Reusing that script rather than calling `papirus-folders` directly keeps the
+accent-to-Papirus-color mapping (an HSV nearest-match against the palette)
+defined in exactly one place — Noctalia's. It reads `colors-final` and is a
+no-op exiting 0 when that file doesn't exist, so it's safe on a host where
+Noctalia has never run, and it's `|| true` besides: a theming refresh must
+never fail activation.
+
+**`papirus-folders` needs `getent` on the PATH, and eval cannot tell you
+that.** Home Manager activation runs with a minimal PATH, so the call is
+wrapped in an explicit `lib.makeBinPath`. The first version listed bash,
+coreutils, findutils, gawk, gnused and gtk3 — everything an obvious reading of
+the two scripts calls for — and still died with the script's own opaque
+`Error: Failed to apply papirus-folders`. The real message one line up was
+`papirus-folders: line 187: getent: command not found`: its `get_user_home()`
+resolves the home directory with `getent passwd "$user"`. Adding `pkgs.getent`
+fixed it. `pkgs.gtk3` is there for `gtk-update-icon-cache`, whose absence is
+only a warning but a noisy one.
+
+**How it was verified**, since none of the above is visible to `nix flake
+check`: a throwaway script reproduced the activation sequence on the live
+desktop in order — re-seed from the store path, re-link Papirus-Dark's `places`
+dirs, run `apply.sh` under the same explicit PATH — printing `readlink -f` of
+`inode-directory.svg` before and after. Before: `folder-blue.svg`. After:
+`folder-bluegrey.svg`, and `folder-documents.svg` resolving to
+`folder-bluegrey-documents.svg`, with no `gtk-update-icon-cache` warning. This
+is the same lesson as every other entry in this file: the missing `getent`
+would have shipped green through eval, a full closure build and CI alike.

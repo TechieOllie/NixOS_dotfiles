@@ -57,11 +57,11 @@ lib.mkIf osConfig.features.niri {
   # present, so the incompatible fallback never triggers.
   #
   # Must be a real, writable copy (not a symlink into the read-only Nix
-  # store) since papirus-folders rewrites the SVGs in place. Re-seeded (and
-  # therefore reset to Papirus' default blue) on every Home Manager
-  # activation — accepted trade-off: folder colors go back to default after
-  # every nixos-rebuild switch until Noctalia's next automatic re-theme pass
-  # repaints them.
+  # store) since papirus-folders rewrites the SVGs in place. Re-seeded on
+  # every Home Manager activation, which resets the folders to Papirus'
+  # default blue — so the re-seed is immediately followed by re-running the
+  # template's own apply.sh (see the note at the end of this script), which
+  # repaints them from the color Noctalia last computed.
   home.activation.seedPapirusIcons = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     run rm -rf "$HOME/.local/share/icons/Papirus"
     run mkdir -p "$HOME/.local/share/icons"
@@ -114,5 +114,40 @@ lib.mkIf osConfig.features.niri {
         run ln -sfn "$recoloredPlacesDir" "$HOME/.local/share/icons/Papirus-Dark/$papirusDarkSize/places"
       fi
     done
+
+    # Re-apply the wallpaper-derived folder color that the re-seed above just
+    # wiped. Noctalia only runs a template when the theme actually changes,
+    # so on its own the seed leaves folders default-blue from one
+    # `nixos-rebuild switch` until the next wallpaper change — which is what
+    # the operator saw as "Nautilus folders aren't themed" (found live on the
+    # desktop 2026-08-22: every places icon resolved to folder-blue.svg while
+    # the template's own cached state said bluegrey).
+    #
+    # The template's apply.sh is reused rather than calling papirus-folders
+    # directly, so the accent-to-Papirus-color mapping stays defined in
+    # exactly one place — Noctalia's. It reads `colors-final` (written by
+    # Noctalia on each theme pass) and is a no-op exiting 0 when that file
+    # doesn't exist yet, so this is safe on a host where Noctalia has never
+    # run. Best-effort by design: a failure here must not fail activation, so
+    # it is `|| true`. Run through an explicit PATH because activation's own
+    # is minimal — apply.sh needs awk, and papirus-folders needs find/sed and
+    # `getent passwd` (to locate the home directory; without it the whole run
+    # dies with `Error: Failed to apply papirus-folders`, found by simulating
+    # this script live rather than by eval). gtk3 is for gtk-update-icon-cache,
+    # whose absence is only a warning but a noisy one.
+    papirusApply="$HOME/.local/state/noctalia/community-templates/papirus-icons/apply.sh"
+    if [ -x "$papirusApply" ]; then
+      run env PATH="${
+        lib.makeBinPath [
+          pkgs.bash
+          pkgs.coreutils
+          pkgs.findutils
+          pkgs.gawk
+          pkgs.getent
+          pkgs.gnused
+          pkgs.gtk3
+        ]
+      }" ${lib.getExe pkgs.bash} "$papirusApply" || true
+    fi
   '';
 }
