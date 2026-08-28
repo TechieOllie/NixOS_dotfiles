@@ -213,10 +213,10 @@
       # it in; add this entry back the moment inotmac's exists and
       # .sops.yaml's placeholder recipient is replaced with the real one.
       #
-      # nixosConfigurations.inotmac = mkHost {
-      #   inherit system;
-      #   hostPath = ./hosts/inotmac;
-      # };
+      nixosConfigurations.inotmac = mkHost {
+        inherit system;
+        hostPath = ./hosts/inotmac;
+      };
 
       # Bootstrap tool, not a host: a minimal installer ISO with the
       # operator's key pre-authorized for root, so nixos-anywhere can SSH in

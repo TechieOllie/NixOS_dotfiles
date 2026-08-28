@@ -2,14 +2,7 @@ keys:
   - &the-entertaining-nios-vm age1hsaqjyj4mtmdyyqtetjn0twlfeppn0vxla724tl9uy702lv0qp7sxmejq5
   - &the-entertaining-nios-laptop age182ymkfkp0gx8lu66gd4c5dfhq8632p42898h5a4p20xdln75j4fq5ssa6y
   - &the-entertaining-nios-desktop age189gntjuuenp0jgc4knr2dmg290psrfu469s02zfu9zwdlk0f9cksazeysc
-  # PLACEHOLDER — replace with the real public key from
-  # `age-keygen -o ~/.config/sops/age/inotmac.txt`, run by the operator (this
-  # agent does not hold that key and did not generate one). Everything below
-  # that references it is inert config, not a working recipient, until this
-  # line is replaced with the real age1... value. See the secrets runbook
-  # left in this commit's message / hosts/inotmac/secrets.nix for the exact
-  # steps.
-  - &inotmac age1REPLACE-WITH-A-REAL-AGE-PUBLIC-KEY-FOR-INOTMAC
+  - &inotmac age1cwrtzlfk0evaq7adgec5djl3y22rnmgggupu3kvrcdtczm0kvfms69f03v
 creation_rules:
   - path_regex: hosts/the-entertaining-nios-vm/secrets/.*\.yaml$
     key_groups:
