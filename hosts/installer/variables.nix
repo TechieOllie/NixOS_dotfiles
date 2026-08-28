@@ -4,13 +4,21 @@
 # features.nix/disko.nix/hardware-configuration.nix/secrets.nix here, and no
 # nixosConfigurations entry — unlike every other directory under hosts/.
 #
-# One operator today ("ol", administrator of every host). If this ever needs
-# to cover multiple administrators with different keys, extend `user` here
-# (e.g. a list) rather than inventing a second mechanism.
+# One operator today ("ol", administrator of every host), but more than one
+# key: the ISO authorizes every key that might need to reach an installer
+# over SSH, which is why this is a list rather than the single
+# `sshPublicKey` a real host's variables.nix carries. Add a key here when a
+# new machine has to be able to drive `nixos-anywhere`.
 {
   user = {
     name = "ol";
     fullName = "ol";
-    sshPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIATBdWsHaaYkSYrvxuIyjAlRO5Un1cDcOcI9RUXu9LTH oliverwest06@outlook.com";
+    sshPublicKeys = [
+      # The bootstrap key, shared with every real host's variables.nix.
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIATBdWsHaaYkSYrvxuIyjAlRO5Un1cDcOcI9RUXu9LTH oliverwest06@outlook.com"
+      # The desktop's own per-host key (~/.ssh/id_ed25519), so the machine
+      # running nixos-anywhere can reach the installer as itself.
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINK969JoQS2K7NuxD5TYEP+2QXevdSdwpc6BAb/lAWRt ol@the-entertaining-nios-desktop"
+    ];
   };
 }

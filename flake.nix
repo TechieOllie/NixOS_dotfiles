@@ -207,7 +207,7 @@
           modules = [
             "${nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-minimal.nix"
             {
-              users.users.root.openssh.authorizedKeys.keys = [ installerVars.user.sshPublicKey ];
+              users.users.root.openssh.authorizedKeys.keys = installerVars.user.sshPublicKeys;
             }
           ];
         }).config.system.build.isoImage;
