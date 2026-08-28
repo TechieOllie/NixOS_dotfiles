@@ -57,7 +57,7 @@
           # reinstall could hand one person's number to another and
           # silently mis-own every file restored from a backup. Cheap to
           # state, impossible to reconstruct after the fact.
-          uid = u.uid;
+          inherit (u) uid;
           shell = pkgs.zsh;
         }
         // lib.optionalAttrs (config.sops.secrets ? "password-hash-${u.name}") {
