@@ -196,23 +196,11 @@
         hostPath = ./hosts/the-entertaining-nios-desktop;
       };
 
-      # Mid-2011 21.5" iMac (iMac12,1), GNOME instead of niri, multi-user.
-      # hosts/inotmac/ is fully scaffolded (variables.nix, features.nix,
-      # disko.nix with a real resolved /dev/disk/by-id path, a generated
-      # hardware-configuration.nix, secrets.nix) but deliberately NOT wired
-      # in here yet — same reasoning CLAUDE.md's Phase 1/8 notes document
-      # for the laptop and (pre-bootstrap) desktop: sops-nix's
-      # neededForUsers machinery reads hosts/inotmac/secrets/secrets.yaml
-      # as a literal git-tracked path at *eval* time (confirmed live: this
-      # entry, wired in, threw "Path '.../secrets.yaml' does not exist in
-      # Git repository" from sops-nix's own secrets-for-users module, not a
-      # bug in this repo's own code), and that file doesn't exist yet — it
-      # needs a real operator-held age key first (age-keygen is
-      # operator-only, see the runbook left for this host). Every other
-      # real host here got its secrets.yaml in the same commit that wired
-      # it in; add this entry back the moment inotmac's exists and
-      # .sops.yaml's placeholder recipient is replaced with the real one.
-      #
+      # Mid-2011 21.5" iMac (iMac12,1): the only host running GNOME rather
+      # than niri, the only one with more than one human account (ol plus
+      # three non-admin users, see hosts/inotmac/variables.nix), and the
+      # only real host on plain ext4 — a single spinning 2011 SATA HDD is
+      # not the case btrfs's CoW overhead is free on. See hosts/inotmac/.
       nixosConfigurations.inotmac = mkHost {
         inherit system;
         hostPath = ./hosts/inotmac;
