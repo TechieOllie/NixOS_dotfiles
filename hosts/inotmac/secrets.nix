@@ -14,6 +14,14 @@
       password-hash = {
         neededForUsers = true;
       };
+
+      # The Wi-Fi PSK, as a NetworkManager environment file — its decrypted
+      # content is the single line `WIFI_PSK=<the password>`, not a bare
+      # password, because ensureProfiles substitutes it by variable name.
+      # Deliberately NOT neededForUsers: that flag is what makes sops-nix
+      # read a secrets file at *eval* time (see CLAUDE.md), and this one is
+      # only wanted at activation, when NetworkManager writes the profile.
+      wifi-env = { };
     }
     # One optional secret per extra account, same shape as the primary
     # user's — modules/system/users.nix already handles either being

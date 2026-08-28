@@ -1,4 +1,4 @@
-{ vars, ... }:
+{ config, vars, ... }:
 {
   imports = [
     ./features.nix
@@ -45,6 +45,37 @@
     vars.user.name
   ]
   ++ map (u: u.name) vars.extraUsers;
+
+  # This machine has no Ethernet run to it — it joined the network over
+  # Wi-Fi during install and has no wired fallback, so a host that boots
+  # without credentials is a host nobody can reach. Declared here rather
+  # than in a module because an SSID describes where this one machine
+  # physically sits, the same reasoning that keeps the desktop's kernel
+  # and lact host-level.
+  #
+  # The PSK never enters the store or git: sops decrypts it to an
+  # environment file at activation and NetworkManager substitutes
+  # $WIFI_PSK by name while writing the profile.
+  networking.networkmanager.ensureProfiles = {
+    environmentFiles = [ config.sops.secrets.wifi-env.path ];
+    profiles.home = {
+      connection = {
+        id = "home";
+        type = "wifi";
+        autoconnect = true;
+      };
+      wifi = {
+        ssid = "Unknown SSID";
+        mode = "infrastructure";
+      };
+      wifi-security = {
+        key-mgmt = "wpa-psk";
+        psk = "$WIFI_PSK";
+      };
+      ipv4.method = "auto";
+      ipv6.method = "auto";
+    };
+  };
 
   # Provisional: reconfirm against the actually-released stable at install
   # time, then leave untouched — same rule as every other host's
