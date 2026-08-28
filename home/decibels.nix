@@ -61,13 +61,16 @@ let
     "audio/x-ms-wma"
   ];
 in
-lib.mkIf osConfig.features.niri {
-  home.packages = [ pkgs.decibels ];
+lib.mkMerge [
+  # The package itself: wanted on any desktop host, niri or GNOME.
+  (lib.mkIf (osConfig.features.niri || osConfig.features.gnome) {
+    home.packages = [ pkgs.decibels ];
+  })
 
-  # Decibels ships most of these associations in its own desktop entry, but
-  # that only makes it a *candidate* handler; the default comes from
-  # ~/.config/mimeapps.list, which home/xdg-mime-apps.nix owns. A default set
-  # there is honoured regardless of what the entry declares, which is what
-  # lets the canonical names above work.
-  xdg.mimeApps.defaultApplications = lib.genAttrs playableTypes (_: "org.gnome.Decibels.desktop");
-}
+  # MIME defaults stay niri-only — see home/papers.nix's comment for why a
+  # GNOME host leaves this to GNOME's own default-application mechanism
+  # instead.
+  (lib.mkIf osConfig.features.niri {
+    xdg.mimeApps.defaultApplications = lib.genAttrs playableTypes (_: "org.gnome.Decibels.desktop");
+  })
+]

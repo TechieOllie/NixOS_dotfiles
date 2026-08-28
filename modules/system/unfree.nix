@@ -49,5 +49,11 @@
       # modules/hardware/controllers.nix, which is the second reason (after
       # the features.niri gate above) this list stopped being desktop-only.
       "xone-dongle-firmware"
+      # Google Chrome's own EULA rather than an OSS license (confirmed via
+      # `nix eval nixpkgs#google-chrome.meta.license.shortName`: "unfree").
+      # inotmac's browser choice — see home/chrome.nix, which installs it.
+      # Has to live here rather than in that Home Manager module for the
+      # same useGlobalPkgs reason as vscode/obsidian above.
+      "google-chrome"
     ];
 }

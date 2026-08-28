@@ -84,13 +84,20 @@ let
     "video/x-theora+ogg"
   ];
 in
-lib.mkIf osConfig.features.niri {
-  home.packages = [ pkgs.celluloid ];
+lib.mkMerge [
+  # The package itself: wanted on any desktop host, niri or GNOME. Same
+  # GoPro/Showtime reasoning applies regardless of desktop environment —
+  # this is a GStreamer bug, not a niri-specific one.
+  (lib.mkIf (osConfig.features.niri || osConfig.features.gnome) {
+    home.packages = [ pkgs.celluloid ];
+  })
 
-  # Celluloid ships these associations in its own desktop entry, but that only
-  # makes it a *candidate* handler; the default comes from
-  # ~/.config/mimeapps.list, which home/xdg-mime-apps.nix owns.
-  xdg.mimeApps.defaultApplications = lib.genAttrs playableTypes (
-    _: "io.github.celluloid_player.Celluloid.desktop"
-  );
-}
+  # MIME defaults stay niri-only — see home/papers.nix's comment for why a
+  # GNOME host leaves this to GNOME's own default-application mechanism
+  # instead.
+  (lib.mkIf osConfig.features.niri {
+    xdg.mimeApps.defaultApplications = lib.genAttrs playableTypes (
+      _: "io.github.celluloid_player.Celluloid.desktop"
+    );
+  })
+]

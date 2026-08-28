@@ -53,6 +53,11 @@
           default = false;
           description = "Enable the Moonshine streaming server: a headless Moonlight-compatible host exposing a full niri desktop, Steam Big Picture and a remote poweroff.";
         };
+        gnome = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Enable the GNOME desktop (GDM + GNOME Shell), independent of features.niri. A separate desktop stack for hosts that aren't running Niri/Noctalia.";
+        };
       };
     };
     default = { };

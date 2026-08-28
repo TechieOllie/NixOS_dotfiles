@@ -36,6 +36,16 @@
     ./jetbrains.nix
     ./claude-code.nix
     ./gh.nix
+
+    # GNOME-host app set (features.gnome). ./papers.nix, ./celluloid.nix and
+    # ./decibels.nix are shared with the niri hosts (package install widened
+    # to features.gnome too; MIME wiring stays niri-only) rather than
+    # duplicated here.
+    ./chrome.nix
+    ./picard.nix
+    ./snapshot.nix
+    ./simple-scan.nix
+    ./whipper.nix
   ];
 
   home.username = vars.user.name;
