@@ -23,21 +23,28 @@
 
   # Three additional, non-admin accounts sharing this machine — see
   # modules/system/users.nix, which reads this with `or []` so every other
-  # host's variables.nix needs no change. None of these get Home Manager
+  # host's variables.nix needs no change. Each uid is pinned rather than
+  # left to be allocated, for the same reason ol's is: an allocated uid
+  # depends on account-creation order, so a reinstall could hand liz's
+  # number to regis and silently mis-own every restored file. None of
+  # these get Home Manager
   # (see that module's comment) or wheel; each optionally gets its own
   # sops-backed password hash (hosts/inotmac/secrets.nix).
   extraUsers = [
     {
       name = "liz";
       fullName = "Liz";
+      uid = 1001;
     }
     {
       name = "regis";
       fullName = "Regis";
+      uid = 1002;
     }
     {
       name = "jolan";
       fullName = "Jolan";
+      uid = 1003;
     }
   ];
 }

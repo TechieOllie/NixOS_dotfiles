@@ -31,7 +31,7 @@
   }
   # Secondary, non-admin accounts — plain users with no Home Manager
   # profile and no wheel membership. `vars.extraUsers` is new, purely
-  # additive data (a list of { name, fullName }), read with `or []` so
+  # additive data (a list of { name, fullName, uid }), read with `or []` so
   # every other host's variables.nix needs no change at all. This was
   # added for inotmac (a shared iMac with four real people using it, only
   # one of whom is the operator) rather than folding a whole second
@@ -52,6 +52,12 @@
         {
           isNormalUser = true;
           description = u.fullName;
+          # Pinned for the same reason the primary user's is, one layer
+          # down: an allocated uid depends on account-creation order, so a
+          # reinstall could hand one person's number to another and
+          # silently mis-own every file restored from a backup. Cheap to
+          # state, impossible to reconstruct after the fact.
+          uid = u.uid;
           shell = pkgs.zsh;
         }
         // lib.optionalAttrs (config.sops.secrets ? "password-hash-${u.name}") {
