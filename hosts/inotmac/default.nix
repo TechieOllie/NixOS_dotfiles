@@ -8,7 +8,7 @@
     ../../profiles/base.nix
     ../../modules/desktop/gnome.nix
     ../../modules/programs/chrome.nix
-    ../../modules/programs/freac.nix
+    ../../modules/programs/rhythmbox.nix
     ../../modules/programs/picard.nix
     ../../modules/services/printing.nix
   ];
@@ -39,8 +39,8 @@
   # during research): revisit only if the machine actually runs hot under
   # real GNOME use.
 
-  # SANE (modules/services/printing.nix, features.printing) and fre:ac
-  # (modules/programs/freac.nix) both need real device-group
+  # SANE (modules/services/printing.nix, features.printing) and Rhythmbox
+  # (modules/programs/rhythmbox.nix) both need real device-group
   # membership that neither package grants on its own. Applied to every account on this shared
   # machine, not just ol, since all four people use the same physical
   # scanner-capable printer and the same optical drive.

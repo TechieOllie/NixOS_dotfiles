@@ -4210,3 +4210,108 @@ than a wiring gap. Recorded so the next audit doesn't re-derive the list:
 Not flagged at all, and not worth revisiting: `.iso .deb .rpm .exe .msi
 .apk .torrent .psd .xcf .blend .ai`. Either meaningless on NixOS or needing
 an application well outside this stack.
+
+## Five CD rippers, and the constraint nobody had named
+
+inotmac's ripper was replaced four times. Each swap was a correct decision
+on the criterion in play and wrong on the one that actually bound, so the
+sequence is worth keeping intact rather than compressed to its answer.
+
+| # | Ripper | Chosen for | Failed on |
+| --- | --- | --- | --- |
+| 1 | whipper | rip accuracy (AccurateRip) | CLI-only; three of four accounts could not launch it |
+| 2 | asunder | having a window | unusable in practice — three SIGABRT coredumps on the machine |
+| 3 | sound-juicer | being GNOME's own | worked; rejected on feel |
+| 4 | fre:ac | maintained, AccurateRip, best tagging | output layout cannot be declared |
+| 5 | rhythmbox | layout *and* format are declarable for every account | player-first UI, no AccurateRip |
+
+**The binding constraint was never "does it rip".** After whipper, every
+candidate ripped correctly. It was: *can the output layout be set for four
+people, three of whom have no Home Manager profile?* That question was not
+asked until the operator said the export folder and file choices did not
+match what they use — at which point fre:ac, which had just produced a
+verified-perfect rip, was out, because it keeps its patterns in
+`~/.config/freac/freac.xml`, a file the app owns and rewrites.
+
+**fre:ac did not crash, despite being reported as crashing.** No coredump
+existed for it, while coredumpctl held three SIGABRTs from asunder on the
+same day, so the subsystem was demonstrably working. Its scope ran 25
+minutes wall / 15 minutes CPU and exited cleanly four minutes after writing
+its last file, and `~/Music` held 19 tracks that all passed `flac -t` with
+full tags — ISRC, catalogue number, `MEDIA=CD`. The rip was flawless. This
+is the same shape as the Zen entry above: **get the on-screen symptom before
+calling something a crash**, because "the window went away" and "the program
+died" are different claims and only one of them was true here.
+
+One method note against my own first reading: the initial integrity check
+reported all 19 files as FAILED. That was the harness, not the files —
+`flac` is not installed on inotmac (it is a `features.workstation` host with
+that flag off), so every invocation was a command-not-found scoring as a
+failure. Re-run through `nix shell nixpkgs#flac`, all 19 passed. A loop that
+reports failure identically for "the test failed" and "the test never ran"
+is the same class of problem as a lint that cannot fail.
+
+### fre:ac's packaging bug, recorded so it is not re-derived
+
+`overlays/` was created for this and removed with it. If fre:ac is ever
+reconsidered — it remains the only GUI ripper in nixpkgs with AccurateRip —
+this is what it needs, all of it verified by building:
+
+- **It can encode nothing as packaged.** BoCA dlopens codecs under
+  unprefixed, unversioned names relative to the installed binary
+  (`codecs/FLAC.so`), while nixpkgs provides `libFLAC.so.14` and puts it on
+  `LD_LIBRARY_PATH` under a name nothing asks for. Every component loads as
+  a shared object — `ldd` is clean — and then reports itself unavailable.
+  The tell is `freaccmd --help`, whose encoder list reads exactly `meh`.
+- **The fix is a `$out/bin/codecs/` symlink farm, inside the store output.**
+  BoCA resolves that directory against the installed binary's path, not
+  argv[0] or cwd; building the same layout beside a copy of the binary
+  changes nothing, confirmed by strace still probing the original path.
+- **`sndfile` is the decoder side** — without it fre:ac answers every file
+  with "Could not process file" *while CD ripping still works*, so it is
+  invisible if the only thing tested is a disc.
+- **`libcdio` is how it finds the drive**, also missing from the stock
+  wrapper. It and sndfile are looked up under proper sonames, so they belong
+  on `LD_LIBRARY_PATH`, not in the symlink farm.
+- `faac` is unfree and must be allow-listed even though no AAC codec ends up
+  wired up, because it is a build input of the derivation itself.
+
+With all of that, the encoder list becomes `flac, lame, vorbis, opus,
+sndfile` and a WAV round-trips through FLAC bit-identically.
+
+### Rhythmbox: dconf, not a GSettings override
+
+The declarative layout is `%aa/%at (%ay)` and `%tN - %tt`, giving
+`P!nk/Greatest Hits...So Far!!! (2010)/01 - Get The Party Started.flac`.
+Every specifier was read out of `filepath_parse_pattern()` in
+`rb-library-source.c`, because Rhythmbox's own UI offers only a fixed
+dropdown of preset layouts and none of them includes the year — the legend
+is not discoverable from the app. `%ay` renders a missing year as `0`,
+giving `Album (0)`; there is no conditional syntax, so a disc whose lookup
+returns no date needs fixing before or after the rip.
+
+The format setting is the interesting half. `org.gnome.rhythmbox.encoding
+-settings` is a **relocatable** schema, and a `.gschema.override` cannot
+target one at all — not with a bare header, and not with the `[schema:path]`
+form the `gsettings` CLI accepts. Both compile clean, neither warns, and the
+value silently stays `audio/x-vorbis`. Found by querying the compiled schema
+rather than trusting the build, then checking the build log for a warning
+that never came.
+
+`programs.dconf.profiles.user.databases` has no such limit, because dconf
+keys on paths rather than schemas. The path is
+`/org/gnome/rhythmbox/library/encoding/`, from `g_settings_get_child
+(settings, "encoding")` in `rb-library-source.c` against
+`org.gnome.rhythmbox.library` — read from both the `<child>` element and the
+call site. Both keys moved to dconf so there is one mechanism rather than
+two. `enableUserDb` defaults true, so these remain defaults that a person's
+own change still overrides.
+
+To verify a dconf database, write a throwaway profile naming just that
+`file-db` and run `DCONF_PROFILE=<it> dconf dump /`. A plain `dconf dump /`
+reads the machine you are sitting at, which looks like a result and is not.
+
+CD ripping itself needs no plugin configuration: `active-plugins` defaults
+to `[]`, but `audiocd` is marked `Builtin=true` in its own `.plugin` file
+and is always loaded. Worth checking rather than assuming — an empty default
+list is exactly the shape that usually means nothing is enabled.
