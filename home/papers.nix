@@ -48,21 +48,13 @@ let
     "application/x-cbt"
   ];
 in
-lib.mkMerge [
-  # The package itself: wanted on any desktop host, niri or GNOME.
-  (lib.mkIf (osConfig.features.niri || osConfig.features.gnome) {
-    home.packages = [ pkgs.papers ];
-  })
+lib.mkIf osConfig.features.niri {
+  home.packages = [ pkgs.papers ];
 
-  # MIME defaults only make sense where home/xdg-mime-apps.nix actually
-  # owns ~/.config/mimeapps.list, which is niri-only (see that module) —
-  # on a GNOME host, GNOME's own default-application mechanism (Settings +
-  # each app's packaged .desktop entry) is what a GNOME user expects to
-  # edit, and setting xdg.mimeApps.defaultApplications there would either
-  # silently do nothing (xdg.mimeApps.enable off) or fight GNOME's own
-  # store — exactly the "accepted while disabled, discarded" trap
-  # CLAUDE.md documents elsewhere. So this half stays niri-only.
-  (lib.mkIf osConfig.features.niri {
-    xdg.mimeApps.defaultApplications = lib.genAttrs readableTypes (_: "org.gnome.Papers.desktop");
-  })
-]
+  # Papers ships these associations in its own desktop entry, but that only
+  # makes it a *candidate* handler; the default comes from
+  # ~/.config/mimeapps.list, which home/xdg-mime-apps.nix owns. application/pdf
+  # is in the zen-browser flake's own list at mkDefault, so this overrides it
+  # cleanly — same shape as home/neovim.nix's text types.
+  xdg.mimeApps.defaultApplications = lib.genAttrs readableTypes (_: "org.gnome.Papers.desktop");
+}

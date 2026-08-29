@@ -37,14 +37,13 @@
     ./claude-code.nix
     ./gh.nix
 
-    # GNOME-host app set (features.gnome). ./papers.nix, ./celluloid.nix and
-    # ./decibels.nix are shared with the niri hosts (package install widened
-    # to features.gnome too; MIME wiring stays niri-only) rather than
-    # duplicated here.
-    ./chrome.nix
+    # GNOME-host app set (features.gnome) — only what GNOME does *not*
+    # already ship. Its default install covers the document viewer, camera,
+    # scanner, image viewer, audio player, video player and calculator, so
+    # declaring those here bought a second copy of each and nothing else.
+    # Chrome is wanted by all four accounts on that host, not just ol, so it
+    # is system-level instead: modules/programs/chrome.nix.
     ./picard.nix
-    ./snapshot.nix
-    ./simple-scan.nix
     ./whipper.nix
   ];
 

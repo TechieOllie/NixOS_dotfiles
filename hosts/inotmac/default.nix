@@ -7,6 +7,7 @@
     ./secrets.nix
     ../../profiles/base.nix
     ../../modules/desktop/gnome.nix
+    ../../modules/programs/chrome.nix
     ../../modules/services/printing.nix
   ];
 
