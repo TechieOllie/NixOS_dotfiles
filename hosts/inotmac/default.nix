@@ -16,6 +16,10 @@
   networking.hostName = vars.system.hostName;
   time.timeZone = vars.system.timeZone;
   console.keyMap = vars.system.keyMap;
+  # Must match console.keyMap above — see variables.nix for why both exist
+  # and what breaks when only one is set. GDM and the GNOME session both
+  # read this.
+  services.xserver.xkb.layout = vars.system.xkbLayout;
 
   # Firmware for the Radeon HD 6750M (Turks/Whistler, radeon driver — not
   # amdgpu, which has no PCI ID match for anything pre-GCN), the Broadcom

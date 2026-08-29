@@ -26,7 +26,24 @@
   ...
 }:
 lib.mkIf config.features.gnome {
-  environment.systemPackages = [ pkgs.google-chrome ];
+  # Hardware acceleration is forced off. This host's GPU is a Radeon HD
+  # 6750M (Turks, pre-GCN, driven by the legacy `radeon` driver), and Chrome
+  # is unusable on it with GPU compositing enabled — reported from the
+  # machine itself, not predicted. --disable-gpu is the whole-hog switch:
+  # it turns off GPU compositing and accelerated video decode together,
+  # which is what "turn hardware acceleration off" means in Chrome's own
+  # settings.
+  #
+  # Declared through the package rather than a flags file: Chrome reads
+  # neither ~/.config/chrome-flags.conf nor any per-user opt-in on this
+  # platform, and three of the four accounts here have no Home Manager to
+  # write one anyway. commandLineArgs is baked into the wrapper, so it
+  # applies to every user and survives their own settings.
+  environment.systemPackages = [
+    (pkgs.google-chrome.override {
+      commandLineArgs = "--disable-gpu";
+    })
+  ];
 
   # Default browser, system-wide (/etc/xdg/mimeapps.list), so it applies to
   # all four accounts without each person setting it in GNOME Settings —

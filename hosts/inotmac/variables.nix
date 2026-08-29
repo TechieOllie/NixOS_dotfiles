@@ -7,6 +7,18 @@
     # reasonable default.
     timeZone = "Europe/Paris";
     keyMap = "fr-pc";
+    # The same physical keyboard, named again in xkb's namespace rather than
+    # the console's — "fr-pc" is a console keymap file and means nothing to
+    # X11/Wayland, which needs the two-letter xkb layout. Both have to be
+    # stated; neither can be derived from the other.
+    #
+    # Not cosmetic: without it the graphical stack silently defaults to "us"
+    # while the console is French, so a password typed correctly at GDM
+    # produces different characters than the same password typed over SSH.
+    # That is exactly how this host locked its own operator out — sudo
+    # worked, GDM did not, and the journal showed a plain PAM auth failure
+    # with no hint that the keyboard was the reason.
+    xkbLayout = "fr";
   };
 
   user = {

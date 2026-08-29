@@ -32,4 +32,19 @@ lib.mkIf config.features.gnome {
   # else in GNOME's default set is excluded; the rest is the stock install
   # the operator asked to keep.
   environment.gnome.excludePackages = [ pkgs.epiphany ];
+
+  # The dash's default contents. GNOME's own default still lists Epiphany,
+  # which the exclusion above removes — leaving a dead icon in the dash of
+  # every account that has not customised it. Setting this both fixes that
+  # and gives the four people sharing this machine the two things they
+  # actually use.
+  #
+  # A *default*, not a lock: anyone can still pin and unpin freely, and the
+  # moment they do, their own dconf value shadows this. It is what a fresh
+  # account gets, which is exactly the reach Home Manager cannot give here
+  # (three of the four users have none).
+  services.desktopManager.gnome.favoriteAppsOverride = ''
+    [org/gnome/shell]
+    favorite-apps=[ 'google-chrome.desktop', 'org.gnome.Nautilus.desktop' ]
+  '';
 }
