@@ -19,6 +19,16 @@
     # per-host GitHub deploy key, which (if this host wants one) belongs in
     # secrets.nix instead, same shape as the desktop's ssh-private-key.
     sshPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIATBdWsHaaYkSYrvxuIyjAlRO5Un1cDcOcI9RUXu9LTH oliverwest06@outlook.com";
+
+    # This host is administered remotely from the desktop, which holds only
+    # its own per-host identity (~/.ssh/id_ed25519, provisioned by that
+    # host's secrets.nix) and not the bootstrap key's private half. Without
+    # this the desktop cannot SSH in at all — the exact gap that appeared on
+    # inotmac's first boot, and the same reason hosts/installer/variables.nix
+    # already lists this key.
+    extraSshPublicKeys = [
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINK969JoQS2K7NuxD5TYEP+2QXevdSdwpc6BAb/lAWRt ol@the-entertaining-nios-desktop"
+    ];
   };
 
   # Three additional, non-admin accounts sharing this machine — see
