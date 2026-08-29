@@ -1,6 +1,7 @@
-# Not a real host — this folder holds only the operator identity needed by
-# the installer-iso package (flake.nix), so that package doesn't have to
-# reach into one specific real host's variables.nix. Deliberately no
+# Not a real host — this folder holds only what the installer-iso package
+# (flake.nix) needs: the operator identity, plus the one piece of hardware
+# truth that outlives having no particular hardware. Kept here so that
+# package doesn't have to reach into one specific real host's variables.nix. Deliberately no
 # features.nix/disko.nix/hardware-configuration.nix/secrets.nix here, and no
 # nixosConfigurations entry — unlike every other directory under hosts/.
 #
@@ -11,6 +12,20 @@
 # Add a key here when a new machine has to be able to drive
 # `nixos-anywhere`.
 {
+  # The ISO is generic across machines, but not across keyboards: every
+  # keyboard the operator will boot it on is French, and an installer that
+  # comes up in "us" mangles the very things it exists to have typed — a
+  # root password, a disk path, an SSH command. Same value every real host
+  # carries, for the same reason; hosts/inotmac/variables.nix explains at
+  # length how a keymap mismatch locked that machine's operator out.
+  #
+  # Console half only. There is no xkbLayout counterpart here because the
+  # minimal ISO ships no graphical session for one to apply to — stating it
+  # would be config that nothing reads.
+  system = {
+    keyMap = "fr-pc";
+  };
+
   user = {
     name = "ol";
     fullName = "ol";

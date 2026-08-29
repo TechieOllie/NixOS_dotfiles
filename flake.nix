@@ -209,8 +209,8 @@
       # Bootstrap tool, not a host: a minimal installer ISO with the
       # operator's key pre-authorized for root, so nixos-anywhere can SSH in
       # without any manual console step. Reads hosts/installer/variables.nix
-      # (operator identity only, not a real host — see that file's own
-      # comment) rather than any one real host's variables.nix.
+      # (the operator's identity and keyboard, not a real host — see that
+      # file's own comment) rather than any one real host's variables.nix.
       packages.${system}.installer-iso =
         (nixpkgs.lib.nixosSystem {
           inherit system;
@@ -218,6 +218,9 @@
             "${nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-minimal.nix"
             {
               users.users.root.openssh.authorizedKeys.keys = installerVars.user.sshPublicKeys;
+              # Everything typed on this image is typed on one of the
+              # operator's own French keyboards — see variables.nix.
+              console.keyMap = installerVars.system.keyMap;
             }
           ];
         }).config.system.build.isoImage;
