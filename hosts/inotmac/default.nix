@@ -8,6 +8,7 @@
     ../../profiles/base.nix
     ../../modules/desktop/gnome.nix
     ../../modules/programs/chrome.nix
+    ../../modules/programs/asunder.nix
     ../../modules/programs/picard.nix
     ../../modules/programs/whipper.nix
     ../../modules/services/printing.nix
