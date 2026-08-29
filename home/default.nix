@@ -37,14 +37,10 @@
     ./claude-code.nix
     ./gh.nix
 
-    # GNOME-host app set (features.gnome) — only what GNOME does *not*
-    # already ship. Its default install covers the document viewer, camera,
-    # scanner, image viewer, audio player, video player and calculator, so
-    # declaring those here bought a second copy of each and nothing else.
-    # Chrome is wanted by all four accounts on that host, not just ol, so it
-    # is system-level instead: modules/programs/chrome.nix.
-    ./picard.nix
-    ./whipper.nix
+    # No GNOME-host app modules live here. GNOME ships its own viewer set,
+    # and the three apps it lacks (Chrome, Picard, whipper) are wanted by
+    # every account on that shared host rather than just ol — so they are
+    # system-level, in modules/programs/.
   ];
 
   home.username = vars.user.name;

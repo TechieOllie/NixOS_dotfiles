@@ -10,15 +10,26 @@
 # display-managers/gdm.nix} at this pin, not assumed from older docs/tutorials
 # that still show the xserver-nested paths).
 #
-# Deliberately no environment.gnome.excludePackages: the stock app set is
-# kept as-is per the operator's own choice, rather than trimming apps this
-# repo happens to replace elsewhere (Papers/Celluloid/Decibels/Chrome are
-# additions, not replacements of anything excluded here). gnome-calculator in
-# particular needs no separate package entry — it's already part of GNOME's
-# own default set (nixos/modules/services/desktop-managers/gnome.nix), so
-# adding it explicitly would just be a redundant duplicate.
-{ config, lib, ... }:
+# The stock app set is otherwise kept as-is, per the operator's own choice:
+# GNOME's defaults already cover the document viewer, camera, scanner, image
+# viewer, audio player, video player and calculator, which is why this host
+# declares none of them itself. Only Epiphany is excluded (see below), since
+# Chrome replaces it outright rather than sitting beside it.
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 lib.mkIf config.features.gnome {
   services.displayManager.gdm.enable = true;
   services.desktopManager.gnome.enable = true;
+
+  # Epiphany (GNOME Web) is dropped: modules/programs/chrome.nix installs
+  # Chrome and claims the browser MIME defaults on this host, so shipping a
+  # second browser only offers a choice nobody asked for — and one that
+  # would otherwise sit in the app grid looking like the default. Nothing
+  # else in GNOME's default set is excluded; the rest is the stock install
+  # the operator asked to keep.
+  environment.gnome.excludePackages = [ pkgs.epiphany ];
 }

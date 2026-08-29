@@ -13,12 +13,16 @@
 # confirmed live via lsblk on the installer) and, like scanning, needs group
 # membership whipper's own package doesn't grant on its own — see
 # hosts/inotmac/default.nix, which adds "cdrom" to every account here.
+#
+# System-wide rather than a Home Manager module: this repo wires Home
+# Manager for exactly one user (lib/mkHost.nix), and inotmac is shared by
+# four people who all get the optical drive and the "cdrom" group.
 {
   pkgs,
   lib,
-  osConfig,
+  config,
   ...
 }:
-lib.mkIf osConfig.features.gnome {
-  home.packages = [ pkgs.whipper ];
+lib.mkIf config.features.gnome {
+  environment.systemPackages = [ pkgs.whipper ];
 }

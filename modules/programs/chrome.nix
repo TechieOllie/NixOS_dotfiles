@@ -27,4 +27,28 @@
 }:
 lib.mkIf config.features.gnome {
   environment.systemPackages = [ pkgs.google-chrome ];
+
+  # Default browser, system-wide (/etc/xdg/mimeapps.list), so it applies to
+  # all four accounts without each person setting it in GNOME Settings —
+  # and so it is reproducible from this repo rather than being per-user
+  # state. A user who prefers something else still wins: their own
+  # ~/.config/mimeapps.list is consulted first.
+  #
+  # "google-chrome.desktop", NOT "com.google.Chrome.desktop": this package
+  # ships both, and the reverse-DNS one is NoDisplay=true — a hidden
+  # duplicate. Pointing a default at it would register a handler nothing
+  # surfaces, the silent-no-op failure CLAUDE.md documents for MIME
+  # defaults. Read out of the package, not guessed.
+  #
+  # Only the four types Chrome actually declares and that make it "the
+  # browser" are claimed. application/pdf is deliberately NOT among them
+  # even though Chrome advertises it: GNOME ships Papers, and a PDF is a
+  # document here rather than a web page — same reasoning home/papers.nix
+  # already applies on the niri hosts.
+  xdg.mime.defaultApplications = {
+    "text/html" = "google-chrome.desktop";
+    "application/xhtml+xml" = "google-chrome.desktop";
+    "x-scheme-handler/http" = "google-chrome.desktop";
+    "x-scheme-handler/https" = "google-chrome.desktop";
+  };
 }
