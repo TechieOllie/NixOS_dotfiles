@@ -39,12 +39,19 @@ lib.mkIf config.features.gnome {
   # and gives the four people sharing this machine the two things they
   # actually use.
   #
+  # The section header is the schema id in *dotted* form — this is a
+  # GSettings override file, not a dconf one. Written as [org/gnome/shell]
+  # it compiles without complaint and applies nothing at all; the dash
+  # simply keeps GNOME's stock list, which looks exactly like the option
+  # having no effect. Verified by reading the generated override out of
+  # pkgs.gnome.nixos-gsettings-overrides, not by trusting the build.
+  #
   # A *default*, not a lock: anyone can still pin and unpin freely, and the
   # moment they do, their own dconf value shadows this. It is what a fresh
   # account gets, which is exactly the reach Home Manager cannot give here
   # (three of the four users have none).
   services.desktopManager.gnome.favoriteAppsOverride = ''
-    [org/gnome/shell]
+    [org.gnome.shell]
     favorite-apps=[ 'google-chrome.desktop', 'org.gnome.Nautilus.desktop' ]
   '';
 }
