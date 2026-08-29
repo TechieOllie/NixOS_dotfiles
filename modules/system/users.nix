@@ -66,4 +66,55 @@
       )
     ) (vars.extraUsers or [ ])
   );
+
+  # Per-account GNOME session language, for any extraUser that named one.
+  #
+  # There is no NixOS option for this and no way to fully declare it: GDM
+  # and gnome-session read the language from AccountsService, whose store is
+  # a plain ini file per user under /var/lib/AccountsService/users that the
+  # daemon owns and rewrites whenever anything changes — the same
+  # app-owned-mutable-state shape as Noctalia's settings sidecar and Zen's
+  # xulstore.json. So this *seeds* rather than declares.
+  #
+  # `f` deliberately, not `f+`: create-if-absent. The same file also holds
+  # keys the daemon learned on its own (Icon, Session, XSession,
+  # SystemAccount), so rewriting it on every boot would throw those away and
+  # would also stomp the person's own choice the moment they used Settings →
+  # Region & Language. The cost of that is the usual seed-once cost: an
+  # account that has *already* logged in has a file, so this does nothing
+  # for it and the language has to be set once by hand — either in Settings
+  # or with `sudo loginctl`/`chsh`-style direct edit of the same file.
+  #
+  # The \\n are literal backslash-n in the generated rule, not real
+  # newlines — systemd-tmpfiles parses one rule per line and un-escapes the
+  # argument field itself, so a real newline here would split the rule in
+  # two and leave `Language=...` sitting on its own as an unparseable
+  # second rule. Which is exactly what the first version of this did;
+  # caught by reading the evaluated rule rather than by the build, which
+  # was perfectly green.
+  #
+  # Note the mode and owner: root:root 0600, matching what accountsservice
+  # itself writes. The directory is declared too, at the 0700 root:root the
+  # daemon creates it with — without it systemd-tmpfiles would create the
+  # parent implicitly at 0755.
+  systemd.tmpfiles.rules =
+    let
+      localised = builtins.filter (u: (u.language or null) != null) (vars.extraUsers or [ ]);
+    in
+    lib.optionals (localised != [ ]) (
+      [ "d /var/lib/AccountsService/users 0700 root root -" ]
+      ++ map (
+        u: "f /var/lib/AccountsService/users/${u.name} 0600 root root - [User]\\nLanguage=${u.language}\\n"
+      ) localised
+    );
+
+  # A language nobody generated is a language GNOME silently falls back out
+  # of — glibc has no fr_FR.UTF-8 unless it is built, and the session then
+  # comes up in the default locale with no error anywhere. Derived from the
+  # same list rather than stated separately so the two can't drift.
+  i18n.extraLocales = lib.unique (
+    map (u: "${u.language}/UTF-8") (
+      builtins.filter (u: (u.language or null) != null) (vars.extraUsers or [ ])
+    )
+  );
 }

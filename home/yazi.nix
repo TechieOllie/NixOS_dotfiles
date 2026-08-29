@@ -10,7 +10,19 @@
 # ~/.config/yazi/flavors/noctalia.yazi/ and activating it in
 # ~/.config/yazi/theme.toml -- deliberately not Nix-managed here at all,
 # so there's nothing for Noctalia's runtime writes to conflict with.
-{ pkgs, ... }:
+# Self-gates on osConfig.features.workstation: this is part of the
+# operator's personal terminal environment, wanted only on machines they
+# actually work on. inotmac is not one — ol holds an admin account there
+# and nothing else — so the whole toolkit stays off it. Zsh and Starship
+# are deliberately *not* on this flag: a login shell that behaves the way
+# its owner expects is worth having even on a machine visited only to fix
+# something.
 {
+  pkgs,
+  lib,
+  osConfig,
+  ...
+}:
+lib.mkIf osConfig.features.workstation {
   home.packages = [ pkgs.yazi ];
 }

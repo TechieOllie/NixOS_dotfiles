@@ -1,7 +1,19 @@
 # User-level Lazygit config. No system half — same reasoning as
 # home/starship.nix for why this is its own small file.
-{ config, ... }:
+# Self-gates on osConfig.features.workstation: this is part of the
+# operator's personal terminal environment, wanted only on machines they
+# actually work on. inotmac is not one — ol holds an admin account there
+# and nothing else — so the whole toolkit stays off it. Zsh and Starship
+# are deliberately *not* on this flag: a login shell that behaves the way
+# its owner expects is worth having even on a machine visited only to fix
+# something.
 {
+  config,
+  lib,
+  osConfig,
+  ...
+}:
+lib.mkIf osConfig.features.workstation {
   programs.lazygit = {
     enable = true;
     settings = {

@@ -53,6 +53,11 @@
           default = false;
           description = "Enable the Moonshine streaming server: a headless Moonlight-compatible host exposing a full niri desktop, Steam Big Picture and a remote poweroff.";
         };
+        workstation = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Enable the operator's personal terminal environment (Ghostty, Git, Lazygit, Neovim, Yazi) on the Home Manager side. Off for hosts where the operator only holds an admin account rather than actually working on the machine; Zsh and Starship are unconditional and stay either way.";
+        };
         gnome = lib.mkOption {
           type = lib.types.bool;
           default = false;

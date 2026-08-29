@@ -2,6 +2,11 @@
 {
   features = {
     snapshots = true;
+    # The operator's own machines: their full terminal environment
+    # (Ghostty, Git, Lazygit, Neovim, Yazi) belongs here. Off by default,
+    # so a host where ol only holds an admin account — inotmac — gets
+    # Zsh and Starship and nothing else.
+    workstation = true;
     niri = true;
     docker = true;
     tailscale = true;
@@ -12,8 +17,8 @@
     # Phone integration. Desktop-only for now on availability, not on
     # principle: the laptop would want it too once it's installed.
     kdeconnect = true;
-    # FreeCAD, and the workstation tooling (IntelliJ IDEA, Claude Code)
-    # that sits on top of the terminal stack every host already gets.
+    # FreeCAD, and the developer tooling (IntelliJ IDEA, Claude Code)
+    # that sits on top of the workstation terminal stack above.
     cad = true;
     development = true;
     # gaming is left to profiles/gaming.nix's mkDefault rather than

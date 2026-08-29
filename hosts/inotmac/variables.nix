@@ -54,6 +54,15 @@
   # these get Home Manager
   # (see that module's comment) or wheel; each optionally gets its own
   # sops-backed password hash (hosts/inotmac/secrets.nix).
+  #
+  # `language` is optional and also read with `or null`. It sets that one
+  # account's GNOME session language, which is a per-person property and
+  # not a machine one: this iMac sits in France, but ol administers it in
+  # English while regis and jolan want a French desktop, and liz has not
+  # said. So i18n.defaultLocale stays en_US.UTF-8 for the system and only
+  # the accounts that asked get something else. See modules/system/users.nix
+  # for how it is applied, and why it can only be *seeded* rather than
+  # fully declared.
   extraUsers = [
     {
       name = "liz";
@@ -64,11 +73,13 @@
       name = "regis";
       fullName = "Regis";
       uid = 1002;
+      language = "fr_FR.UTF-8";
     }
     {
       name = "jolan";
       fullName = "Jolan";
       uid = 1003;
+      language = "fr_FR.UTF-8";
     }
   ];
 }

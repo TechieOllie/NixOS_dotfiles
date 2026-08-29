@@ -18,7 +18,19 @@
 # (github:TechieOllie/neovim_dotfiles) and treated as a live, externally
 # -sourced directory, the same way it already was before this repo
 # touched Neovim at all.
-{ pkgs, lib, ... }:
+# Self-gates on osConfig.features.workstation: this is part of the
+# operator's personal terminal environment, wanted only on machines they
+# actually work on. inotmac is not one — ol holds an admin account there
+# and nothing else — so the whole toolkit stays off it. Zsh and Starship
+# are deliberately *not* on this flag: a login shell that behaves the way
+# its owner expects is worth having even on a machine visited only to fix
+# something.
+{
+  pkgs,
+  lib,
+  osConfig,
+  ...
+}:
 let
   # The file types Neovim should own. Everything here is a format the
   # operator edits as source or config, and every name was verified against
@@ -78,7 +90,7 @@ let
     # reach Neovim through text/plain like .nix and .conf do.
   ];
 in
-{
+lib.mkIf osConfig.features.workstation {
   # git and yazi are deliberately NOT listed here even though
   # lazy.nvim/Mason need them (git for lazy.nvim's own bootstrap clone;
   # yazi for yazi.nvim) -- both are already installed by their own

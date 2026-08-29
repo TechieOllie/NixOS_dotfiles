@@ -8,7 +8,7 @@
     ../../profiles/base.nix
     ../../modules/desktop/gnome.nix
     ../../modules/programs/chrome.nix
-    ../../modules/programs/asunder.nix
+    ../../modules/programs/sound-juicer.nix
     ../../modules/programs/picard.nix
     ../../modules/services/printing.nix
   ];
@@ -39,9 +39,9 @@
   # during research): revisit only if the machine actually runs hot under
   # real GNOME use.
 
-  # SANE (modules/services/printing.nix, features.printing) and Asunder
-  # (modules/programs/asunder.nix) both need real device-group membership
-  # that neither package grants on its own. Applied to every account on this shared
+  # SANE (modules/services/printing.nix, features.printing) and Sound Juicer
+  # (modules/programs/sound-juicer.nix) both need real device-group
+  # membership that neither package grants on its own. Applied to every account on this shared
   # machine, not just ol, since all four people use the same physical
   # scanner-capable printer and the same optical drive.
   users.groups.scanner.members = [
