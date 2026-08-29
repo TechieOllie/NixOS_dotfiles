@@ -19,8 +19,11 @@ is:
 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINK969JoQS2K7NuxD5TYEP+2QXevdSdwpc6BAb/lAWRt ol@the-entertaining-nios-desktop
 ```
 
-That is a different identity from `variables.nix`'s `sshPublicKey`, which is
-the operator's bootstrap key and exists only to reach installer ISOs.
+That is a different identity from the operator's bootstrap key, which exists
+to reach installer ISOs. Both now appear in every host's `variables.nix`
+`sshPublicKeys` list: this repo is edited here and remote rebuilds are driven
+from here, so the desktop has to be able to reach the other machines as
+itself.
 
 Two disks, deliberately asymmetric:
 

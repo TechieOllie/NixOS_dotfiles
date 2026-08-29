@@ -8,16 +8,11 @@
     };
   };
 
-  # The operator's bootstrap key, plus any host-specific additions. The
-  # extras exist for the same reason hosts/installer/variables.nix carries a
-  # second key: the machine that administers a host over SSH is not always
-  # holding the bootstrap key. inotmac is the live case — it is managed from
-  # the desktop, which has only its own per-host identity.
-  #
-  # `or [ ]` so no other host's variables.nix needs to change, the same
-  # shape vars.extraUsers uses in modules/system/users.nix.
-  users.users.${vars.user.name}.openssh.authorizedKeys.keys = [
-    vars.user.sshPublicKey
-  ]
-  ++ (vars.user.extraSshPublicKeys or [ ]);
+  # Every key the operator can log in with, listed per host in its own
+  # variables.nix — the same plural shape hosts/installer/variables.nix has
+  # always used. Required rather than optional: a host that authorizes no
+  # key is one nobody can reach, and with PasswordAuthentication off above
+  # there is no fallback. Making it non-optional means a host that forgets
+  # it fails at eval instead of after install.
+  users.users.${vars.user.name}.openssh.authorizedKeys.keys = vars.user.sshPublicKeys;
 }

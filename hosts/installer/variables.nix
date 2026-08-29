@@ -6,9 +6,10 @@
 #
 # One operator today ("ol", administrator of every host), but more than one
 # key: the ISO authorizes every key that might need to reach an installer
-# over SSH, which is why this is a list rather than the single
-# `sshPublicKey` a real host's variables.nix carries. Add a key here when a
-# new machine has to be able to drive `nixos-anywhere`.
+# over SSH. Real hosts carry the same plural `sshPublicKeys` list, so this
+# file no longer differs from them in shape — only in which keys it lists.
+# Add a key here when a new machine has to be able to drive
+# `nixos-anywhere`.
 {
   user = {
     name = "ol";
