@@ -38,7 +38,7 @@
     ./gh.nix
 
     # No GNOME-host app modules live here. GNOME ships its own viewer set,
-    # and the three apps it lacks (Chrome, Picard, whipper) are wanted by
+    # and the apps it lacks (Chrome, Picard, Asunder) are wanted by
     # every account on that shared host rather than just ol — so they are
     # system-level, in modules/programs/.
   ];

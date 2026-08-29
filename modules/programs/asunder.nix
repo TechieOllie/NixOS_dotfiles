@@ -1,10 +1,10 @@
 # Graphical CD ripper for the shared GNOME host.
 #
-# This exists because whipper — modules/programs/whipper.nix, chosen when
-# the priority was rip *accuracy* — has no GUI at all, which made it
-# invisible to the people meant to use it. The two coexist deliberately:
-# whipper keeps the AccurateRip-verified path for anyone willing to use a
-# terminal, Asunder is the one that shows up in the app grid.
+# The host's only CD ripper. whipper came first, chosen when the stated
+# priority was rip *accuracy*, and was removed once it became clear the
+# trade was wrong for this machine: it is CLI-only, so the three
+# non-technical accounts sharing this iMac could not find it at all. An
+# AccurateRip-verifying ripper nobody can launch rips nothing.
 #
 # Asunder rather than Sound Juicer: Sound Juicer is the GNOME-native option
 # but is effectively unmaintained upstream, and an unmaintained ripper on a
@@ -19,7 +19,7 @@
 # no hint as to why. Asunder's wrapper prepends its own PATH while keeping
 # $PATH, so a system-installed lame is found.
 #
-# System-wide for the same reason as chrome/picard/whipper here: Home
+# System-wide for the same reason as chrome/picard here: Home
 # Manager covers one of this host's four accounts.
 {
   pkgs,
