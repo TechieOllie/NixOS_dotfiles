@@ -49,11 +49,16 @@
       # modules/hardware/controllers.nix, which is the second reason (after
       # the features.niri gate above) this list stopped being desktop-only.
       "xone-dongle-firmware"
+      # Pulled in as a build input of fre:ac (modules/programs/freac.nix),
+      # inotmac's CD ripper. Only AAC encoding needs it and this repo's
+      # overlay wires up no AAC codec at all, but the name still has to be
+      # allowed for the derivation to evaluate.
+      "faac"
       # Google Chrome's own EULA rather than an OSS license (confirmed via
       # `nix eval nixpkgs#google-chrome.meta.license.shortName`: "unfree").
-      # inotmac's browser choice — see home/chrome.nix, which installs it.
-      # Has to live here rather than in that Home Manager module for the
-      # same useGlobalPkgs reason as vscode/obsidian above.
+      # inotmac's browser choice — see modules/programs/chrome.nix, which
+      # installs it system-wide, since three of that host's four accounts
+      # have no Home Manager profile to install anything into.
       "google-chrome"
     ];
 }
