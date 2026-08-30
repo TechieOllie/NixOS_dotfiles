@@ -443,6 +443,12 @@ in
         plugins.enabled = [
           "8bury/mini-docker"
           "rylos/tailnet"
+
+          # Screen mirroring, replacing v4's mirror-mirror plugin, which
+          # has no v5 equivalent. Its controls panel is what Mod+P opens
+          # (home/niri/cfg/keybinds.kdl); the wl-mirror binary it drives
+          # comes from home/wl-mirror.nix, not from Noctalia.
+          "elijaharch/wl-screen-mirror"
         ];
 
         # Per-widget settings, keyed by the same widget ids the bar layout

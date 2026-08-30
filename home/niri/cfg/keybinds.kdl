@@ -154,8 +154,7 @@ binds {
     Mod+Shift+S                         { spawn-sh "noctalia msg screenshot-region"; }
 
     // ─── Display ───
-    // No v5 equivalent for v4's mirror-mirror plugin — confirmed no
-    // screen-mirroring plugin exists among v5's official plugins. Dropped.
+    Mod+P                               { spawn-sh "noctalia msg panel-toggle elijaharch/wl-screen-mirror:controls"; }
 
     // ─── Clipboard History
     Mod+V                               { spawn-sh "noctalia msg panel-toggle clipboard"; }

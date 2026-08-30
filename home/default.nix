@@ -20,6 +20,7 @@
     ./zen-browser.nix
     ./vesktop.nix
     ./nautilus.nix
+    ./wl-mirror.nix
     ./loupe.nix
     ./papers.nix
     ./celluloid.nix

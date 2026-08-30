@@ -4315,3 +4315,38 @@ CD ripping itself needs no plugin configuration: `active-plugins` defaults
 to `[]`, but `audiocd` is marked `Builtin=true` in its own `.plugin` file
 and is always loaded. Worth checking rather than assuming — an empty default
 list is exactly the shape that usually means nothing is enabled.
+
+## Screen mirroring came back, and Noctalia does not ship the binary
+
+Noctalia v4 had a `mirror-mirror` plugin; v5 has no equivalent among its
+official plugins, which is why the Display section of
+`home/niri/cfg/keybinds.kdl` sat empty with a comment saying the bind had
+been dropped. The replacement is a *community* plugin,
+`elijaharch/wl-screen-mirror`, and `Mod+P` now opens its controls panel
+(`noctalia msg panel-toggle elijaharch/wl-screen-mirror:controls`).
+
+The part worth writing down: a Noctalia plugin is fetched and cached by
+Noctalia into `~/.local/state/noctalia/plugins`, but that only ever brings
+QML. Anything the plugin *shells out to* is not part of it. This one drives
+`wl-mirror`, so without `home/wl-mirror.nix` putting that binary on PATH the
+panel opens, looks correct, and every button does nothing — a failure with
+no error anywhere in `journalctl --user -u noctalia`. Treat "which binaries
+does this plugin assume the distro already has" as the first question when
+adding one, since a distro-agnostic plugin has no way to declare it.
+
+Three consequences follow from the split. The plugin id is declared in
+`home/noctalia.nix`'s `plugins.enabled`, so a rebuilt host re-fetches it
+rather than the operator re-adding it in the UI. The package is a separate
+`home/` module gated on `features.niri`, matching every other
+session-only program here rather than being hidden inside the Noctalia
+module. And the build-time config validator gains a third permanent
+`unrecognized widget type` warning — `elijaharch/wl-screen-mirror:controls`
+joins the tailnet and mini-docker ones, for the same reason: a runtime-
+fetched widget cannot be known at build time.
+
+`wl-mirror` also ships `wl-present`, an interactive wrapper wanting
+bemenu/slurp/wl-copy on PATH. Deliberately not catered for — the plugin's
+panel is exactly that role, and pulling in a menu program to duplicate it
+would be a second way to do one thing.
+
+Verified live on the desktop 2026-08-30.
