@@ -12,17 +12,24 @@
 # missing entirely.
 #
 # `projects` is home-manager's own non-standard addition (not a real
-# freedesktop XDG user directory) — disabled since it wasn't asked for and
-# isn't part of what Nautilus/GTK actually special-case.
+# freedesktop XDG user directory), so GTK gives it no special icon — but it
+# is enabled anyway, purely so `createDirectories` guarantees ~/Projects
+# exists on a fresh host. home/nautilus.nix pins it in the sidebar, and a
+# bookmark pointing at a missing directory is a dead entry.
 #
 # Self-gates on osConfig.features.niri, same convention as home/nautilus.nix
 # — XDG user dirs only matter for GUI apps (file managers, browsers' save
 # dialogs, ...), all niri-gated in this repo today.
-{ lib, osConfig, ... }:
+{
+  config,
+  lib,
+  osConfig,
+  ...
+}:
 lib.mkIf osConfig.features.niri {
   xdg.userDirs = {
     enable = true;
     createDirectories = true;
-    projects = null;
+    projects = "${config.home.homeDirectory}/Projects";
   };
 }

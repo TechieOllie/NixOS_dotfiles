@@ -69,17 +69,20 @@ lib.mkIf osConfig.features.niri {
   # Sidebar pinned locations. Confirmed live (on the operator's real,
   # currently-used Nautilus 50.2.2) that this legacy gtk-3.0 path is still
   # exactly what present-day GTK4 Nautilus reads for this — one
-  # "file://<path> <Label>" per line. Deliberately just the standard XDG
-  # set (matching home/xdg-user-dirs.nix, "the usual folders" per the
-  # operator's own request), not the operator's own real bookmarks file's
-  # extra personal entries (custom Documents subfolders) — those are
-  # workflow-specific to that machine, not a repo-wide default.
+  # "file://<path> <Label>" per line. Deliberately close to the standard
+  # XDG set (matching home/xdg-user-dirs.nix, "the usual folders" per the
+  # operator's own request) plus ~/Projects, not the operator's own real
+  # bookmarks file's extra personal entries (custom Documents subfolders)
+  # — those are workflow-specific to that machine, not a repo-wide default.
+  # Home is deliberately absent: Nautilus already shows it unconditionally
+  # in the sidebar's top section, so a bookmark for it only duplicates the
+  # entry (there is no way to reorder around that built-in one).
   xdg.configFile."gtk-3.0/bookmarks".text = ''
-    file://${config.home.homeDirectory} Home
     file://${config.home.homeDirectory}/Documents Documents
     file://${config.home.homeDirectory}/Downloads Downloads
     file://${config.home.homeDirectory}/Music Music
     file://${config.home.homeDirectory}/Pictures Pictures
+    file://${config.home.homeDirectory}/Projects Projects
     file://${config.home.homeDirectory}/Videos Videos
   '';
 
