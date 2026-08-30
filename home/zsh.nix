@@ -75,9 +75,24 @@
     # all). Not present in the operator's original .zshrc either, so this
     # plugin may have been inert there too; added here since it's clearly
     # what the plugin needs to function and is harmless either way.
+    #
+    # Both bindings are guarded on the capability being non-empty. An
+    # arriving TERM with no terminfo entry on this host (see
+    # modules/system/shell.nix for how that happens over SSH) leaves
+    # $terminfo empty, and bindkey with an empty key sequence is a hard
+    # error — `cannot bind to an empty key sequence`, printed on every
+    # single login. The guard degrades to "no arrow-key history search"
+    # instead, which is what an unknown terminal can honestly offer.
+    # `if` rather than `[[ ... ]] &&`: the latter is the last statement
+    # .zshrc runs, so a missing capability would leave $? non-zero and
+    # Starship would draw the very first prompt as a failed command.
     initContent = ''
-      bindkey "$terminfo[kcuu1]" history-substring-search-up
-      bindkey "$terminfo[kcud1]" history-substring-search-down
+      if [[ -n "$terminfo[kcuu1]" ]]; then
+        bindkey "$terminfo[kcuu1]" history-substring-search-up
+      fi
+      if [[ -n "$terminfo[kcud1]" ]]; then
+        bindkey "$terminfo[kcud1]" history-substring-search-down
+      fi
     '';
 
     shellAliases = {
