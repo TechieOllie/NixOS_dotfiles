@@ -119,6 +119,21 @@ worked.
 nixos-rebuild switch --flake .#<name>
 ```
 
-should now work directly on the host for all future changes. If a change
-ever breaks the boot, `nixos-rebuild switch --rollback` covers NixOS and
-integrated Home Manager together.
+should now work directly on the host for all future changes, from a clone
+of this repo.
+
+A host that has no clone — because nobody works on it, so there is no
+reason to give it a git identity — rebuilds straight from the public
+flake instead, needing neither credentials nor a working tree:
+
+```bash
+sudo nixos-rebuild switch --refresh --flake github:TechieOllie/NixOS_dotfiles#<name>
+```
+
+`--refresh` is not optional here. Without it Nix reuses whatever revision
+it has already cached for that URL, so the rebuild quietly succeeds
+against a stale commit and looks exactly like a change that had no
+effect. `inotmac` is the host this applies to.
+
+If a change ever breaks the boot, `nixos-rebuild switch --rollback` covers
+NixOS and integrated Home Manager together.
