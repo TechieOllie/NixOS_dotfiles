@@ -52,6 +52,17 @@
       # this repo's standing gotchas are about.
       extraCompatPackages = [ pkgs.proton-cachyos ];
 
+      # Winetricks, taught to find Steam's Proton prefixes. This flag is
+      # the only correct way to install it: it doesn't merely add the
+      # package, it installs it *overridden* with the same extraCompatPaths
+      # computed from extraCompatPackages above, baked in as
+      # STEAM_EXTRA_COMPAT_TOOLS_PATHS via makeWrapper. Protontricks reads
+      # that variable to find compat tools, and it runs outside Steam's FHS
+      # environment — which is where the option's export normally stops —
+      # so a plain pkgs.protontricks in home.packages finds no Proton at
+      # all and fails with "Could not find configured Proton installation".
+      protontricks.enable = true;
+
       # Steam's own in-home streaming and Remote Play Together need these
       # ports open; the option exists precisely so the port list doesn't
       # have to be transcribed into networking.firewall by hand.

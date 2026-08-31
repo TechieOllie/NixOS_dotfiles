@@ -1131,7 +1131,8 @@ same tradeoff already accepted for `noctalia` in Phase 3.
 
 **What was proposed and dropped.** MangoHud, gamescope, gamemode, Lutris,
 Bottles, goverlay, protontricks, ludusavi, steamtinkerlaunch and vkbasalt
-were all offered and declined in favour of a minimal profile; the operator's
+were all offered and declined in favour of a minimal profile (protontricks
+was later reversed — see "protontricks came back" below); the operator's
 instruction was "keep the gaming profile minimal." Two are worth recording
 because they'd otherwise be re-proposed:
 
@@ -4350,3 +4351,82 @@ panel is exactly that role, and pulling in a menu program to duplicate it
 would be a second way to do one thing.
 
 Verified live on the desktop 2026-08-30.
+
+## protontricks came back (2026-08-31)
+
+Asked for by name after having been declined in Phase 7's minimal-stack
+cull. It is worth separating from the two GUI Proton installers rejected
+alongside it, which stay rejected: protonup-qt and protonplus write Proton
+*builds* into `~/.steam/root/compatibilitytools.d` by hand, duplicating what
+`programs.steam.extraCompatPackages` already does declaratively — the
+app-owned-mutable-state trap. Protontricks writes nothing there. It edits
+the per-game wine prefix under `steamapps/compatdata`, which is game state
+this repo has never claimed to declare (same category as a Prism Launcher
+instance or a Heroic install), so there is no file for Nix and the app to
+fight over and nothing to configure.
+
+**It went into the wrong place first, and the failure was invisible to
+eval.** The obvious reading of this repo's own conventions — a user-level
+app with no service belongs in `home/` — produced `home/protontricks.nix`
+with `home.packages = [ pkgs.protontricks ]`, riding `features.gaming`
+beside `home/prismlauncher.nix`. That evaluates green, builds green,
+installs a working binary, and then fails on the first real use:
+
+    protontricks (ERROR): Could not find configured Proton installation!
+    protontricks (ERROR): Active Proton installation could not be found automatically.
+
+This is the `extraCompatPackages` gotcha from Phase 7 seen from the other
+side. Protontricks locates compat tools by reading
+`STEAM_EXTRA_COMPAT_TOOLS_PATHS` (`get_compat_tool_dirs()` in its
+`steam.py`), and that variable is exported *only inside Steam's own FHS
+environment* — `programs.steam.extraCompatPackages` puts it in
+`steam.extraEnv` and nowhere else. Protontricks is not launched by Steam, so
+it inherits nothing. It then reads the desktop's `config.vdf`, finds the
+game's compat tool named `Proton-CachyOS`, and can match that name against
+nothing, because no directory by that name exists anywhere on the system —
+it is a store path Steam's wrapper knows about and nothing else does. The
+error says nothing about the environment, which is what makes it worth
+recording.
+
+nixpkgs already solves this and the flag is easy to miss:
+`programs.steam.protontricks.enable` does not merely add the package, it
+installs `cfg.protontricks.package.override { inherit extraCompatPaths; }`
+— the *same* path list computed from `extraCompatPackages`, baked into the
+wrapper with `makeWrapper --set`. So the two cannot drift, which a
+hand-written `home.sessionVariables` copy of the path eventually would. Four
+lines in `modules/programs/steam.nix` now; `home/protontricks.nix` is gone.
+The system-vs-user split still holds — this turns out to be part of Steam's
+system configuration rather than an independent app.
+
+One detail worth keeping: `lib.makeSearchPathOutput "steamcompattool" ""`
+yields the package *root* (`…-proton-cachyos/`), not `$out/bin` where the
+tool tree actually lives — the same layout quirk `home/heroic.nix` has to
+work around by linking `/bin` explicitly. It works here because protontricks
+globs `<dir>/*/compatibilitytool.vdf` as well as `<dir>/*.vdf`, so the root
+matches via the subdirectory form and resolves `install_path "."` back to
+`$out/bin`.
+
+Verified live on the desktop, 2026-08-31, in three steps: the installed
+binary with the variable set by hand before rebuilding, which turned the
+abort into
+
+    protontricks (DEBUG): Found custom compatibility tool Proton-CachyOS at
+      /nix/store/…-proton-cachyos/bin
+
+then `find_proton_app` resolving `Proton-CachyOS` for all twelve games with
+a prefix after the switch, then `corefonts` actually installing into
+Stationeers' prefix (544550) — all eleven families in
+`drive_c/windows/Fonts` and `corefonts` as the last line of that prefix's
+`winetricks.log`.
+
+**A footnote on reading that run's output.** It scrolls hundreds of `fixme:`
+lines and looks like a failure. `fixme:winediag:loader_init wine-cachyos
+11.0 is a testing version…` is a banner CachyOS's Wine prints on *every*
+process start, and winetricks starts wine twice per font (32- and 64-bit
+`regedit`); `fixme:ntoskrnl:kernel_object_from_handle No constructor for
+type L"Token"` is an unimplemented stub, and `grep: warning: stray \ before
+/` is a cosmetic bug in winetricks' own shell code. `fixme:` is Wine's "not
+implemented, carrying on" level — an actual failure is `err:`, and
+winetricks would have aborted rather than run to the end. Check the
+prefix's `winetricks.log` and its `Fonts/corefonts.installed` marker rather
+than the console.

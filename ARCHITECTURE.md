@@ -761,13 +761,15 @@ Obsidian.
 
 ## Gaming
 
-Steam (patched by Millennium), proton-cachyos, Heroic, umu-launcher, Xbox
-controller drivers (xone + xpadneo). Desktop host only.
+Steam (patched by Millennium), proton-cachyos, Heroic, umu-launcher,
+protontricks, Xbox controller drivers (xone + xpadneo). Desktop host only.
 
 Gamescope, MangoHud and Gamemode were in earlier versions of this list and
 were **deliberately dropped** in Phase 7 in favour of a minimal stack — as
-were Lutris, Bottles, goverlay, protontricks, ludusavi, steamtinkerlaunch and
-vkbasalt, all of which were proposed and declined. Proton GE was replaced by
+were Lutris, Bottles, goverlay, ludusavi, steamtinkerlaunch and vkbasalt,
+all of which were proposed and declined. protontricks was declined with them
+and later asked for anyway; it is now in, via
+`programs.steam.protontricks.enable` rather than as a package of its own. Proton GE was replaced by
 CachyOS's Proton fork, and the GUI Proton installers (protonup-qt,
 protonplus) are deliberately absent, `programs.steam.extraCompatPackages`
 doing that job declaratively instead. See `docs/decisions.md` before
