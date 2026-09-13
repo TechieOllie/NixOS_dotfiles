@@ -354,6 +354,14 @@ in
         # working, centered login box per monitor rather than an unlockable
         # blank screen — the failure this would otherwise risk.
         #
+        # The `[lockscreen_widgets.grid]` block (cell_size/major_interval/
+        # visible) and `schema_version` are the two keys in that block that
+        # are *not* display-bound, and are still left out deliberately: the
+        # grid is an affordance of the canvas editor, so it only has meaning
+        # while arranging a canvas this repo does not back up, and
+        # schema_version is Noctalia's own migration marker for that canvas,
+        # which it must be free to bump itself.
+        #
         # The consequence worth stating: the widget *arrangement* stays
         # runtime state, per host, and is not backed up by this repo.
         lockscreen_widgets.enabled = true;
@@ -450,6 +458,20 @@ in
           # comes from home/wl-mirror.nix, not from Noctalia.
           "elijaharch/wl-screen-mirror"
         ];
+
+        # Per-plugin settings, keyed by the same `<author>/<name>` ids as
+        # plugins.enabled above. Each key is `<panel-or-widget-id>_<option>`,
+        # overriding a value from that plugin's own plugin.toml manifest.
+        #
+        # wl-screen-mirror's manifest declares `open_near_click = true` on its
+        # `controls` panel, which anchors the panel to the pointer's position.
+        # That is the right behaviour for a panel opened by clicking its bar
+        # widget and the wrong one here: this panel is opened by Mod+P
+        # (home/niri/cfg/keybinds.kdl), so "where the pointer happens to be"
+        # is unrelated to the gesture, and the panel lands somewhere different
+        # every time. false attaches it to its bar widget instead, which is
+        # where the keybind's result should predictably appear.
+        plugin_settings."elijaharch/wl-screen-mirror".controls_open_near_click = false;
 
         # Per-widget settings, keyed by the same widget ids the bar layout
         # above lists. All display-independent.
@@ -722,7 +744,7 @@ in
         # Consequence worth knowing: changing this line does *not* reach an
         # already-provisioned host. Clearing that host's sidecar wallpaper
         # keys is the operator step — see docs/decisions.md.
-        wallpaper.default.path = "/home/${vars.user.name}/.dotfiles/wallpapers/877223.jpg";
+        wallpaper.default.path = "/home/${vars.user.name}/.dotfiles/wallpapers/SPACE.webp";
 
         # Deliberately a plain string, NOT a Nix path (e.g. ../wallpapers) —
         # a path literal gets copied into the Nix store as its own
