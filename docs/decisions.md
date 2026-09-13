@@ -4507,3 +4507,88 @@ A backup was left beside the file. Note that the 2026-08-21 cleanup was
 partial — it cleared the specific keys that were actively causing trouble;
 this pass cleared the rest, so the desktop's sidecar is now runtime state
 only.
+
+## Both Noctalia inputs are in nixpkgs now, and both stay as flake inputs anyway (2026-09-13)
+
+Prompted by noticing `disabledModules =
+["services/display-managers/noctalia-greeter.nix"]` in the greeter flake's
+NixOS module (see the previous entry): if upstream has to displace a nixpkgs
+module, nixpkgs must have grown one. It has, for both projects — so the
+question of dropping one or both inputs is now a real one rather than a
+hypothetical, and this records the answer so it isn't re-derived.
+
+Checked against the nixpkgs **this flake pins**, not whatever `nixpkgs#`
+resolves to on the machine — the standing trap about wrapper/attribute
+differences between pins applies just as much to "does this package exist
+yet":
+
+    nix eval --raw .#nixosConfigurations.<host>.pkgs.path
+
+**First, a naming trap that has now inverted.** There are four `noctalia*`
+attributes at this pin, and the obvious-looking one is wrong:
+
+| attribute | version | what it is |
+| --- | --- | --- |
+| `noctalia` | 5.0.0-beta.8 | **the v5 shell** — repo `noctalia-dev/noctalia`, tag `v5.0.0-beta.8` |
+| `noctalia-shell` | 4.7.7 | the *old* Quickshell v4, same repo, older tag |
+| `noctalia-qs` | 0.0.12 | their Quickshell toolkit fork |
+| `noctalia-greeter` | 1.2.1 | the greeter |
+
+Earlier notes in this file warn against confusing `noctalia-shell` with the
+greeter, from back when v4 was current and `noctalia-shell` was the thing you
+wanted. That advice is now actively misleading: `noctalia-shell` is the stale
+v4 line, and `noctalia` is what this repo runs. Both packages substitute from
+`cache.nixos.org` (verified with `nix path-info --store
+https://cache.nixos.org <path>`), so neither would be a from-source build.
+
+Versions lag the flake in both cases: nixpkgs has the shell at 5.0.0-beta.8
+against the input's **5.1.0**, and the greeter at 1.2.1 against the input's
+**1.5.0**.
+
+**The shell: cannot move, and the version gap is not the reason.** nixpkgs'
+module is `nixos/modules/programs/wayland/noctalia.nix`, 67 lines, and its
+entire option surface is `enable`, `package`, `systemd.*` and
+`recommendedServices.enable`. There is **no `settings` option and no Home
+Manager module at all**. Everything `home/noctalia.nix` does — the settings
+block, `theme.templates`, and the four custom `templates.user.*` that exist
+specifically to avoid fighting Home-Manager-managed files — comes from
+`noctalia.homeModules.default`, which lives only in the flake. Switching
+would mean hand-writing `~/.config/noctalia/config.toml`, i.e. re-entering
+the exact problem the sidecar gotcha describes, with no template engine to
+drive the fifteen theming targets. Not a trade-off; just a loss.
+
+**The greeter: could move, and still should not yet.** nixpkgs'
+`nixos/modules/services/display-managers/noctalia-greeter.nix` (130 lines) is
+a near-twin of the flake's: same option path
+`services.displayManager.noctalia-greeter`, same free-form `settings`, the
+same `L+` force-symlink tmpfiles rule for `greeter.toml`, and the same
+`cursorTheme.package`. The shared option path is almost certainly *why*
+upstream renamed theirs and added the `disabledModules` — the two collide
+exactly.
+
+Two differences that make a switch a translation rather than a rename. The
+flake takes `greeter-args` as a **string** and builds
+`noctalia-greeter-session -- ${greeter-args}`, with a literal `--`
+separator; nixpkgs takes `extraArgs` as a **list** through `escapeShellArgs`
+and emits no separator, so `greeter-args = "--session niri"` becomes
+`extraArgs = [ "--" "--session" "niri" ]` and wants confirming against the
+greeter's own arg parsing rather than assuming. nixpkgs also has no
+`passwordless-sync-users`.
+
+Decision: **keep both inputs.** The shell has no alternative, so its input
+(and therefore its second nixpkgs copy) is in the closure regardless; moving
+only the greeter would trade 1.5.0 for 1.2.1 and re-introduce a module that
+would have to be re-verified against the `Writeback-1` greeter bug, for a
+closure saving that the shell input cancels out anyway.
+
+One reasoning update this does force: `flake.nix`'s comment justifies
+`noctalia` not following this repo's nixpkgs on the grounds that following it
+would lose Noctalia's Cachix cache and force a from-source build of a native
+Wayland/OpenGL project. That is still true of the *input*, but it is no
+longer true that nixpkgs can't serve this software prebuilt — it can. The
+argument for the input is now the Home Manager module, not the cache.
+
+Re-check condition: **nixpkgs gaining a Home Manager module for Noctalia with
+a `settings` option.** That, not a version bump, is what would make dropping
+the shell input worth costing out — and it would make the greeter worth
+moving in the same pass.
