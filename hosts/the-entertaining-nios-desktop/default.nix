@@ -75,7 +75,7 @@ in
   # Host-level, not in modules/desktop/greetd.nix: a connector name describes
   # this machine's cabling, and the VM (which shares that module) has neither
   # a DP-1 nor a writeback connector.
-  programs.noctalia-greeter.settings.output.name = "DP-1";
+  services.displayManager.noctalia-greeter.settings.output.name = "DP-1";
 
   networking.hostName = vars.system.hostName;
   time.timeZone = vars.system.timeZone;

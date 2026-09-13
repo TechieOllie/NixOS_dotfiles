@@ -17,7 +17,7 @@
     # noctalia-greeter's NixOS module enables and configures services.greetd
     # itself once this is turned on — no separate services.greetd.* wiring
     # needed here.
-    programs.noctalia-greeter = {
+    services.displayManager.noctalia-greeter = {
       enable = true;
       # Session name matches the Wayland session entry programs.niri.enable
       # registers.

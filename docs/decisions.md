@@ -4430,3 +4430,80 @@ implemented, carrying on" level — an actual failure is `err:`, and
 winetricks would have aborted rather than run to the end. Check the
 prefix's `winetricks.log` and its `Fonts/corefonts.installed` marker rather
 than the console.
+
+## The greeter option moved, and the desktop's sidecar was pruned (2026-09-13)
+
+Two things landed together, both triggered by a routine `nix flake update`
+run alongside a rebuild.
+
+**The rename.** The bump produced
+
+    evaluation warning: The option `programs.noctalia-greeter' defined in
+    `…/modules/desktop/greetd.nix' and `…/hosts/the-entertaining-nios-desktop'
+    has been renamed to `services.displayManager.noctalia-greeter'.
+
+Confirmed at the source rather than from the message: the newly locked
+revision's `nix/nixos-module.nix` declares
+`options.services.displayManager.noctalia-greeter` and imports a
+`lib.mkRenamedOptionModule [ "programs" "noctalia-greeter" ]
+[ "services" "displayManager" "noctalia-greeter" ]`. So the old path kept
+working and only warned — this was never broken, just loud. Both call sites
+moved (`modules/desktop/greetd.nix`, and the host-level `output.name` pin in
+`hosts/the-entertaining-nios-desktop/default.nix`).
+
+Two other things in that file are worth knowing and were deliberately not
+acted on. It now carries `disabledModules =
+["services/display-managers/noctalia-greeter.nix"]`, i.e. nixpkgs has grown
+its own greeter module and this flake displaces it — so the flake input
+remains the thing configuring the greeter, and a future decision to drop the
+input is not simply "delete the import". And there is a new
+`cursorTheme.package` option that `mkDefault`s `settings.cursor.path` to
+`"${package}/share/icons"`; this repo still sets `settings.cursor.theme`/
+`size` by hand and relies on `modules/desktop/theming.nix` installing
+bibata-cursors system-wide, which works, so the switch was left for whenever
+someone is in that file for another reason. The `L+` force-symlink for
+`greeter.toml` is unchanged at this revision, so the "no rm dance needed"
+note still holds.
+
+**The sidecar prune.** `home/noctalia.nix` is derived from an export of the
+desktop's *effective* config, which means nearly every key it declares also
+exists verbatim in that host's `~/.local/state/noctalia/settings.toml`. Since
+nothing prunes an override once it matches the base again, each of those was a
+permanent shadow: this repo could never change any of them on the desktop
+again, and would have no way to notice.
+
+The prune was done by comparison, not by hand. Flatten the sidecar and the
+evaluated Nix settings
+
+    nix eval --json .#nixosConfigurations.the-entertaining-nios-desktop\
+      .config.home-manager.users.ol.programs.noctalia.settings
+
+to leaf paths, then classify: 39 keys shadowed Nix with an **identical**
+value, 0 shadowed it with a different value, and 66 existed only in the
+sidecar. Deleting exactly the 39 is provably a no-op for current behaviour —
+the base supplies the same value — while restoring Nix's authority over all
+of them. The rule generalizes: delete only on an exact match, and *report* a
+divergence rather than clobbering it, since a differing value is a real
+choice someone made in the UI.
+
+What stayed: `config_version` (Noctalia's own migration marker), the entire
+`lockscreen_widgets` canvas (`widget_order`, `grid`, and the three
+`widget.*` placement tables — the hand-built lockscreen this repo
+deliberately does not back up), and `wallpaper.last` /
+`wallpaper.monitors.*`, which are per-output picks that correctly win over
+`wallpaper.default`. `lockscreen_widgets.enabled` *was* removed: Nix declares
+it identically, and it is not part of the canvas the warning protects.
+
+The operational trap, and the reason this is written down: **stop the shell
+before editing the file.** A running Noctalia holds its override map in
+memory, and any later flush would have rewritten all 39 keys straight back.
+The sequence was `systemctl --user stop noctalia`, edit, start — then verified
+that the file still had only three top-level sections after the restart, that
+the canvas was byte-identical to the backup, and that the startup log was
+clean (both bars created, wallpaper loaded on both outputs, all three plugin
+services started, polkit agent registered, telemetry disabled).
+
+A backup was left beside the file. Note that the 2026-08-21 cleanup was
+partial — it cleared the specific keys that were actively causing trouble;
+this pass cleared the rest, so the desktop's sidecar is now runtime state
+only.
