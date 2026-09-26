@@ -79,15 +79,17 @@
     // See docs/decisions.md.
     window-rule {
         match app-id=r#"^zen(-\w+)?$"#
-        match app-id=r#"^md.obsidian.Obsidian?$"#
-        match app-id=r#"^steam?$"#
+        match app-id=r#"^md\.obsidian\.Obsidian$"#
+        match app-id=r#"^steam$"#
         // default-column-width { proportion 1.0; }
         open-maximized true
         draw-border-with-background false
     }
 
-        window-rule {
+    window-rule {
         match app-id="vesktop"
+        open-maximized true
+        open-focused false
         // opacity 0.80  // OFF: see the blur banner above
         draw-border-with-background false
         open-on-output "Samsung Electric Company C27F390 H4ZR113985"
