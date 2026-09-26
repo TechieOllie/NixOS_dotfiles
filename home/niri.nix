@@ -80,7 +80,7 @@ lib.mkIf osConfig.features.niri {
               natural-scroll // Enable natural (macOS-style) scrolling
           }
 
-          //focus-follows-mouse // Automatically focus windows under the mouse pointer
+          focus-follows-mouse // Automatically focus windows under the mouse pointer
           workspace-auto-back-and-forth // Enable workspace back & forth switching
       }
     '';
