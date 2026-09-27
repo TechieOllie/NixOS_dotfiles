@@ -676,7 +676,7 @@ default:
 
 # Build and switch to the current host's configuration
 switch host=`hostname`:
-    nixos-rebuild switch --flake .#{{host}}
+    nixos-rebuild switch --sudo --flake .#{{host}}
 
 # Build without switching — the safe way to test a host
 build host=`hostname`:
@@ -684,7 +684,7 @@ build host=`hostname`:
 
 # Roll back to the previous generation
 rollback:
-    nixos-rebuild switch --rollback
+    nixos-rebuild switch --rollback --sudo
 
 # Update flake inputs
 update:
