@@ -796,8 +796,8 @@ nixd, nil, nixfmt, statix, deadnix, just, sops and age are provided by
 `devShells.${system}.default` (`nix develop`), added in Phase 8 — a fresh
 clone needs none of them installed globally. `alejandra` was dropped in
 favour of `nixfmt`; see **Validation and CI** above. The `justfile` exists at
-the repo root. There is still no `.envrc`, so direnv doesn't yet enter the
-dev shell automatically.
+the repo root, and an `.envrc` holding `use flake` sits beside it, so direnv
+enters that shell on `cd` into the repo.
 
 ---
 

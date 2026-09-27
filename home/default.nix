@@ -37,6 +37,7 @@
     ./jetbrains.nix
     ./claude-code.nix
     ./gh.nix
+    ./direnv.nix
 
     # No GNOME-host app modules live here. GNOME ships its own viewer set,
     # and the apps it lacks (Chrome, Picard, Rhythmbox) are wanted by
