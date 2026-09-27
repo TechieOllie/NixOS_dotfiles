@@ -87,7 +87,7 @@
     }
 
     window-rule {
-        match app-id="vesktop"
+        match app-id=r#"^vesktop$"#
         open-maximized true
         open-focused false
         // opacity 0.80  // OFF: see the blur banner above

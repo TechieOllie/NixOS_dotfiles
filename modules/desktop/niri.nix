@@ -4,6 +4,50 @@
   pkgs,
   ...
 }:
+let
+  # xwayland-satellite, pinned forward to 0.8.3.
+  #
+  # 0.8.2 — what this flake's nixpkgs pin ships, and what nixpkgs master
+  # still ships as of 2026-09-26 — carries a regression in
+  # override-redirect popup handling introduced by upstream 3273a0f: the
+  # popup is mapped, the pointer is immediately reported as leaving it,
+  # and it dismisses itself ~35ms later. Under niri the visible symptom is
+  # Steam's top-bar menus (Steam/View/Friends) and the friends list
+  # flashing open and vanishing before they can be clicked, which reads as
+  # a Steam client regression and is not one — Steam's client version is
+  # self-updating runtime state this repo doesn't pin anyway, so there is
+  # nothing to revert on that side. Upstream issue #468 and
+  # ValveSoftware/steam-for-linux#13566 both land here; every fix reported
+  # in that thread is an xwayland-satellite move, down to 0.8.1 or up to
+  # 0.8.3.
+  #
+  # Fixed upstream by add2795 ("Fix for new Steam popups"), released in
+  # v0.8.3 on 2026-09-24. Takes effect on a fresh graphical session, not a
+  # config reload — niri starts the satellite at compositor startup.
+  #
+  # A flake update does not resolve this: the nixpkgs bump is unmerged, in
+  # NixOS/nixpkgs#566386. Delete this whole block and go back to a bare
+  # pkgs.xwayland-satellite once that lands and the pin carries >= 0.8.3
+  # (`nix eval --raw nixpkgs#xwayland-satellite.version` against the
+  # locked input answers it).
+  xwaylandSatelliteSrc = pkgs.fetchFromGitHub {
+    owner = "Supreeeme";
+    repo = "xwayland-satellite";
+    tag = "v0.8.3";
+    hash = "sha256-eFEjCCniMCKeWU0PcZNv+tDYe08SLFPjRplyPY8OFt4=";
+  };
+  xwayland-satellite = pkgs.xwayland-satellite.overrideAttrs {
+    version = "0.8.3";
+    src = xwaylandSatelliteSrc;
+    # buildRustPackage turns the package's own cargoHash into a cargoDeps
+    # derivation before overrideAttrs runs, so bumping the source means
+    # replacing that vendor tree outright rather than just restating a hash.
+    cargoDeps = pkgs.rustPlatform.fetchCargoVendor {
+      src = xwaylandSatelliteSrc;
+      hash = "sha256-gMGFvnbxM3hD5fmkSimaFd87GEf6BXFe/MGjoS6VNVU=";
+    };
+  };
+in
 lib.mkIf config.features.niri {
   # Package + Wayland session entry only, via upstream's programs.niri
   # module. Greetd wiring lives in modules/desktop/greetd.nix, and user
@@ -55,5 +99,5 @@ lib.mkIf config.features.niri {
   # see it too. It only takes effect on a fresh session, though: niri can
   # restart the satellite on config reload but explicitly does not re-push
   # DISPLAY into the systemd environment.
-  environment.systemPackages = [ pkgs.xwayland-satellite ];
+  environment.systemPackages = [ xwayland-satellite ];
 }
