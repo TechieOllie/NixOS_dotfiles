@@ -6,9 +6,13 @@
 # distribution, and nixpkgs removed the attribute outright — evaluating it
 # throws a "has been removed" error naming its two replacements.
 #
-# Of those two, `jetbrains.idea-oss` is the Apache-2.0 build (the literal
-# Community successor) and plain `jetbrains.idea` is JetBrains' own
-# unified binary. This takes the latter, despite it being the unfree one,
+# Of those two, `intellij-idea-oss` is the Apache-2.0 build (the literal
+# Community successor) and plain `intellij-idea` is JetBrains' own
+# unified binary. Both lived under the `jetbrains` set as `idea-oss`/`idea`
+# until nixpkgs moved them to pkgs/by-name (this repo followed the rename
+# on 2026-09-26); the old attributes still work as aliases, but the pname
+# changed with the move, which is what modules/system/unfree.nix had to be
+# taught. This takes the latter, despite it being the unfree one,
 # because nixpkgs currently pins idea-oss at 2025.3.4 and marks that
 # version *insecure* (NIXPKGS-2026-2269, multiple known vulnerabilities):
 # using it would mean adding it to permittedInsecurePackages, which is a
@@ -33,5 +37,5 @@
   ...
 }:
 lib.mkIf osConfig.features.development {
-  home.packages = [ pkgs.jetbrains.idea ];
+  home.packages = [ pkgs.intellij-idea ];
 }

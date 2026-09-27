@@ -33,9 +33,14 @@
       # home/claude-code.nix, which installs it.
       "claude-code"
       # IntelliJ IDEA's unified distribution. Its Apache-2.0 sibling
-      # (idea-oss) would need permittedInsecurePackages instead — see
-      # home/jetbrains.nix.
-      "idea"
+      # (intellij-idea-oss) would need permittedInsecurePackages instead —
+      # see home/jetbrains.nix. The name was plain "idea" until nixpkgs
+      # moved the package to pkgs/by-name/in/intellij-idea (in the pin of
+      # 2026-09-26), which renamed its pname too: the `jetbrains.idea`
+      # attribute still resolves through an alias, so the only symptom was
+      # this list silently stopping matching and eval failing with an
+      # unfree error pointing at the new file.
+      "intellij-idea"
       # Steam and the pieces the NixOS steam module pulls in around it.
       # Millennium's own `millennium-steam` is built inside that flake's
       # pinned nixpkgs (which sets allowUnfree itself), but the module
