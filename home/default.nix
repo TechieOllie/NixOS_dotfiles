@@ -25,6 +25,7 @@
     ./papers.nix
     ./celluloid.nix
     ./decibels.nix
+    ./simple-scan.nix
     ./xdg-user-dirs.nix
     ./xdg-mime-apps.nix
     ./feishin.nix
