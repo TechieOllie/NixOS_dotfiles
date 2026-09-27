@@ -12,8 +12,14 @@ default:
 
 # Build and switch to a host's configuration. Destructive — this is the one
 # recipe that changes a running machine.
+#
+# `--sudo` rather than a `sudo` prefix on the whole command: it elevates only
+# the activation step, so the build and the flake evaluation still run as the
+# invoking user, keeping their nix.conf and substituters and avoiding git's
+# dubious-ownership check on a tree root doesn't own. Only the VM has
+# passwordless wheel sudo, so expect a password prompt on a real host.
 switch host=`hostname`:
-    nixos-rebuild switch --flake .#{{ host }}
+    nixos-rebuild switch --sudo --flake .#{{ host }}
 
 # Build a host's system closure without switching to it.
 build host=`hostname`:
@@ -25,9 +31,10 @@ eval host=`hostname`:
     nix eval --raw .#nixosConfigurations.{{ host }}.config.system.build.toplevel.drvPath
 
 # Roll back to the previous generation (covers NixOS and Home Manager
-# together, since Home Manager is inside the system closure).
+# together, since Home Manager is inside the system closure). Activates, so
+# it needs the same elevation as `switch`.
 rollback:
-    nixos-rebuild switch --rollback
+    nixos-rebuild switch --rollback --sudo
 
 # Update every flake input.
 update:
