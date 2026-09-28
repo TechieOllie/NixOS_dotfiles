@@ -157,6 +157,34 @@ in
   # temporary queues, which don't need cups-browsed.
   services.printing.browsed.enable = false;
 
+  # The Logitech Z407 is the default output at every login; picking another
+  # device from the panel still works, it just doesn't survive a reboot.
+  #
+  # Two halves, both needed. WirePlumber normally remembers whatever was last
+  # picked (~/.local/state/wireplumber/default-nodes) and restores it, so
+  # without the first setting a runtime choice would stick. With that off, it
+  # falls back to the highest priority.session among the outputs present,
+  # and the Z407's own (1010) loses to the Yeti Nano's headphone jack (1109)
+  # and the HDMI audio (696) — hence the second. 2000 just clears both.
+  #
+  # A runtime pick still wins while the session lasts: WirePlumber gives the
+  # currently selected device +30000 (find-selected-default-node.lua), so the
+  # speaker reconnecting over Bluetooth doesn't steal it back. The Z407 only
+  # exists once Bluetooth has reconnected, so audio sits on the Yeti for the
+  # first few seconds after login and then moves over by itself.
+  #
+  # Host-level: it names this machine's speaker by MAC address. The `.*`
+  # suffix is the profile index WirePlumber appends to the node name.
+  services.pipewire.wireplumber.extraConfig."50-default-output" = {
+    "wireplumber.settings"."node.restore-default-targets" = false;
+    "monitor.bluez.rules" = [
+      {
+        matches = [ { "node.name" = "~bluez_output.EC_81_93_94_96_DB.*"; } ];
+        actions.update-props."priority.session" = 2000;
+      }
+    ];
+  };
+
   # Wake-on-LAN, and the shutdown path that pairs with it.
   #
   # A Raspberry Pi on the LAN emulates a Wemo smart plug (fauxmo), so "Alexa,
