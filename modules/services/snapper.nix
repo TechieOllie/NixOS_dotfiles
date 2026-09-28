@@ -31,8 +31,8 @@ lib.mkIf config.features.snapshots {
       }
       // retention;
       # Game libraries under /home are kept out of these snapshots by being
-      # nested subvolumes, not by anything here — see
-      # docs/bootstrapping-a-host.md step 8.
+      # separately mounted subvolumes in the host's disko.nix, not by
+      # anything here — a snapshot never crosses a mount.
       home = {
         SUBVOLUME = "/home";
         ALLOW_USERS = [ vars.user.name ];

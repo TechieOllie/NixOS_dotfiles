@@ -88,40 +88,17 @@ what makes this easy to miss. See [`live-dotfiles.md`](./live-dotfiles.md).
 
 ## 8. Post-install steps Nix cannot do for you
 
-Three things stay imperative by nature, because their state lives outside this
-repo entirely. None fails loudly — the host will simply be missing the
-capability it looks configured for, or quietly filling its disk.
+Two things stay imperative by nature, because their state lives outside this
+repo entirely. Neither fails loudly — the host will simply be missing the
+capability it looks configured for.
 
-**Carve the game libraries into their own subvolumes** (any host with both
-`features.snapshots` and `features.gaming`), before the first game is
-installed:
-
-```bash
-btrfs subvolume create ~/.local/share/Steam ~/Games
-```
-
-Snapper snapshots `/home` hourly, and a btrfs snapshot never descends into a
-nested subvolume — so this is what keeps hundreds of gigabytes of
-re-downloadable game files, and every patch Steam applies to them, out of
-those snapshots. Without it, uninstalling a game frees nothing until the last
-snapshot holding it expires. disko can't declare this: the directories sit
-inside a user's home, which doesn't exist when disko runs. No `fileSystems`
-entry is needed; a nested subvolume appears inside its parent on its own.
-
-To convert a library that already exists (the desktop's case, done
-2026-09-28), with the launcher closed:
-
-```bash
-mv ~/Games ~/Games.old
-btrfs subvolume create ~/Games
-cp -a --reflink=always ~/Games.old/. ~/Games/
-rm -rf ~/Games.old
-```
-
-The reflink copy shares extents instead of duplicating them, so it is
-near-instant and costs no space. The old copy's space only comes back once
-the existing `home` snapshots holding it are gone
-(`sudo snapper -c home delete --sync <first>-<last>`).
+(Game libraries on a host with both `features.snapshots` and
+`features.gaming` are *not* one of them: the desktop's `disko.nix` declares
+`@steam` and `@games` as their own subvolumes mounted into the home
+directory, so snapper's `/home` snapshots never contain them. Copy that
+pattern to any new gaming host. Adding subvolumes to an *already installed*
+host's `disko.nix` does not create them — disko only runs at install — so
+see "Adding a subvolume to an installed host" below.)
 
 **Join the tailnet** (any host with `features.tailscale`):
 
@@ -168,3 +145,34 @@ effect. `inotmac` is the host this applies to.
 
 If a change ever breaks the boot, `nixos-rebuild switch --rollback` covers
 NixOS and integrated Home Manager together.
+
+## Adding a subvolume to an installed host
+
+disko's layout is applied once, by nixos-anywhere. On a running host a new
+entry in `disko.nix` only produces a `fileSystems` mount for a subvolume
+that doesn't exist yet — and since it isn't `nofail`, booting that
+generation fails. Create the subvolume by hand *before* switching. The
+desktop's game libraries were moved this way on 2026-09-28, launchers
+closed first:
+
+```bash
+sudo mkdir -p /mnt/btrfs-root
+sudo mount -o subvolid=5 /dev/disk/by-partlabel/disk-main-root /mnt/btrfs-root
+
+# EITHER it is already a nested subvolume (`stat -c %i ~/Games` prints
+# 256): a rename, instant.
+sudo mv /mnt/btrfs-root/@home/ol/Games /mnt/btrfs-root/@games
+
+# OR it is a plain directory: new subvolume, reflink copy (shares extents,
+# no extra space), then remove the original.
+sudo btrfs subvolume create /mnt/btrfs-root/@games
+sudo cp -a --reflink=always ~/Games/. /mnt/btrfs-root/@games/
+rm -rf ~/Games
+
+mkdir ~/Games                        # the mountpoint
+sudo umount /mnt/btrfs-root
+sudo nixos-rebuild switch --flake .#<name> && reboot
+```
+
+Space the old copy occupied only comes back once the `home` snapshots taken
+before the move are gone (`sudo snapper -c home delete --sync <first>-<last>`).

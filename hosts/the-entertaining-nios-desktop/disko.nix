@@ -1,5 +1,20 @@
-{ ... }:
+{ vars, ... }:
+let
+  home = "/home/${vars.user.name}";
+in
 {
+  # A mounted subvolume's root is owned by root, and systemd creates any
+  # missing parent of a mountpoint as root too — so on a fresh install Steam
+  # and Heroic would find their own libraries unwritable. tmpfiles runs after
+  # local-fs.target, i.e. once the game subvolumes below are mounted. Mode
+  # `-` leaves an existing directory's mode alone.
+  systemd.tmpfiles.rules = map (d: "d ${home}/${d} - ${vars.user.name} users -") [
+    ".local"
+    ".local/share"
+    ".local/share/Steam"
+    "Games"
+  ];
+
   disko.devices = {
     # The 1TB NVMe: the whole of it becomes this machine's system disk.
     # Addressed by /dev/disk/by-id rather than /dev/nvme0n1 — the kernel's
@@ -79,6 +94,27 @@
                 };
                 "@home_snapshots" = {
                   mountpoint = "/home/.snapshots";
+                  mountOptions = [
+                    "compress=zstd"
+                    "noatime"
+                  ];
+                };
+                # The game libraries, as siblings of @home rather than part
+                # of it, so snapper's hourly /home snapshots never contain
+                # them. Hundreds of gigabytes of re-downloadable files, every
+                # patch of which a snapshot would otherwise pin — uninstalling
+                # a game freed nothing until the last snapshot holding it
+                # expired. Steam's library is its client directory
+                # (steamapps/ lives inside it); Heroic installs to ~/Games.
+                "@steam" = {
+                  mountpoint = "${home}/.local/share/Steam";
+                  mountOptions = [
+                    "compress=zstd"
+                    "noatime"
+                  ];
+                };
+                "@games" = {
+                  mountpoint = "${home}/Games";
                   mountOptions = [
                     "compress=zstd"
                     "noatime"
