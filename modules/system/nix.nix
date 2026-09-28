@@ -26,4 +26,20 @@
     keep-outputs = true;
     keep-derivations = true;
   };
+
+  # Every rebuild keeps its generation, and every generation roots its whole
+  # closure, so the store only ever grows: the desktop reached 38 generations
+  # and a 151G store before anyone looked. Two weeks is long past the point a
+  # bad switch gets noticed, and `persistent` (on by default) catches up a
+  # run missed while the machine was off. Optimise follows on its own weekly
+  # timer, deduplicating what survives into hard links.
+  nix.gc = {
+    automatic = true;
+    dates = "weekly";
+    options = "--delete-older-than 14d";
+  };
+  nix.optimise = {
+    automatic = true;
+    dates = [ "weekly" ];
+  };
 }
