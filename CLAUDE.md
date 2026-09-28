@@ -74,7 +74,13 @@ files are excluded from all three lints (see `handWrittenNix` in `flake.nix`).
 
 Both niri hosts (laptop, desktop) use the same btrfs subvolumes (`@`, `@home`, `@nix`,
 `@snapshots`, `@home_snapshots`) so `features.snapshots` can enable
-`modules/services/snapper.nix`; swap is sized to each host's own RAM.
+`modules/services/snapper.nix`; swap is sized to each host's own RAM. The
+desktop adds `@steam` and `@games`, mounted at `~/.local/share/Steam` and
+`~/Games` (hidden from Nautilus with `x-gvfs-hide`), so the hourly `/home`
+snapshots never pin game files — before that they held ~65G of uninstalled
+and patched-over games. Snapper keeps 10 hourly, 7 daily, 4 weekly and nothing
+older. A subvolume added to an installed host's `disko.nix` must be created by
+hand before switching — see the end of `docs/bootstrapping-a-host.md`.
 Snapshots are file-level recovery via the `snapper` CLI only — deliberately
 not wired into the bootloader, since NixOS generation rollback already covers
 boot-time recovery.
