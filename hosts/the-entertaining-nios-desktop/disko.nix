@@ -106,11 +106,14 @@ in
                 # a game freed nothing until the last snapshot holding it
                 # expired. Steam's library is its client directory
                 # (steamapps/ lives inside it); Heroic installs to ~/Games.
+                # x-gvfs-hide keeps them out of Nautilus' sidebar, which
+                # otherwise lists every mount under /home as a drive.
                 "@steam" = {
                   mountpoint = "${home}/.local/share/Steam";
                   mountOptions = [
                     "compress=zstd"
                     "noatime"
+                    "x-gvfs-hide"
                   ];
                 };
                 "@games" = {
@@ -118,6 +121,7 @@ in
                   mountOptions = [
                     "compress=zstd"
                     "noatime"
+                    "x-gvfs-hide"
                   ];
                 };
               };
