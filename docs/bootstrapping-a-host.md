@@ -88,9 +88,40 @@ what makes this easy to miss. See [`live-dotfiles.md`](./live-dotfiles.md).
 
 ## 8. Post-install steps Nix cannot do for you
 
-Two things stay imperative by nature, because their state lives outside this
-repo entirely. Neither fails loudly — the host will simply be missing the
-capability it looks configured for.
+Three things stay imperative by nature, because their state lives outside this
+repo entirely. None fails loudly — the host will simply be missing the
+capability it looks configured for, or quietly filling its disk.
+
+**Carve the game libraries into their own subvolumes** (any host with both
+`features.snapshots` and `features.gaming`), before the first game is
+installed:
+
+```bash
+btrfs subvolume create ~/.local/share/Steam ~/Games
+```
+
+Snapper snapshots `/home` hourly, and a btrfs snapshot never descends into a
+nested subvolume — so this is what keeps hundreds of gigabytes of
+re-downloadable game files, and every patch Steam applies to them, out of
+those snapshots. Without it, uninstalling a game frees nothing until the last
+snapshot holding it expires. disko can't declare this: the directories sit
+inside a user's home, which doesn't exist when disko runs. No `fileSystems`
+entry is needed; a nested subvolume appears inside its parent on its own.
+
+To convert a library that already exists (the desktop's case, done
+2026-09-28), with the launcher closed:
+
+```bash
+mv ~/Games ~/Games.old
+btrfs subvolume create ~/Games
+cp -a --reflink=always ~/Games.old/. ~/Games/
+rm -rf ~/Games.old
+```
+
+The reflink copy shares extents instead of duplicating them, so it is
+near-instant and costs no space. The old copy's space only comes back once
+the existing `home` snapshots holding it are gone
+(`sudo snapper -c home delete --sync <first>-<last>`).
 
 **Join the tailnet** (any host with `features.tailscale`):
 
