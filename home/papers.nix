@@ -57,4 +57,11 @@ lib.mkIf osConfig.features.niri {
   # is in the zen-browser flake's own list at mkDefault, so this overrides it
   # cleanly — same shape as home/neovim.nix's text types.
   xdg.mimeApps.defaultApplications = lib.genAttrs readableTypes (_: "org.gnome.Papers.desktop");
+
+  # Open documents without the sidebar, as set by hand on the desktop. The
+  # only view preference there that differs from the schema default (which
+  # `continuous`, the other one that looks deliberate, already matches). The
+  # zoom level and dual-page state Papers also writes into this path are
+  # per-document habits it rewrites as you go, so they stay runtime state.
+  dconf.settings."org/gnome/papers/default".show-sidebar = false;
 }

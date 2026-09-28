@@ -115,6 +115,48 @@ in
     "L+ /home/${vars.user.name}/Storage - - - - /mnt/storage"
   ];
 
+  # The HP OfficeJet 4650 on the LAN, as a declared queue instead of the one
+  # added by hand on 2026-08-20. Host-level: it names one printer on one
+  # network, which modules/services/printing.nix deliberately doesn't know.
+  #
+  # The PPD is vendored rather than `model = "everywhere"`, and that is the
+  # important part. ensurePrinters runs its lpadmin calls in cups.service's
+  # ExecStartPost under `set -e`, and "everywhere" makes lpadmin query the
+  # printer live to build the PPD — so a printer that is switched off at boot
+  # would fail CUPS outright, taking every other queue down with it. The
+  # vendored file is byte-for-byte the IPP Everywhere PPD CUPS generated for
+  # the hand-made queue (fetched from localhost:631/printers/<name>.ppd), so
+  # nothing about printing changes; lpadmin just stops needing the network.
+  # Regenerate it the same way if the printer's firmware ever changes what it
+  # advertises.
+  #
+  # The name matches the hand-made queue's, so lpadmin -p updates that queue
+  # in place instead of adding a third.
+  services.printing.drivers = [
+    (pkgs.runCommand "officejet-4650-ppd" { } ''
+      install -Dm644 ${./officejet-4650.ppd} $out/share/cups/model/officejet-4650.ppd
+    '')
+  ];
+  hardware.printers = {
+    ensurePrinters = [
+      {
+        name = "HP_OfficeJet_4650_series";
+        description = "HP OfficeJet 4650";
+        deviceUri = "ipp://HP30E17143BDD4.local:631/ipp/print";
+        model = "officejet-4650.ppd";
+        ppdOptions.PageSize = "A4";
+      }
+    ];
+    ensureDefaultPrinter = "HP_OfficeJet_4650_series";
+  };
+
+  # cups-browsed made a second, automatic queue for the same printer
+  # (HP_OfficeJet_4650_series_43BDD4) next to the one above. With the printer
+  # declared, it has nothing left to do here. GTK's print dialog still lists
+  # any other driverless printer on the network through CUPS's own DNS-SD
+  # temporary queues, which don't need cups-browsed.
+  services.printing.browsed.enable = false;
+
   # Wake-on-LAN, and the shutdown path that pairs with it.
   #
   # A Raspberry Pi on the LAN emulates a Wemo smart plug (fauxmo), so "Alexa,

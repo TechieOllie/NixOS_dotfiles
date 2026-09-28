@@ -20,11 +20,33 @@
 #
 # Verified live on the desktop 2026-09-27: scans from the OfficeJet 4650.
 {
+  config,
   pkgs,
   lib,
   osConfig,
   ...
 }:
+let
+  scanDir = "${config.xdg.userDirs.documents}/Scanned Documents";
+in
 lib.mkIf (osConfig.features.niri && osConfig.features.printing) {
   home.packages = [ pkgs.simple-scan ];
+
+  # The preferences set by hand in the app on the desktop, read back with
+  # `dconf dump /org/gnome/simple-scan/`. Only the keys that differ from the
+  # schema: save-format is already application/pdf by default, so it isn't
+  # restated. Paper size is in tenths of a millimetre (A4 = 210 x 297 mm);
+  # the default of 0 means "detect", and the OfficeJet's flatbed doesn't.
+  dconf.settings."org/gnome/simple-scan" = {
+    paper-width = 2100;
+    paper-height = 2970;
+    # A GIO URI, not a path, so the space is percent-encoded.
+    save-directory = "file://${lib.replaceStrings [ " " ] [ "%20" ] scanDir}/";
+  };
+
+  # The folder the setting above names. Without it a fresh host's save
+  # dialog would open on a directory that doesn't exist. `d` never touches
+  # an existing directory or its contents. The quotes are tmpfiles' own:
+  # the path has a space in it.
+  systemd.user.tmpfiles.rules = [ ''d "${scanDir}" - - - -'' ];
 }
