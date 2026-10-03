@@ -83,6 +83,24 @@
       url = "github:hgaiser/moonshine";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # Claude Code, on its own update cadence. Upstream ships a release most
+    # days, and nixpkgs' `claude-code` trails it by however long the bump PR
+    # takes to reach nixos-unstable — while moving it any faster meant
+    # `nix flake update`, i.e. a whole new nixpkgs for one CLI. This flake
+    # is bumped hourly by its own CI, so `nix flake update claude-code`
+    # (`just update-claude-code`) moves Claude Code and nothing else.
+    #
+    # Only its package.nix is used, called with *our* pkgs in
+    # home/claude-code.nix, so the flake's own nixpkgs is never evaluated
+    # and the `.follows` just keeps a second copy out of flake.lock. That is
+    # also why the binary cache it advertises is not wired in: the package
+    # is a fetchurl of Anthropic's prebuilt native binary plus a wrapper,
+    # so there is nothing to compile and nothing a cache would save.
+    claude-code = {
+      url = "github:sadjow/claude-code-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -98,6 +116,7 @@
       chaotic,
       millennium,
       moonshine,
+      claude-code,
       ...
     }:
     let
@@ -117,6 +136,7 @@
           chaotic
           millennium
           moonshine
+          claude-code
           ;
       };
 

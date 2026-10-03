@@ -40,6 +40,11 @@ rollback:
 update:
     nix flake update
 
+# Update Claude Code alone, leaving nixpkgs and every other input where it
+# is — the reason it is a separate input (see flake.nix).
+update-claude-code:
+    nix flake update claude-code
+
 # The full gate: formatting, statix, deadnix, per-host evaluation *and*
 # per-host closure builds. The same command CI runs — see
 # .github/workflows/check.yml.

@@ -15,15 +15,21 @@
 # useGlobalPkgs consequence: the allow-list can't live in this file even
 # though this file is what installs the package.
 #
-# Upgrades come from `nix flake update`. The binary's own auto-updater
-# cannot write into the store and is expected to no-op; a version banner
-# nagging about an update is not a broken install.
+# The package comes from the `claude-code` flake input rather than nixpkgs,
+# so it can be upgraded on its own with `just update-claude-code` without
+# moving nixpkgs (see flake.nix). Its package.nix is called with this
+# repo's own pkgs — exactly what the input's overlay does — rather than
+# taken from its `packages` output, which is built from a nixpkgs instance
+# with `allowUnfree = true` and would silently bypass the allow-list above.
+# Upstream's wrapper sets DISABLE_AUTOUPDATER, so the binary does not try to
+# update itself out of the store.
 {
   pkgs,
   lib,
   osConfig,
+  claude-code,
   ...
 }:
 lib.mkIf osConfig.features.development {
-  home.packages = [ pkgs.claude-code ];
+  home.packages = [ (pkgs.callPackage "${claude-code}/package.nix" { }) ];
 }

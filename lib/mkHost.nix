@@ -12,6 +12,7 @@
   chaotic,
   millennium,
   moonshine,
+  claude-code,
 }:
 { system, hostPath }:
 let
@@ -70,7 +71,15 @@ nixpkgs.lib.nixosSystem {
       # zen-browser has no NixOS module (home-manager only) — passed through
       # here only, matching noctalia's own treatment. home/zen-browser.nix
       # imports zen-browser.homeModules.beta itself.
-      home-manager.extraSpecialArgs = { inherit vars noctalia zen-browser; };
+      # claude-code likewise: home/claude-code.nix calls its package.nix.
+      home-manager.extraSpecialArgs = {
+        inherit
+          vars
+          noctalia
+          zen-browser
+          claude-code
+          ;
+      };
       home-manager.users.${vars.user.name} = import ../home;
     }
   ];
