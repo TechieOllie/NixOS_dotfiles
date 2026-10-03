@@ -28,11 +28,7 @@
 #                                    # build the ISO — both are `build`/
 #                                    # `iso`, opt-in only.
 #
-# host defaults to $DEFAULT_HOST below. Valid hosts (see flake.nix):
-#   the-entertaining-nios-vm        # bootstrapped, the dev/verification host
-#   the-entertaining-nios-laptop    # wired + eval-clean, not yet installed
-#   the-entertaining-nios-desktop   # bootstrapped, the gaming/niri workstation
-#   inotmac                         # bootstrapped, shared GNOME iMac
+# host: any nixosConfigurations attribute in flake.nix (default $DEFAULT_HOST).
 #
 # Exit code is 0 iff every step run actually succeeded — check this, don't
 # just eyeball the output.

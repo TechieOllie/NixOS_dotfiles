@@ -4,8 +4,8 @@ description: Build, evaluate, and smoke-test this NixOS flake config — the way
 ---
 
 This repo has no in-container app to launch: it's a Nix flake that produces
-whole-machine NixOS system closures (`nixosConfigurations.the-entertaining-nios-vm`,
-`...-laptop`) deployed elsewhere via `nixos-anywhere`, plus a bootstrap
+whole-machine NixOS system closures (one `nixosConfigurations` entry per
+host) deployed elsewhere via `nixos-anywhere`, plus a bootstrap
 installer ISO (`packages.x86_64-linux.installer-iso`). "Running" it means
 evaluating and building those outputs — the same thing `nixos-rebuild
 switch`/`build` and `nix flake check` do, minus actually switching a real
@@ -71,8 +71,8 @@ extra-trusted-public-keys = noctalia.cachix.org-1:pCOR47nnMEo5thcxNDtzWpOxNFQsBR
 Those lines are not optional-in-practice: a NixOS host running this flake gets
 them from its own config (`modules/desktop/noctalia.nix`, chaotic's own NixOS
 module), but a plain CachyOS dev box has no such config. Without them, Nix
-silently falls back to building a native Wayland/OpenGL shell — and, once the
-desktop is wired, a kernel — from source. Setting them at the daemon level is
+silently falls back to building a native Wayland/OpenGL shell — and, for the
+gaming desktop, a kernel — from source. Setting them at the daemon level is
 the real fix; the `--extra-substituters` flags the driver passes are ignored
 for non-trusted users (see Gotchas). `.github/workflows/check.yml` configures
 exactly these same two lines for CI, for exactly this reason.
@@ -82,8 +82,8 @@ exactly these same two lines for CI, for exactly this reason.
 ```bash
 cd /path/to/NixOS_dotfiles   # the repo root, next to flake.nix
 
-# Fastest, run this first after any change: evaluates BOTH
-# nixosConfigurations (vm + laptop) and the installer-iso package, no
+# Fastest, run this first after any change: evaluates EVERY
+# nixosConfigurations entry and the installer-iso package, no
 # building. Catches option typos, missing imports, assertion failures.
 .claude/skills/run-nixos-dotfiles/driver.sh check
 
@@ -96,20 +96,19 @@ cd /path/to/NixOS_dotfiles   # the repo root, next to flake.nix
 # ships as a build artifact. Opt-in, not part of `all` (see below):
 .claude/skills/run-nixos-dotfiles/driver.sh iso
 
-# check + eval (both hosts covered via `check`) — the routine, default,
-# eval-only path. Deliberately does NOT build the ISO or either host's
+# check + eval (every host covered via `check`) — the routine, default,
+# eval-only path. Deliberately does NOT build the ISO or any host's
 # closure; run `iso`/`build` separately when you actually need a realized
 # build, not as part of every-change verification:
 .claude/skills/run-nixos-dotfiles/driver.sh all the-entertaining-nios-vm
 ```
 
-Valid hosts (see `flake.nix`): `the-entertaining-nios-vm` (bootstrapped,
-the actual dev/verification host) and `the-entertaining-nios-laptop`
-(wired and eval-clean, not yet installed on real hardware). `the-entertaining-nios-desktop`
-is scaffold-only and has no `nixosConfigurations` entry yet — don't pass it.
+Valid hosts: any `nixosConfigurations` attribute in `flake.nix`; `CLAUDE.md`'s
+Hosts table has each one's state. The default is `the-entertaining-nios-vm`,
+the disposable verification host.
 
 **Realized builds (`build`, `iso`) are opt-in, not part of `all`.** `driver.sh
-build <host>` (verified for both hosts — each realizes a full
+build <host>` (verified for the VM and laptop — each realizes a full
 `nixos-system-<host>-*` closure, symlinked to `./result-<host>`) and
 `driver.sh iso` (verified — realizes the installer ISO, symlinked to
 `./result-iso`) both work, but neither runs as part of `all`: a system
@@ -163,7 +162,7 @@ just fmt          # nix fmt
 ```
 
 Note the gap between `just check-fast` and `just check`: plain `nix flake
-check` builds `build-<host>` closures for both hosts as checks, so it is
+check` builds `build-<host>` closures for every host as checks, so it is
 genuinely expensive, while `--no-build` is lints + evaluation only. CI runs
 the full one. Run the full one yourself after any `nix flake update`, since
 `--no-build` never fetches and so cannot see a rotted input source.
@@ -225,13 +224,11 @@ nothing passes just as green as one that works.
   than failing outright — still correct, just slow. The real fix is
   daemon-level config, not a driver flag: put both substituters in
   `/etc/nix/nix.conf` as shown under Prerequisites (needs root).
-- **chaotic-nyx's cache only becomes load-bearing once the desktop is
-  wired.** `chaotic` and `millennium` reach only hosts importing
-  `profiles/gaming.nix`, which today is `the-entertaining-nios-desktop`
-  alone — and that host has no `nixosConfigurations` entry, so neither
-  input is in anything `check`/`build` can currently reach. The driver and
-  CI pass `nyx-cache.chaotic.cx` anyway, so that the day the desktop gets a
-  flake entry, nobody discovers the omission by compiling a kernel.
+- **chaotic-nyx's cache is load-bearing for the desktop.** `chaotic` and
+  `millennium` reach only hosts importing `profiles/gaming.nix` (today
+  `the-entertaining-nios-desktop` alone). Without `nyx-cache.chaotic.cx`, a
+  realized build of that host — `build`, or a full `nix flake check` —
+  compiles the CachyOS kernel from source. The driver and CI both pass it.
 - **`nix build .../toplevel` never touches real hardware or actually
   switches anything** — it only realizes the closure in the local Nix
   store and symlinks it to `./result-<host>`; nothing is activated. This
@@ -241,10 +238,6 @@ nothing passes just as green as one that works.
 - **`result*` is already gitignored** (`.gitignore`: `result`, `result-*`)
   — the driver's output symlinks (`result-<host>`, `result-iso`) never
   need manual cleanup before a commit.
-- **Don't build `the-entertaining-nios-desktop`** — it has no
-  `hardware-configuration.nix`/`secrets.nix`/`flake.nix` entry yet
-  (scaffold-only per `CLAUDE.md`); there's no `nixosConfigurations.the-entertaining-nios-desktop`
-  to build against at all yet.
 
 ## Troubleshooting
 
