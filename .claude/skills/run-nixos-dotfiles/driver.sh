@@ -7,8 +7,8 @@
 # directory containing flake.nix), or pass --repo <path>.
 #
 # Usage:
-#   driver.sh check                 # nix flake check (fast: evals both
-#                                    # hosts + the ISO package, no full build)
+#   driver.sh check                 # nix flake check (fast: evals every
+#                                    # host + the ISO package, no full build)
 #   driver.sh eval   [host]         # eval-only, just resolves .drvPath
 #                                    # (fastest — a few seconds, catches
 #                                    # option/type errors with no build)
@@ -31,6 +31,8 @@
 # host defaults to $DEFAULT_HOST below. Valid hosts (see flake.nix):
 #   the-entertaining-nios-vm        # bootstrapped, the dev/verification host
 #   the-entertaining-nios-laptop    # wired + eval-clean, not yet installed
+#   the-entertaining-nios-desktop   # bootstrapped, the gaming/niri workstation
+#   inotmac                         # bootstrapped, shared GNOME iMac
 #
 # Exit code is 0 iff every step run actually succeeded — check this, don't
 # just eyeball the output.

@@ -4631,3 +4631,52 @@ files and the two sat side by side in a dirty repo.
 project uses (lockfile detection). The operator asked for built-in modules
 only; Starship has none for either, so the web side is `nodejs`/`bun`/`deno`
 plus `package`.
+
+## Host verification log (moved from CLAUDE.md, 2026-10-03)
+
+`CLAUDE.md`'s Hosts table had grown into a dated record of what was
+confirmed where, which a future session never acts on. The rows were cut
+down to current state; the dates and the live-verification details land
+here so they are not lost.
+
+**`the-entertaining-nios-desktop`**
+
+- Installed via nixos-anywhere onto the 1T NVMe, replacing the Windows
+  install on it. The 2T Seagate ST2000DM008 (serial ZK3055P8) is addressed
+  by its real `by-id` path; the NTFS partition labelled `Extra` it used to
+  hold was destroyed by the install.
+- First boot hit the `Writeback-1` greeter bug; fixed by pinning
+  `output.name = "DP-1"`.
+- 2026-08-20: Phase 7's gaming stack on real hardware. Steam launches and
+  draws once `xwayland-satellite` provides an X server; Sifu played through
+  Heroic under `proton-cachyos` (the symlinked build, per Heroic's own
+  config); a wired Xbox controller bound to `xone` (`xone_wired`/
+  `xone_gip_gamepad`, `js1`). `xpadneo` loads but has never had a device.
+- 2026-08-20: KDE Connect, FreeCAD, IntelliJ IDEA, Claude Code + GitHub CLI
+  and Prism Launcher switched on and confirmed launching.
+- 2026-08-22: KiCad and Papers confirmed working.
+- 2026-08-23: Celluloid (after Showtime's GoPro deadlock — see its own
+  section) and Decibels confirmed, completing the image/PDF/video/audio
+  handler set.
+- 2026-08-30: screen mirroring verified — `Mod+P` opens the
+  `elijaharch/wl-screen-mirror` controls panel driving `wl-mirror`.
+- 2026-09-28: the OfficeJet `ensurePrinters` queue
+  (`HP_OfficeJet_4650_series`) and the Z407 default-output rule both made
+  declarative and verified live.
+
+**`inotmac`**
+
+- Installed 2026-08-29; the first boot locked the operator out (unset xkb
+  layout — see the keyboard gotcha in `CLAUDE.md`).
+- Fully verified live 2026-08-30, over the declarative Wi-Fi profile
+  (`home`, the only one for that SSID): GNOME Shell 50.4 on Wayland with
+  `card0` bound to `radeon` and `card1` to `i915`; all four accounts
+  resolving their pinned uids, `wheel` holding `ol` alone and
+  `cdrom`/`scanner` on all four; CUPS, Avahi and SANE active; the dash
+  override applying (`['google-chrome.desktop', 'org.gnome.Nautilus.desktop']`,
+  Epiphany gone); Rhythmbox's three dconf defaults present in the system
+  database; `fr` as the X11 layout and `fr_FR.utf8` built. The boot
+  journal's only errors were dbus-broker duplicate-name notices, which are
+  normal.
+- `liz`, `regis` and `jolan` have since all logged in and their sessions
+  work.
