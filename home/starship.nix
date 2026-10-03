@@ -27,7 +27,7 @@
 # from both. The palettes deliberately still differ — the Noctalia copy
 # tracks the wallpaper, this one needs no such machinery.
 #
-# Layout: line 1 is *where* you are on the left (user@host over SSH only,
+# Layout: line 1 is *where* you are on the left (user always, @host over SSH,
 # path, git, nix shell) and *which toolchain* applies on the right, split
 # by $fill; the right side of the input line is the last command's outcome
 # (exit status, duration, background jobs), via right_format. Language and
@@ -46,7 +46,7 @@ let
   prompt = c: {
     format = lib.concatStrings [
       "[┌─ ](bold ${c.frame})"
-      "($username$hostname )"
+      "($username$hostname in )"
       "$directory"
       "$git_branch$git_status$git_state"
       "$nix_shell"
@@ -59,10 +59,12 @@ let
 
     fill.symbol = " ";
 
-    # Both only over SSH (or as root, for username), so a local prompt
-    # stays short and a remote one is unmistakable. The `@` lives in
-    # hostname's format so a local root shell reads `root`, not `root@`.
+    # Username always (`ol in …`, as the original prompt had it — without
+    # it a local prompt read as too bare); hostname only over SSH, so a
+    # remote shell is still unmistakable. The `@` lives in hostname's
+    # format so a local shell reads `ol`, not `ol@`.
     username = {
+      show_always = true;
       format = "[$user]($style)";
       style_user = "bold ${c.accent}";
     };

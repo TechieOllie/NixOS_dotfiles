@@ -4617,8 +4617,9 @@ Verified by building both renders and diffing them: identical apart from
 colour values.
 
 **Layout**, chosen from three mockups by the operator: two lines with the
-`┌─`/`└─` frame kept; line 1 holds location on the left (`user@host` only
-over SSH or as root, path, `git_branch`/`git_status`/`git_state`,
+`┌─`/`└─` frame kept; line 1 holds location on the left (`user in` always —
+SSH-only at first, put back after the operator found the local prompt too
+bare — `@host` only over SSH, path, `git_branch`/`git_status`/`git_state`,
 `nix_shell`) and toolchain on the right after `$fill` (python, rust, go,
 node, bun, deno, java, c, cmake, php, plus `package` for the project
 version); `right_format` carries the last command's outcome (`status` only
