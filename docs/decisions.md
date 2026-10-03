@@ -4592,3 +4592,41 @@ Re-check condition: **nixpkgs gaining a Home Manager module for Noctalia with
 a `settings` option.** That, not a version bump, is what would make dropping
 the shell input worth costing out — and it would make the greeter worth
 moving in the same pass.
+
+## The Starship prompt: one definition, and a prompt that says something (2026-10-03)
+
+The prompt existed twice — `home/noctalia-templates/starship.toml.tmpl` for
+niri hosts and a static copy in `home/starship.nix` for the rest — kept in
+sync by hand, and both had already drifted from the operator's original in
+the same way: `shell_dotfiles/starship/starship.toml` has `symbol = ''`
+(U+E73C) for Python, and both copies here had `symbol = ''`, so a venv
+rendered as `via  (venv)`. A private-use-area glyph is easy to lose in
+transit; writing the new module lost eleven more the same way, which were
+restored by codepoint and are now called out in `CLAUDE.md`.
+
+**Single source.** `home/starship.nix` defines `prompt = colours: { … }`.
+Static colours → `programs.starship.settings` (non-niri hosts); Noctalia's
+`{{colors.primary.default.hex}}`-style placeholders →
+`(pkgs.formats.toml { }).generate` → the `starship` user template's
+`input_path`, which `home/starship.nix` now sets itself rather than
+`home/noctalia.nix`. Same generated-input shape as `niriStyleTemplate`. The
+option is a TOML-value type, so the entry merges with `home/noctalia.nix`'s
+other templates; on a non-niri host it evaluates to an empty
+`templates.user` under a disabled `programs.noctalia`, which is inert.
+Verified by building both renders and diffing them: identical apart from
+colour values.
+
+**Layout**, chosen from three mockups by the operator: two lines with the
+`┌─`/`└─` frame kept; line 1 holds location on the left (`user@host` only
+over SSH or as root, path, `git_branch`/`git_status`/`git_state`,
+`nix_shell`) and toolchain on the right after `$fill` (python, rust, go,
+node, bun, deno, java, c, cmake, php, plus `package` for the project
+version); `right_format` carries the last command's outcome (`status` only
+when non-zero, `cmd_duration` over 2 s, `jobs`). `status` prints `exit N` in
+words rather than a glyph, because `git_status` already uses `✘` for deleted
+files and the two sat side by side in a dirty repo.
+
+**Declined:** `custom.*` modules for Vite and for which package manager a
+project uses (lockfile detection). The operator asked for built-in modules
+only; Starship has none for either, so the web side is `nodejs`/`bun`/`deno`
+plus `package`.

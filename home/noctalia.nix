@@ -682,15 +682,8 @@ in
                 output_path = [ "$XDG_CONFIG_HOME/niri/noctalia-style.kdl" ];
               };
 
-              starship = {
-                input_path = ./noctalia-templates/starship.toml.tmpl;
-                # No post_hook needed: Starship re-reads its config file
-                # on every new prompt render, no daemon/signal to
-                # restart. home/starship.nix deliberately has no
-                # `settings` — this template is the sole owner of the
-                # whole file.
-                output_path = [ "$XDG_CONFIG_HOME/starship.toml" ];
-              };
+              # starship: declared in home/starship.nix, which generates
+              # its input from the same definition as the non-niri prompt.
 
               lazygit = {
                 input_path = ./noctalia-templates/lazygit-theme.yml.tmpl;
