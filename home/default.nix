@@ -22,6 +22,7 @@
     ./fzf.nix
     ./ripgrep.nix
     ./fastfetch.nix
+    ./nix-index.nix
     ./vscode.nix
     ./zen-browser.nix
     ./vesktop.nix

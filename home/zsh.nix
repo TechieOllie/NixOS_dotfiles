@@ -47,8 +47,9 @@
       enable = true;
       plugins = [
         "colored-man-pages"
-        "command-not-found"
         "extract"
+        # "command-not-found" was here and never worked on NixOS without
+        # channels; home/nix-index.nix provides the real thing.
       ];
     };
 

@@ -101,6 +101,18 @@
       url = "github:sadjow/claude-code-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # A prebuilt nix-index database, published weekly, so nix-locate,
+    # command-not-found and comma work without anyone running the
+    # hour-long `nix-index` crawl locally. The database is a plain fetch of
+    # a release asset, so following nixpkgs costs no cache. It is pinned
+    # like any input: it moves on `nix flake update`, and between updates
+    # it describes the nixpkgs of its own release week. Imported by
+    # home/nix-index.nix.
+    nix-index-database = {
+      url = "github:nix-community/nix-index-database";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -117,6 +129,7 @@
       millennium,
       moonshine,
       claude-code,
+      nix-index-database,
       ...
     }:
     let
@@ -137,6 +150,7 @@
           millennium
           moonshine
           claude-code
+          nix-index-database
           ;
       };
 

@@ -13,6 +13,7 @@
   millennium,
   moonshine,
   claude-code,
+  nix-index-database,
 }:
 { system, hostPath }:
 let
@@ -71,13 +72,15 @@ nixpkgs.lib.nixosSystem {
       # zen-browser has no NixOS module (home-manager only) — passed through
       # here only, matching noctalia's own treatment. home/zen-browser.nix
       # imports zen-browser.homeModules.beta itself.
-      # claude-code likewise: home/claude-code.nix calls its package.nix.
+      # claude-code likewise: home/claude-code.nix calls its package.nix,
+      # and nix-index-database: home/nix-index.nix imports its module.
       home-manager.extraSpecialArgs = {
         inherit
           vars
           noctalia
           zen-browser
           claude-code
+          nix-index-database
           ;
       };
       home-manager.users.${vars.user.name} = import ../home;
