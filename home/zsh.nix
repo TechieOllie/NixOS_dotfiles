@@ -40,6 +40,35 @@
     enable = true;
     enableCompletion = true;
 
+    # Home Manager already shares history across sessions and drops
+    # consecutive duplicates; on top of that: room for a few years of it,
+    # a timestamp per entry (`fc -li`, and what fzf's Ctrl-R shows), and
+    # duplicates are the first thing trimmed when the file is full.
+    history = {
+      size = 50000;
+      save = 50000;
+      extended = true;
+      expireDuplicatesFirst = true;
+    };
+
+    # Quick directory jumps. Named directories work anywhere a path does —
+    # `cd ~proj`, `cp x ~dots/home/`, `~<Tab>` lists them — and autocd turns
+    # a bare `~dots` (or `..`) into a cd, so no per-directory alias has to
+    # claim a command name. Unconditional like the rest of this file; a name
+    # whose directory a host lacks (~stor off the desktop, ~dots on inotmac)
+    # just fails to cd. zoxide (`z`, and `zi` with fzf) covers everything
+    # else by frecency. Yazi's `g` bookmarks read the same paths
+    # (home/yazi.nix).
+    autocd = true;
+    dirHashes = {
+      dots = "${config.home.homeDirectory}/.dotfiles";
+      proj = "${config.home.homeDirectory}/Documents/Projects";
+      docs = "${config.home.homeDirectory}/Documents";
+      dl = "${config.home.homeDirectory}/Downloads";
+      cfg = config.xdg.configHome;
+      stor = "${config.home.homeDirectory}/Storage";
+    };
+
     autosuggestion.enable = true; # zsh-users/zsh-autosuggestions
     fastSyntaxHighlighting.enable = true; # zdharma-continuum/fast-syntax-highlighting
 
