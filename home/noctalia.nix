@@ -540,7 +540,15 @@ in
             # leading path, so it recognizes home/niri.nix's existing
             # `include "./noctalia.kdl"` and never duplicates it) — no
             # conflict with anything Nix manages.
+            #
+            # "btop": writes a separate themes/noctalia.theme, then its
+            # apply.sh rewrites btop.conf in place to select it — which
+            # would hit home/btop.nix's read-only store symlink. It doesn't,
+            # because that module already declares color_theme = "noctalia",
+            # and the script's first branch is a no-op when that exact line
+            # is present. Keep the two in step.
             builtin_ids = [
+              "btop"
               "ghostty"
               "gtk3"
               "gtk4"
@@ -616,7 +624,18 @@ in
             # CSS snippet inside each one's snippets/ folder —
             # home/obsidian.nix doesn't manage any vault content, so no
             # conflict.
+            # "bat": writes themes/noctalia.tmTheme, then its apply.sh
+            # `touch`es and rewrites ~/.config/bat/config and runs
+            # `bat cache --build`. That touch would fail on a store symlink
+            # and abort the script before the cache rebuild, so home/bat.nix
+            # deliberately declares no bat config at all and leaves the file
+            # to this hook.
+            # "fzf": writes a separate fzf/themes/noctalia.sh that appends
+            # --color options to FZF_DEFAULT_OPTS; home/fzf.nix sources it
+            # from .zshrc when present.
             community_ids = [
+              "bat"
+              "fzf"
               "yazi"
               "papirus-icons"
               "discord"

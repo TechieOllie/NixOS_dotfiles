@@ -96,9 +96,10 @@ lib.mkIf osConfig.features.workstation {
   # yazi for yazi.nvim) -- both are already installed by their own
   # dedicated modules (home/git.nix's programs.git.enable already pulls
   # in pkgs.git; home/yazi.nix installs yazi itself and carries its
-  # Noctalia theming). Putting them here too would be a redundant second
-  # place declaring the same package, for a tool this file doesn't
-  # actually own. Everything below stays here because its only reason
+  # Noctalia theming). ripgrep, which Telescope's live_grep needs, is
+  # likewise home/ripgrep.nix's now. Putting them here too would be a
+  # redundant second place declaring the same package, for a tool this
+  # file doesn't actually own. Everything below stays here because its only reason
   # for existing in this repo *is* Neovim/Mason's own needs -- if a
   # future phase adds general-purpose Python/Node/Go/PHP tooling on its
   # own merits, move the relevant entry to that phase's own module
@@ -111,10 +112,6 @@ lib.mkIf osConfig.features.workstation {
     # shells out to `tree-sitter build`, confirmed live ("ENOENT: no
     # such file or directory (cmd): 'tree-sitter'" without this); a C
     # compiler alone isn't enough for this rewritten version.
-    ripgrep # Telescope live_grep / grep_string -- also on this repo's
-    # planned general terminal-tool stack, but has no configuration of
-    # its own to warrant a dedicated file (unlike yazi); fine here until
-    # that changes.
     python3 # Mason's debugpy installer needs a python3 on PATH to build
     # its own venv (confirmed live: "Unable to find python3 installation
     # in PATH" without this) -- also just generally needed to run/debug

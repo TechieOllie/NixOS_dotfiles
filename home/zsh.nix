@@ -25,7 +25,12 @@
 #     itself, avoiding running it twice) — oh-my-zsh's own compinit call
 #     already only rebuilds $ZSH_COMPDUMP when needed, covering the same
 #     goal ez-compinit served.
-{ pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 {
   # Replaces rupa/z. Zsh integration (`zoxide init zsh`) is added
   # automatically once both this and programs.zsh.enable are true.
@@ -96,9 +101,6 @@
     '';
 
     shellAliases = {
-      l = "ls --color=auto";
-      ll = "ls -l --color=auto";
-      la = "ls -a --color=auto";
       grep = "grep --color=auto";
       lg = "lazygit";
       q = "exit";
@@ -106,6 +108,15 @@
       nv = "nvim";
       open = "xdg-open";
       # `here="explorer.exe ."` dropped: WSL-only, not relevant on NixOS.
+    }
+    # The listing aliases belong to home/eza.nix wherever eza is installed;
+    # these plain-`ls` versions only cover hosts without it (inotmac). Gated
+    # on eza itself rather than on features.workstation so the two can never
+    # both claim the same name.
+    // lib.optionalAttrs (!config.programs.eza.enable) {
+      l = "ls --color=auto";
+      ll = "ls -l --color=auto";
+      la = "ls -a --color=auto";
     };
 
     # No sessionVariables. EDITOR/VISUAL were the only two and moved to

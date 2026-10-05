@@ -16,6 +16,12 @@
     ./git.nix
     ./ghostty.nix
     ./yazi.nix
+    ./eza.nix
+    ./bat.nix
+    ./btop.nix
+    ./fzf.nix
+    ./ripgrep.nix
+    ./fastfetch.nix
     ./vscode.nix
     ./zen-browser.nix
     ./vesktop.nix
