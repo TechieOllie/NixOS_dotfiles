@@ -10,7 +10,37 @@
 # are deliberately *not* on this flag: a login shell that behaves the way
 # its owner expects is worth having even on a machine visited only to fix
 # something.
-{ lib, osConfig, ... }:
+{
+  config,
+  pkgs,
+  lib,
+  osConfig,
+  ...
+}:
+let
+  # delta's colours, rendered by Noctalia on every palette change into a
+  # file of their own and pulled into git's config with include.path — the
+  # same separate-output-file shape as the lazygit and starship templates,
+  # since ~/.config/git/config is a Home Manager store symlink.
+  #
+  # syntax-theme names the tmTheme Noctalia's "bat" template writes; delta
+  # reads bat's theme cache directly (delta 0.19 and bat 0.26 share the
+  # cache format), and that template's own hook rebuilds the cache.
+  #
+  # The added/removed line backgrounds keep the palette's own green and red
+  # hues and only drop their lightness to background level (set_lightness is
+  # 0-100), brighter for the changed words inside a line. Tuned for a dark
+  # palette, which home/noctalia.nix pins with theme.mode = "dark".
+  deltaThemePath = "${config.xdg.configHome}/git/noctalia-delta.gitconfig";
+  deltaTemplate = pkgs.writeText "noctalia-delta.gitconfig.tmpl" ''
+    [delta]
+    	syntax-theme = noctalia
+    	minus-style = syntax "{{colors.terminal_normal_red.default.hex | set_lightness 15}}"
+    	minus-emph-style = syntax "{{colors.terminal_normal_red.default.hex | set_lightness 28}}"
+    	plus-style = syntax "{{colors.terminal_normal_green.default.hex | set_lightness 13}}"
+    	plus-emph-style = syntax "{{colors.terminal_normal_green.default.hex | set_lightness 25}}"
+  '';
+in
 lib.mkIf osConfig.features.workstation {
   programs.git = {
     enable = true;
@@ -39,17 +69,26 @@ lib.mkIf osConfig.features.workstation {
     # Auto-manages the [filter "lfs"] block already present in the
     # operator's live .gitconfig, rather than hand-copying it.
     lfs.enable = true;
+
+    # git skips a missing include silently, so before Noctalia's first
+    # template pass delta just keeps its defaults. Includes come after the
+    # main settings, so the rendered [delta] keys win over programs.delta's.
+    includes = lib.optional osConfig.features.niri { path = deltaThemePath; };
   };
 
   # delta as git's pager: syntax-highlighted diffs, with `n`/`N` jumping
   # between files. A separate programs.* module since Home Manager split it
-  # out of programs.git, and the git hookup now has to be asked for. Theme
-  # left to delta's own default — it reads bat's theme only through
-  # BAT_THEME, which nothing here sets (see home/bat.nix for why bat's
-  # config file belongs to Noctalia). lazygit uses it too: home/lazygit.nix.
+  # out of programs.git, and the git hookup now has to be asked for. Colours
+  # come from the Noctalia-rendered include above; without Noctalia (the
+  # laptop) delta keeps its defaults. lazygit uses it too: home/lazygit.nix.
   programs.delta = {
     enable = true;
     enableGitIntegration = true;
     options.navigate = true;
+  };
+
+  programs.noctalia.settings.theme.templates.user.delta = lib.mkIf osConfig.features.niri {
+    input_path = deltaTemplate;
+    output_path = [ deltaThemePath ];
   };
 }

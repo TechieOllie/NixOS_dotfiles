@@ -4683,6 +4683,17 @@ so no command names get used up. Yazi's `g` bookmarks read the same
 **git:** `pull.ff = "only"` was chosen over `pull.rebase`. lazygit 0.65
 calls its pager list `git.diffRenderers`, not the old `git.paging`.
 
+**delta's colours** come from a custom Noctalia user template, registered in
+`home/git.nix`. It renders `~/.config/git/noctalia-delta.gitconfig`, and
+`git/config` pulls that in with `include.path` (last, so it wins; git skips
+a missing include without complaint). `syntax-theme = noctalia` reuses the
+bat template's tmTheme, since delta reads bat's theme cache directly and
+0.19 and bat 0.26 share its format. A theme missing from the cache only
+gets a warning, not a failure. The added/removed backgrounds are the
+palette's terminal green/red with `set_lightness` dropped to background
+level. Noctalia's `blend` filter looked like the obvious tool but only
+shifts hue toward the argument; it doesn't mix the colours.
+
 **nh** (nix-output-monitor progress, nvd diff, `nh clean`) was considered
 and **not adopted**. It replaces `nixos-rebuild` as the command you run,
 which goes against the justfile's verbatim-commands rule, and its cleaner
