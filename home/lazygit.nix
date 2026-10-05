@@ -19,6 +19,18 @@ lib.mkIf osConfig.features.workstation {
     settings = {
       gui.nerdFontsVersion = "3";
       notARepository = "skip";
+
+      # delta (home/git.nix) for diffs, with git's raw output one `|` away.
+      # `diffRenderers` is lazygit 0.65's name for what older releases
+      # called `git.paging`; --dark because delta can't query the terminal's
+      # background from inside lazygit, and Noctalia's mode is dark.
+      git.diffRenderers = [
+        { command = "delta --dark --paging=never"; }
+        {
+          type = "rawGit";
+          name = "default";
+        }
+      ];
     };
   };
 
