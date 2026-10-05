@@ -235,20 +235,6 @@ in
             # behind ":emo". Every other provider stays prefix-only.
             providers.emoji.global = true;
           };
-
-          screenshot = {
-            # All three default false upstream. Region capture without a
-            # confirmation step fires on mouse-up with no chance to adjust,
-            # and without remember_last_region a re-shot of the same area
-            # has to be re-dragged by hand.
-            confirm_region = true;
-            remember_last_region = true;
-
-            # The pointer is usually the subject when screenshotting a UI
-            # bug — which of these three is a taste call rather than a
-            # correctness one.
-            show_cursor = true;
-          };
         };
 
         # Fires after every full re-theme pass completes (confirmed via

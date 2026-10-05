@@ -149,9 +149,9 @@ binds {
     Mod+W                               { toggle-column-tabbed-display; }
 
     // ─── Screenshots ───
-    // Was a mystery standalone "screenshot" script under v4; noctalia v5
-    // has real screenshot IPC, so this now calls that directly instead.
-    Mod+Shift+S                         { spawn-sh "noctalia msg screenshot-region"; }
+    // The operator's own slurp + grim + Satty script (home/screenshot.nix),
+    // not Noctalia's screenshot IPC.
+    Mod+Shift+S                         { spawn "screenshot"; }
 
     // ─── Display ───
     Mod+P                               { spawn-sh "noctalia msg panel-toggle elijaharch/wl-screen-mirror:controls"; }

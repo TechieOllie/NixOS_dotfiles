@@ -104,6 +104,7 @@
       q = "exit";
       cl = "clear";
       nv = "nvim";
+      open = "xdg-open";
       # `here="explorer.exe ."` dropped: WSL-only, not relevant on NixOS.
     };
 
