@@ -747,11 +747,8 @@ Niri, greetd, Noctalia Greeter, Noctalia Shell v5 (native theming, GTK/Qt themin
 
 ## Terminal
 
-Ghostty, Zsh, Starship, Git, Lazygit, Neovim, zoxide, yazi, ripgrep.
-
-*Planned:* Fastfetch, eza, bat, fd, fzf, btop. (`ripgrep` is installed today
-only as a Neovim/Telescope prerequisite via `home/neovim.nix`, not yet as a
-general-purpose tool in its own right.)
+Ghostty, Zsh, Starship, Git (+ delta), Lazygit, Neovim, zoxide, yazi, ripgrep,
+fd, fzf, eza, bat, btop, Fastfetch, nix-index (prebuilt database) + comma.
 
 ## Applications
 

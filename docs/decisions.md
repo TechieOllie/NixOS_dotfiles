@@ -4632,6 +4632,63 @@ project uses (lockfile detection). The operator asked for built-in modules
 only; Starship has none for either, so the web side is `nodejs`/`bun`/`deno`
 plus `package`.
 
+## The terminal toolkit lands (2026-10-05)
+
+eza, bat, btop, fzf, fd, ripgrep and Fastfetch had been "planned" in
+`ARCHITECTURE.md` since Phase 4 while CLAUDE.md listed them as shipping.
+Nothing installed any of them. They now each have a `home/` module on
+`features.workstation`, along with delta, nix-index + comma, a longer zsh
+history, named directories and Yazi bookmarks.
+
+**Theming without fighting Home Manager.** btop, bat and fzf follow the
+wallpaper through Noctalia templates (`btop` builtin; `bat`, `fzf`
+community). btop's and bat's hooks edit the app's main config in place,
+which is the starship/lazygit conflict again, so each was read before
+being enabled:
+
+- btop's `apply.sh` does nothing if `color_theme = "noctalia"` is already
+  there. `home/btop.nix` declares that line on niri hosts, so the
+  store-symlinked `btop.conf` is never written. `save_config_on_exit = false`
+  stops btop itself from trying to write it back.
+- bat's hook `touch`es `~/.config/bat/config` before anything else, and
+  that fails on a store symlink under `set -e`, so the
+  `bat cache --build` that makes the theme visible would never run. So bat
+  gets no Nix-managed config at all on niri hosts. The first attempt still
+  produced one: Home Manager's ghostty module adds a `map-syntax` entry to
+  `programs.bat.config` whenever bat is enabled. That was found by checking
+  `xdg.configFile`, not by reading `home/bat.nix`, and it is forced empty now.
+- fzf's template writes a separate snippet that appends to
+  `FZF_DEFAULT_OPTS`. `.zshrc` resets the variable before sourcing it,
+  because it is exported and every nested shell would otherwise append
+  another copy.
+- Fastfetch's community template was **declined**. It merges colours into
+  `config.jsonc` with `jq` and refuses to run without that file. Without a
+  config, fastfetch draws with the ANSI palette, which Ghostty's template
+  already themes.
+
+**command-not-found.** oh-my-zsh's plugin had been in `home/zsh.nix` since
+the Antidote migration and never did anything:
+`programs.command-not-found` is off on every host because its database
+ships only with channels. It was replaced by `nix-index-database`, a new
+input following nixpkgs. Its Home Manager module turns `programs.nix-index`
+on with `mkDefault true` just by being imported, so a `lib.mkIf workstation`
+wrapper left it enabled on inotmac. `home/nix-index.nix` assigns the flag
+instead.
+
+**Directory jumping:** zsh named directories (`~dots`, `~proj`, `~docs`,
+`~dl`, `~cfg`, `~stor`) plus `autocd`, rather than one alias per directory,
+so no command names get used up. Yazi's `g` bookmarks read the same
+`dirHashes`, and its defaults already cover `g h`/`g c`/`g d`.
+
+**git:** `pull.ff = "only"` was chosen over `pull.rebase`. lazygit 0.65
+calls its pager list `git.diffRenderers`, not the old `git.paging`.
+
+**nh** (nix-output-monitor progress, nvd diff, `nh clean`) was considered
+and **not adopted**. It replaces `nixos-rebuild` as the command you run,
+which goes against the justfile's verbatim-commands rule, and its cleaner
+duplicates `nix.gc`. If the package diff is wanted, an `nvd diff` line in
+`just switch` gets it without a new tool.
+
 ## Host verification log (moved from CLAUDE.md, 2026-10-03)
 
 Dated live-verification record; `CLAUDE.md`'s Hosts table keeps only current
