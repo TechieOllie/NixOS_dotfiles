@@ -114,6 +114,10 @@ in
         shell = {
           launch_apps_as_systemd_services = true;
 
+          # No avatar_path, deliberately: unset, Noctalia shows the account's
+          # AccountsService picture, which modules/system/users.nix declares
+          # for the greeter too. Setting it here would be a second source.
+
           # Noctalia's own polkit agent. niri's upstream module starts no
           # authentication agent of its own, so without this a pkexec prompt
           # from anything graphical (lact, the Docker socket, a GParted-style

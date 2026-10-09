@@ -97,16 +97,37 @@
   # itself writes. The directory is declared too, at the 0700 root:root the
   # daemon creates it with — without it systemd-tmpfiles would create the
   # parent implicitly at 0755.
+  #
+  # The primary user's account picture rides the same mechanism, split in
+  # two. The image itself *is* declared: an `L+` symlink at the path
+  # accountsservice keeps icons under, replaced on every activation, so
+  # assets/avatar.jpg is the picture on every host. The greeter and GDM read
+  # it through AccountsService's IconFile, and Noctalia falls back to the
+  # same property whenever its own shell.avatar_path is unset, which is why
+  # home/noctalia.nix doesn't set one. Picking a new picture in Noctalia's
+  # settings writes both a copy over this symlink and an avatar_path into
+  # its sidecar; the next activation puts the symlink back, but the sidecar
+  # key has to be deleted by hand — see the Noctalia gotcha in CLAUDE.md.
+  #
+  # Pointing the account *at* that path is the seed half: with no Icon= key
+  # accountsservice falls back to ~/.face, which the greeter user can't read
+  # through a 0700 home. So an account that already has an ini needs Icon=
+  # set once by hand, exactly like Language= above — on the desktop it
+  # already is, because Noctalia's SetIconFile call wrote it.
   systemd.tmpfiles.rules =
     let
       localised = builtins.filter (u: (u.language or null) != null) (vars.extraUsers or [ ]);
+      avatar = "/var/lib/AccountsService/icons/${vars.user.name}";
     in
-    lib.optionals (localised != [ ]) (
-      [ "d /var/lib/AccountsService/users 0700 root root -" ]
-      ++ map (
-        u: "f /var/lib/AccountsService/users/${u.name} 0600 root root - [User]\\nLanguage=${u.language}\\n"
-      ) localised
-    );
+    [
+      "d /var/lib/AccountsService/users 0700 root root -"
+      "d /var/lib/AccountsService/icons 0775 root root -"
+      "L+ ${avatar} - - - - ${../../assets/avatar.jpg}"
+      "f /var/lib/AccountsService/users/${vars.user.name} 0600 root root - [User]\\nIcon=${avatar}\\n"
+    ]
+    ++ map (
+      u: "f /var/lib/AccountsService/users/${u.name} 0600 root root - [User]\\nLanguage=${u.language}\\n"
+    ) localised;
 
   # A language nobody generated is a language GNOME silently falls back out
   # of — glibc has no fr_FR.UTF-8 unless it is built, and the session then

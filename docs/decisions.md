@@ -4700,6 +4700,43 @@ which goes against the justfile's verbatim-commands rule, and its cleaner
 duplicates `nix.gc`. If the package diff is wanted, an `nvd diff` line in
 `just switch` gets it without a new tool.
 
+## Input bump, xwayland-satellite unpinned, and the avatar declared (2026-10-09)
+
+**xwayland-satellite.** `nix flake update` moved nixpkgs to `e7439b6`
+(2026-10-08), which ships xwayland-satellite 0.8.3. That is the version
+`modules/desktop/niri.nix` had been pinning forward by `overrideAttrs` since
+2026-09-26: 0.8.2 dismissed override-redirect popups ~35 ms after mapping
+them (upstream 3273a0f, fixed by add2795), which broke Steam's top-bar
+menus. The pin is gone and the module uses a bare `pkgs.xwayland-satellite`
+again. If Steam's menus start flashing shut again, check that version first.
+
+**The account picture.** The picture was set through Noctalia's settings,
+which does two things (`src/shell/profile/avatar_path.cpp`): it re-encodes
+the image to a 512px PNG and hands it to AccountsService's `SetIconFile`,
+which copies it to `/var/lib/AccountsService/icons/<user>`, and it writes
+`shell.avatar_path` into the sidecar. The greeter (and GDM on inotmac) only
+read AccountsService's `IconFile`. Noctalia reads `avatar_path` first and
+falls back to `IconFile`. So AccountsService is the one source that
+reaches everything. `modules/system/users.nix` now `L+`-symlinks
+`assets/avatar.jpg` to that path on every activation, and seeds `Icon=`
+into the account's ini with an `f` rule. The seed is needed because with
+no `Icon=` key accountsservice falls back to `~/.face`, which the greeter
+can't read through a 0700 home. Like the `Language=` seed, it only reaches
+an account with no ini yet. accountsservice stores the `Icon=` path as a
+plain string with no symlink check (`user.c`), so the store symlink is
+fine. The desktop's sidecar `shell.avatar_path` was deleted (Noctalia
+stopped, key removed, started again); its log then showed `session user
+avatar path: /var/lib/AccountsService/icons/ol`.
+
+**A new community template can miss its first run.** After the terminal
+toolkit switch, Noctalia tried to apply the new `bat` and `fzf` community
+templates before it had finished downloading them, and logged `failed to
+open template input`. fzf recovered on a later pass and bat didn't. Since
+templates only re-run on a palette change, bat stayed unthemed, and delta
+printed `Unknown theme 'noctalia'` on every diff. `noctalia msg
+templates-apply` re-renders everything for the current palette and fixed
+it. Run that after a switch that adds a community id.
+
 ## Host verification log (moved from CLAUDE.md, 2026-10-03)
 
 Dated live-verification record; `CLAUDE.md`'s Hosts table keeps only current
