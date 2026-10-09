@@ -62,7 +62,7 @@
     autocd = true;
     dirHashes = {
       dots = "${config.home.homeDirectory}/.dotfiles";
-      proj = "${config.home.homeDirectory}/Documents/Projects";
+      proj = "${config.home.homeDirectory}/Projects";
       docs = "${config.home.homeDirectory}/Documents";
       dl = "${config.home.homeDirectory}/Downloads";
       cfg = config.xdg.configHome;
