@@ -7,7 +7,7 @@
 # environment, so there's no per-host axis of variation a flag would
 # express — same reasoning ARCHITECTURE.md gives for dropping the
 # bluetooth and sshAgentUnlock flags.
-{ ... }:
+{ pkgs, ... }:
 {
   programs.zsh.enable = true;
 
@@ -27,13 +27,35 @@
   # arrow-key bindings fall over.
   #
   # So the entry has to be present on the *destination*, whether or not
-  # that host has any use for the terminal itself. enableAllTerminfo
-  # rather than a bare `pkgs.ghostty.terminfo` because the failure is
-  # about arriving TERM values in general, not about Ghostty: the option
-  # covers alacritty/foot/kitty/wezterm/tmux and the rest by the same
-  # argument, costs a handful of small terminfo-only outputs, and needs
-  # no edit the next time the operator changes terminal. Verified at
-  # this pin: `ghostty` is in the option's own package list
-  # (nixos/modules/config/terminfo.nix).
-  environment.enableAllTerminfo = true;
+  # that host has any use for the terminal itself — and for arriving TERM
+  # values in general, not just Ghostty's, so that the next change of
+  # terminal needs no edit here.
+  #
+  # This is environment.enableAllTerminfo's own package list
+  # (nixos/modules/config/terminfo.nix) minus contour, and should go back
+  # to that one option once contour builds again. At the 2026-10-08 nixpkgs
+  # pin contour 0.6.3 fails to compile (`simd::native_simd` errors in
+  # Image.cpp), and its `terminfo` is an output of the full package, so the
+  # option alone pulled a from-source build of the whole terminal emulator
+  # into every host's closure and failed it. Nothing is lost by leaving it
+  # out: ncurses already ships a `contour` entry of its own. Check with
+  # `nix build nixpkgs#contour.terminfo` against the locked input;
+  # NixOS/nixpkgs#569719 (contour 0.7.0) is the likely fix.
+  environment.systemPackages = map (p: p.terminfo) (
+    with pkgs.pkgsBuildBuild;
+    [
+      alacritty
+      foot
+      ghostty
+      kitty
+      mtm
+      rio
+      rxvt-unicode-unwrapped
+      rxvt-unicode-unwrapped-emoji
+      st
+      tmux
+      wezterm
+      yaft
+    ]
+  );
 }
