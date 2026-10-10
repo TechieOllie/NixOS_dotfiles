@@ -4772,6 +4772,18 @@ no systemd-boot entry limit.
   (`KillSignal=SIGINT`, its own stop; save is `SIGUSR1`), capturing whichever
   output niri reports as focused at start time, so no connector name is
   written down. 60 s at 60 fps in RAM, desktop audio only.
+- **…and it starts itself with a game.** A `replay-auto` user unit runs
+  `replay watch`, which follows `niri msg --json event-stream` and starts the
+  buffer while any game window is open, stopping it 15 s after the last one
+  closes (launchers swap windows; the grace keeps one buffer across the
+  swap). It never stops a buffer it didn't start. Games are recognised by
+  app_id only — `^steam_app_[0-9]+$` or `\.exe$` — because niri reports
+  xwayland-satellite's pid for every X11 window, so a game's environment
+  can't be read; native Linux games aren't caught and need the key. The
+  watcher's state machine was checked against a scripted fake event stream
+  with stubbed systemctl; the real app_ids are still unconfirmed.
+- **`just switch` runs `nh os switch --ask`**, for the package diff before
+  activation. Without `--ask` nh activates straight after the diff.
 - **Backups: restic, deferred.** The operator picked restic over Pika
   Backup (declarative timer, password in sops, runs without a login) and
   postponed it. Open when it is picked up: destination (the 2T Seagate

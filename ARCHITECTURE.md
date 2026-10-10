@@ -674,9 +674,10 @@ Choosing between the two is a per-file judgment call, not a rule: store-copy by 
 default:
     @just --list
 
-# Build and switch to the current host's configuration
+# Build and switch to the current host's configuration (through nh, for
+# its package diff; --ask waits for confirmation before activating)
 switch host=`hostname`:
-    nixos-rebuild switch --sudo --flake .#{{host}}
+    nh os switch --ask . -H {{host}}
 
 # Build without switching — the safe way to test a host
 build host=`hostname`:

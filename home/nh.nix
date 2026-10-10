@@ -1,7 +1,8 @@
 # nh, a front end for nixos-rebuild: `nh os switch` builds with a progress
-# tree, shows a package diff of the new generation against the running one,
-# and asks before activating. NH_FLAKE points at this host's own clone, so
-# the flake argument can be left off.
+# tree and shows a package diff of the new generation against the running
+# one — and, given `--ask`, waits for confirmation before activating.
+# `just switch` runs it that way. NH_FLAKE points at this host's own clone,
+# so the flake argument can be left off when calling it by hand.
 #
 # Its own cleaner (programs.nh.clean) stays off: nix.gc in
 # modules/system/nix.nix already owns garbage collection, and nh warns when

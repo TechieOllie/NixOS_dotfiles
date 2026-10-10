@@ -13,13 +13,17 @@ default:
 # Build and switch to a host's configuration. Destructive — this is the one
 # recipe that changes a running machine.
 #
-# `--sudo` rather than a `sudo` prefix on the whole command: it elevates only
-# the activation step, so the build and the flake evaluation still run as the
-# invoking user, keeping their nix.conf and substituters and avoiding git's
-# dubious-ownership check on a tree root doesn't own. Only the VM has
-# passwordless wheel sudo, so expect a password prompt on a real host.
+# Through nh (home/nh.nix) rather than nixos-rebuild, for its build progress
+# view and the package diff against the running generation; `--ask` holds
+# activation until that diff has been read and confirmed. nh elevates only
+# the activation step itself, as `nixos-rebuild --sudo` did, so the build
+# and the flake evaluation still run as the invoking user, keeping their
+# nix.conf and substituters and avoiding git's dubious-ownership check on a
+# tree root doesn't own. Only the VM has passwordless wheel sudo, so expect
+# a password prompt on a real host. nh exists only where
+# features.workstation is on — every host with a clone to run `just` in.
 switch host=`hostname`:
-    nixos-rebuild switch --sudo --flake .#{{ host }}
+    nh os switch --ask . -H {{ host }}
 
 # Build a host's system closure without switching to it.
 build host=`hostname`:
