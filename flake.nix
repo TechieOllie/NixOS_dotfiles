@@ -191,6 +191,13 @@
       # nixosConfigurations, so a change that breaks Millennium's wiring at
       # eval time still fails here. Drop this the day upstream's FOD stops
       # being a build (nixpkgs#382086 would also make it moot).
+      #
+      # The same host also skips one protontricks test. Its package is always
+      # rebuilt (programs.steam bakes extraCompatPaths into it, so it is never
+      # in a cache), and 1.15.0 added test_get_runtime_library_paths, which
+      # runs the real steam-run — a bubblewrap sandbox nested inside Nix's.
+      # That passes on a NixOS host and fails on GitHub's Ubuntu runner, so
+      # it is skipped here only; the machine still runs the full suite.
       ciClosure =
         host:
         (
@@ -201,6 +208,14 @@
                   { lib, pkgs, ... }:
                   {
                     programs.steam.package = lib.mkForce pkgs.steam;
+                    # makeOverridable, because overridePythonAttrs drops the
+                    # .override the steam module calls to add extraCompatPaths.
+                    programs.steam.protontricks.package = lib.makeOverridable (
+                      args:
+                      (pkgs.protontricks.override args).overridePythonAttrs (old: {
+                        disabledTests = (old.disabledTests or [ ]) ++ [ "test_get_runtime_library_paths" ];
+                      })
+                    ) { };
                   }
                 )
               ];
