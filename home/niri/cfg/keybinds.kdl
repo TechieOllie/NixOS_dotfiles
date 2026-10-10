@@ -152,6 +152,10 @@ binds {
     // The operator's own slurp + grim + Satty script (home/screenshot.nix),
     // not Noctalia's screenshot IPC.
     Mod+Shift+S                         { spawn "screenshot"; }
+    // Replay buffer (home/gpu-screen-recorder.nix), on ShadowPlay's own keys.
+    // Only the gaming host has `replay`; elsewhere these spawn nothing.
+    Alt+Shift+F10                       hotkey-overlay-title="Replay Buffer: start/stop" { spawn "replay" "toggle"; }
+    Alt+F10                             hotkey-overlay-title="Replay Buffer: save last minute" { spawn "replay" "save"; }
 
     // ─── Display ───
     Mod+P                               { spawn-sh "noctalia msg panel-toggle elijaharch/wl-screen-mirror:controls"; }

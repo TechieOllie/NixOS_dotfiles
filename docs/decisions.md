@@ -4759,16 +4759,19 @@ no systemd-boot entry limit.
   `fileSystems."/".fsType`, not a feature flag.
 - **nh without `nh clean`**: `nix.gc` already owns collection.
 - **Recorders on `features.gaming`.** GPU Screen Recorder through the NixOS
-  module (it creates the `gsr-kms-server`/`gsr-global-hotkeys` capability
-  wrappers) with its overlay run as this repo's own user unit, launching the
-  *system-profile* `gsr-ui`: the module rebuilds the UI against
-  `/run/wrappers`, and a `pkgs.gpu-screen-recorder-ui` store path would not
-  find them. gsr-ui got native Wayland (layer-shell) support in the 1.x
-  series and is 1.13.10 at this pin; it grabs all keyboards behind a virtual
-  one for its hotkeys, so a future key remapper (keyd and the like) must be
-  told to ignore "gsr-ui virtual keyboard". OBS needs no plugin for screen
-  capture on niri (PipeWire portal); `obs-vkcapture` is left out until
-  wanted.
+  module, for the `gsr-kms-server` capability wrapper that lets it capture a
+  monitor without a portal prompt. OBS needs no plugin for screen capture on
+  niri (PipeWire portal); `obs-vkcapture` is left out until wanted.
+- **The gsr-ui overlay was dropped before it ever ran.** It was first wired
+  as an always-on user unit, then reversed the same day, before any switch:
+  to catch Alt+Z under Wayland it grabs every physical keyboard and re-emits
+  input through a virtual one, which is a lot to keep running in front of the
+  keyboard all session. Instead `home/gpu-screen-recorder.nix` ships a
+  `replay toggle|save` script bound to niri keys (Alt+Shift+F10 / Alt+F10,
+  ShadowPlay's own). The recorder runs as a transient user unit `gsr-replay`
+  (`KillSignal=SIGINT`, its own stop; save is `SIGUSR1`), capturing whichever
+  output niri reports as focused at start time, so no connector name is
+  written down. 60 s at 60 fps in RAM, desktop audio only.
 - **Backups: restic, deferred.** The operator picked restic over Pika
   Backup (declarative timer, password in sops, runs without a login) and
   postponed it. Open when it is picked up: destination (the 2T Seagate

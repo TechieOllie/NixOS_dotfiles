@@ -9,9 +9,9 @@ file landing here is that NixOS itself has to configure something (a
 `programs.*` module, a firewall hole, a driver).
 
 `gpu-screen-recorder.nix` (`config.features.gaming`) is here for the same
-reason: its capture and hotkey helpers need capability wrappers, which only
-NixOS can create. Its overlay daemon is the user half, in
-`home/gpu-screen-recorder.nix`.
+reason: its capture helper needs a capability wrapper, which only NixOS can
+create. The on-demand `replay` command bound to niri keys is the user half,
+in `home/gpu-screen-recorder.nix`.
 
 `steam.nix` (`config.features.gaming`): Steam patched by
 Millennium, running games under `proton-cachyos`, plus 32-bit graphics
