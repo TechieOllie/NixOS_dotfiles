@@ -4789,6 +4789,15 @@ no systemd-boot entry limit.
   logging `no drm found, capture will fail` and every later save empty.
   `--kill-whom=main` fixes it. The stubbed test couldn't have caught this —
   it had no second process in the unit.
+- **A start must never end the watcher.** Stopping the buffer by hand while a
+  game was open let the watcher see the game, read the still-deactivating
+  unit as not running, and call `systemd-run` on a name still taken; the
+  failure ended the `set -e` script, and with `Restart=on-failure` and no
+  delay it hit systemd's start limit within a second, leaving auto-start off
+  for the session. The watcher now treats any not-fully-stopped state as
+  busy, a failed start raises a notification and is retried on the next
+  window event, and `RestartSec = 5` keeps a recurring fault from exhausting
+  the start limit.
 - **`just switch` runs `nh os switch --ask`**, for the package diff before
   activation. Without `--ask` nh activates straight after the diff.
 - **Backups: restic, deferred.** The operator picked restic over Pika

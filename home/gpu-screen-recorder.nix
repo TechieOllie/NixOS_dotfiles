@@ -58,16 +58,29 @@ let
 
       running() { systemctl --user -q is-active "$unit"; }
 
+      # Anything but fully stopped. A buffer still shutting down reads as
+      # not-running to is-active, but its unit name is still taken, so a
+      # systemd-run in that window fails — which once killed the watcher.
+      busy() {
+        case "$(systemctl --user is-active "$unit" || true)" in
+          active | activating | deactivating | reloading | refreshing) return 0 ;;
+          *) return 1 ;;
+        esac
+      }
+
       start() {
         output=$(niri msg --json focused-output | jq -r .name)
         mkdir -p "$dir"
         # 60 s at 60 fps, kept in RAM (the recorder's default storage;
         # disk mode would write to the NVMe continuously). Desktop audio
         # only, no microphone.
-        systemd-run --user --quiet --collect --unit="$unit" \
+        if ! systemd-run --user --quiet --collect --unit="$unit" \
           -p KillSignal=SIGINT \
           gpu-screen-recorder -w "$output" -f 60 -r 60 \
-            -a default_output -c mp4 -o "$dir"
+            -a default_output -c mp4 -o "$dir"; then
+          notify-send -u critical -i dialog-error "Replay buffer failed to start" "journalctl --user -u gsr-replay"
+          return 1
+        fi
         notify-send -i media-record "Replay buffer on" "Recording $output — Alt+F10 saves the last minute"
       }
 
@@ -125,7 +138,9 @@ let
 
           if (( ''${#games[@]} )); then
             deadline=0
-            if ! running; then start; ours=1; fi
+            # A failed start must not end the watcher; the next window
+            # event retries it.
+            if ! busy; then start && ours=1; fi
           elif (( ours )) && (( ! deadline )); then
             deadline=$(( $(date +%s) + grace ))
           fi
@@ -134,7 +149,7 @@ let
 
       case "''${1:-}" in
         toggle)
-          if running; then stop; else start; fi
+          if running; then stop; elif ! busy; then start; fi
           ;;
         save)
           if ! running; then
@@ -174,6 +189,9 @@ lib.mkIf (osConfig.features.gaming && osConfig.features.niri) {
     Service = {
       ExecStart = "${lib.getExe replay} watch";
       Restart = "on-failure";
+      # Spaced out so a fault that recurs on every start (it sees the open
+      # game straight away) can't exhaust systemd's start limit in a second.
+      RestartSec = 5;
     };
     Install.WantedBy = [ "graphical-session.target" ];
   };
