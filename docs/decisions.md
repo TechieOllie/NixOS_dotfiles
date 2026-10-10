@@ -4835,7 +4835,13 @@ state. Where a fuller write-up exists, the entry points at it.
   tree from `$out/bin` to `$out` (Heroic's link dangled, "Wine not found"),
   the relinked x86-64-v3 build, the declared `proton-ge-bin` fallback and
   `ntsync` all verified live: `/dev/ntsync` present, DEATH STRANDING
-  DIRECTOR'S CUT launching through Heroic.
+  DIRECTOR'S CUT launching through Heroic. Same day, the maintenance set:
+  smartd monitoring the NVMe and the Seagate (the 500G SATA SSD is not
+  currently connected), the btrfs scrub timer on `/` only, and nh behind
+  `just switch`. The replay buffer auto-started for DEATH STRANDING
+  (`steam_app_0`), and two consecutive Alt+F10 saves after the
+  `--kill-whom=main` fix gave 38 s (all the buffer held) and 61 s clips with
+  `gsr-kms-server` still alive.
 
 **`inotmac`**
 
