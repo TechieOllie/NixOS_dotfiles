@@ -4779,9 +4779,16 @@ no systemd-boot entry limit.
   swap). It never stops a buffer it didn't start. Games are recognised by
   app_id only — `^steam_app_[0-9]+$` or `\.exe$` — because niri reports
   xwayland-satellite's pid for every X11 window, so a game's environment
-  can't be read; native Linux games aren't caught and need the key. The
-  watcher's state machine was checked against a scripted fake event stream
-  with stubbed systemctl; the real app_ids are still unconfirmed.
+  can't be read; native Linux games aren't caught and need the key. Heroic's
+  games come through umu with SteamAppId 0, so they are `steam_app_0` — not
+  the `.exe` class first assumed. Verified live 2026-10-10 with DEATH
+  STRANDING: auto-start fired and Alt+F10 saved a clip.
+- **Saving must signal the main process only.** `systemctl kill` defaults to
+  `--kill-whom=all`, and `gsr-kms-server` runs in the same unit with no
+  SIGUSR1 handler: the first live save killed it, leaving the recorder
+  logging `no drm found, capture will fail` and every later save empty.
+  `--kill-whom=main` fixes it. The stubbed test couldn't have caught this —
+  it had no second process in the unit.
 - **`just switch` runs `nh os switch --ask`**, for the package diff before
   activation. Without `--ask` nh activates straight after the diff.
 - **Backups: restic, deferred.** The operator picked restic over Pika

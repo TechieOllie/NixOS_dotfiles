@@ -33,10 +33,11 @@ let
   # A game is recognised by its window's app_id alone, because that is all
   # niri can say about an X11 window: every client of xwayland-satellite
   # reports the satellite's own pid, so the game's environment can't be
-  # inspected. Proton games show up two ways — Steam's own `steam_app_<id>`,
-  # and Wine's default WM_CLASS of the executable name (`deathstranding.exe`)
-  # for anything else, Heroic included. A native Linux game matches neither
-  # and needs Alt+Shift+F10.
+  # inspected. Proton names a game's window class `steam_app_<SteamAppId>`,
+  # and umu passes Heroic's games SteamAppId 0, so DEATH STRANDING through
+  # Heroic is `steam_app_0` (seen live). `.exe` catches Wine run without
+  # Proton's naming, whose default WM_CLASS is the executable name. A native
+  # Linux game matches neither and needs Alt+Shift+F10.
   gamePattern = ''^steam_app_[0-9]+$|\.exe$'';
 
   replay = pkgs.writeShellApplication {
@@ -140,7 +141,11 @@ let
             notify-send -i dialog-warning "Replay buffer is off" "Alt+Shift+F10 starts it"
             exit 1
           fi
-          systemctl --user kill -s SIGUSR1 "$unit"
+          # The main process only: by default systemctl signals the whole
+          # unit, and gsr-kms-server (the capture helper, in the same
+          # cgroup) has no SIGUSR1 handler, so it died on the first save and
+          # every later save came out empty.
+          systemctl --user kill --kill-whom=main -s SIGUSR1 "$unit"
           notify-send -i media-record "Replay saved" "$dir"
           ;;
         watch)
