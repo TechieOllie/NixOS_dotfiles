@@ -4762,6 +4762,11 @@ state. Where a fuller write-up exists, the entry points at it.
 - 2026-09-28: the OfficeJet `ensurePrinters` queue
   (`HP_OfficeJet_4650_series`) and the Z407 default-output rule both made
   declarative and verified live.
+- 2026-10-10: after the 2026-10-09 input bump moved proton-cachyos's tool
+  tree from `$out/bin` to `$out` (Heroic's link dangled, "Wine not found"),
+  the relinked x86-64-v3 build, the declared `proton-ge-bin` fallback and
+  `ntsync` all verified live: `/dev/ntsync` present, DEATH STRANDING
+  DIRECTOR'S CUT launching through Heroic.
 
 **`inotmac`**
 
