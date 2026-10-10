@@ -40,5 +40,13 @@ lib.mkIf osConfig.features.gaming {
   # chaotic's 2026-10 layout change; a stale /bin link dangles silently and
   # Heroic only says "Wine not found" at launch, so if that returns, check
   # where `proton` sits in the store path before anything else.
-  home.file.".config/heroic/tools/proton/proton-cachyos".source = "${pkgs.proton-cachyos}";
+  #
+  # The link names are load-bearing: Heroic stores each game's chosen
+  # Proton as a path under this directory (GamesConfig/<id>.json), so
+  # renaming a link orphans every game using it. "proton-cachyos" holds
+  # the x86-64-v3 build now, and "GE-Proton-latest" is the name Heroic's
+  # own downloader used for the copy this replaced.
+  home.file.".config/heroic/tools/proton/proton-cachyos".source = "${pkgs.proton-cachyos_x86_64_v3}";
+  home.file.".config/heroic/tools/proton/GE-Proton-latest".source =
+    pkgs.proton-ge-bin.steamcompattool;
 }

@@ -41,16 +41,23 @@
       # made to follow ours.
       package = pkgs.millennium-steam;
 
-      # proton-cachyos over stock Proton or Proton GE, by operator choice:
-      # CachyOS's fork carries the scheduler and Wine patches that machine
-      # is already tuned around. It appears in Steam's per-game
-      # compatibility-tool dropdown once selected.
+      # proton-cachyos over stock Proton, by operator choice: CachyOS's fork
+      # carries the scheduler and Wine patches that machine is already
+      # tuned around. The x86-64-v3 (AVX2) build, since the only gaming host
+      # is a Zen 3; Steam lists it as "Proton-CachyOS x86-64-v3", a
+      # different internal name from the generic build's, so switching
+      # variants means re-picking it in Steam's compatibility settings.
+      # GE-Proton rides along as the fallback for games CachyOS's build
+      # mishandles — it is what ProtonDB reports most often recommend.
       #
       # Declaring it here rather than installing protonup-qt/protonplus is
       # deliberate: those are GUI downloaders that write Proton builds into
       # ~/.steam by hand, i.e. exactly the app-owned mutable state that
       # this repo's standing gotchas are about.
-      extraCompatPackages = [ pkgs.proton-cachyos ];
+      extraCompatPackages = [
+        pkgs.proton-cachyos_x86_64_v3
+        pkgs.proton-ge-bin
+      ];
 
       # Winetricks, taught to find Steam's Proton prefixes. This flag is
       # the only correct way to install it: it doesn't merely add the
