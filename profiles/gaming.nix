@@ -15,6 +15,7 @@
   imports = [
     ../modules/programs/steam.nix
     ../modules/hardware/controllers.nix
+    ../modules/hardware/ntsync.nix
   ];
 
   # mkDefault, not a plain value: a host's own features.nix sets normal

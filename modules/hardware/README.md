@@ -10,11 +10,16 @@ desktop's CachyOS kernel and its `lact` GPU control all live directly in
 that host's own `default.nix`, because they describe one particular machine
 rather than a capability another host could opt into.
 
-Currently just `controllers.nix` (`config.features.gaming`): the `xone` and
+`controllers.nix` (`config.features.gaming`): the `xone` and
 `xpadneo` out-of-tree kernel modules for wired/dongle and Bluetooth Xbox
 controllers respectively. Being out-of-tree kernel modules is exactly why
 they're here and not in `home/` — they build against the running kernel, and
 are the part of the gaming stack most likely to break on a kernel bump.
+
+`ntsync.nix` (`config.features.gaming`) loads the in-tree `ntsync` kernel
+module, which Proton uses for Windows synchronisation primitives when
+`/dev/ntsync` exists. Here rather than in `modules/programs/steam.nix`
+because it serves every Wine/Proton launcher, Heroic included.
 
 `audio.nix` and `graphics.nix` were once planned for this directory and are
 not needed: PipeWire arrives with
