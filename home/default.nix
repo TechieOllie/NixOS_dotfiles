@@ -47,6 +47,12 @@
     ./claude-code.nix
     ./gh.nix
     ./direnv.nix
+    ./nh.nix
+    ./jq.nix
+    ./tealdeer.nix
+    ./dust.nix
+    ./gpu-screen-recorder.nix
+    ./obs-studio.nix
 
     # No GNOME-host app modules live here. GNOME ships its own viewer set,
     # and the apps it lacks (Chrome, Picard, Rhythmbox) are wanted by

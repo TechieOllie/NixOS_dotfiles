@@ -28,6 +28,10 @@
   # and display resolution with the SPICE client.
   services.spice-vdagentd.enable = true;
 
+  # A virtio disk has no SMART data, and smartd fails its unit when
+  # autodetection finds nothing to monitor (modules/system/disk-health.nix).
+  services.smartd.enable = false;
+
   # ── Non-interactive testing ─────────────────────────────────────────────
   #
   # Everything below exists so this host can be driven end-to-end over SSH

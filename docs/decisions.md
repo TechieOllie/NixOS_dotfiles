@@ -4737,6 +4737,44 @@ printed `Unknown theme 'noctalia'` on every diff. `noctalia msg
 templates-apply` re-renders everything for the current palette and fixed
 it. Run that after a switch that adds a community id.
 
+## Maintenance tooling, two recorders, and backups deferred (2026-10-10)
+
+Asked for from a list of suggestions, after a gap check against the
+desktop's evaluated config found fwupd, smartd and btrfs scrub all off and
+no systemd-boot entry limit.
+
+- **fwupd and smartd are base, not features.** They describe facts about
+  every physical machine, not choices. smartd's only exception is the VM —
+  with `DEVICESCAN` and no SMART-capable disk smartd exits non-zero and
+  fails its unit — so the module sets `mkDefault true` and the VM says
+  `false` in its own `default.nix`. Notifications go through
+  `systembus-notify`, because no host has mail and `wall` reaches only
+  open terminals. Its known trade-off, per the NixOS option text: any local
+  process can raise a desktop notification through it. Accepted, including
+  on inotmac.
+- **btrfs scrub is pinned to `/`.** `services.btrfs.autoScrub.fileSystems`
+  defaults to every btrfs *mount point*, and scrub covers the whole
+  filesystem whichever subvolume it is pointed at, so the default would scrub
+  the desktop's one filesystem seven times a month. Gated on
+  `fileSystems."/".fsType`, not a feature flag.
+- **nh without `nh clean`**: `nix.gc` already owns collection.
+- **Recorders on `features.gaming`.** GPU Screen Recorder through the NixOS
+  module (it creates the `gsr-kms-server`/`gsr-global-hotkeys` capability
+  wrappers) with its overlay run as this repo's own user unit, launching the
+  *system-profile* `gsr-ui`: the module rebuilds the UI against
+  `/run/wrappers`, and a `pkgs.gpu-screen-recorder-ui` store path would not
+  find them. gsr-ui got native Wayland (layer-shell) support in the 1.x
+  series and is 1.13.10 at this pin; it grabs all keyboards behind a virtual
+  one for its hotkeys, so a future key remapper (keyd and the like) must be
+  told to ignore "gsr-ui virtual keyboard". OBS needs no plugin for screen
+  capture on niri (PipeWire portal); `obs-vkcapture` is left out until
+  wanted.
+- **Backups: restic, deferred.** The operator picked restic over Pika
+  Backup (declarative timer, password in sops, runs without a login) and
+  postponed it. Open when it is picked up: destination (the 2T Seagate
+  alone, or also off-site) and contents (the suggested default was `/home`
+  minus caches, Trash and the `@steam`/`@games` subvolumes).
+
 ## Host verification log (moved from CLAUDE.md, 2026-10-03)
 
 Dated live-verification record; `CLAUDE.md`'s Hosts table keeps only current

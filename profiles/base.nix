@@ -14,5 +14,7 @@
     ../modules/system/fonts.nix
     ../modules/system/nix-ld.nix
     ../modules/system/unfree.nix
+    ../modules/system/firmware.nix
+    ../modules/system/disk-health.nix
   ];
 }

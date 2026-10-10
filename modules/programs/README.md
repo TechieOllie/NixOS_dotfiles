@@ -8,7 +8,12 @@ this repo need no module at all — they live in `home/` — so the bar for a
 file landing here is that NixOS itself has to configure something (a
 `programs.*` module, a firewall hole, a driver).
 
-Currently just `steam.nix` (`config.features.gaming`): Steam patched by
+`gpu-screen-recorder.nix` (`config.features.gaming`) is here for the same
+reason: its capture and hotkey helpers need capability wrappers, which only
+NixOS can create. Its overlay daemon is the user half, in
+`home/gpu-screen-recorder.nix`.
+
+`steam.nix` (`config.features.gaming`): Steam patched by
 Millennium, running games under `proton-cachyos`, plus 32-bit graphics
 support and Steam's own firewall ports. It's here rather than in `home/`
 because all of that is NixOS-side; the user-level half of the same feature —

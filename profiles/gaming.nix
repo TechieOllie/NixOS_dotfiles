@@ -14,6 +14,7 @@
 {
   imports = [
     ../modules/programs/steam.nix
+    ../modules/programs/gpu-screen-recorder.nix
     ../modules/hardware/controllers.nix
     ../modules/hardware/ntsync.nix
   ];
