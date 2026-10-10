@@ -35,8 +35,10 @@ lib.mkIf osConfig.features.gaming {
   # Heroic's own downloader, which writes real directories there — the
   # app-owned mutable state the standing gotchas are about.
   #
-  # The link target is $out/bin, not $out: that's where the Proton tool
-  # tree (proton, toolmanifest.vdf, files/) actually lives in this
-  # derivation.
-  home.file.".config/heroic/tools/proton/proton-cachyos".source = "${pkgs.proton-cachyos}/bin";
+  # The link target is the package root, which is where the Proton tool
+  # tree (proton, toolmanifest.vdf, files/) lives. It was $out/bin until
+  # chaotic's 2026-10 layout change; a stale /bin link dangles silently and
+  # Heroic only says "Wine not found" at launch, so if that returns, check
+  # where `proton` sits in the store path before anything else.
+  home.file.".config/heroic/tools/proton/proton-cachyos".source = "${pkgs.proton-cachyos}";
 }
