@@ -61,5 +61,13 @@ lib.mkIf config.features.niri {
   # Steam's top-bar menus and friends list flashing open and vanishing — and
   # read as a Steam regression. This module pinned 0.8.3 forward until the
   # 2026-10-09 input bump brought nixpkgs up to it; see docs/decisions.md.
-  environment.systemPackages = [ pkgs.xwayland-satellite ];
+  #
+  # wl-clipboard is the session's clipboard CLI. Anything that reads or
+  # writes the clipboard by shelling out to wl-copy/wl-paste from PATH
+  # (Claude Code's image paste is what found the gap) needs it installed,
+  # not just carried inside one script's closure like home/screenshot.nix.
+  environment.systemPackages = [
+    pkgs.xwayland-satellite
+    pkgs.wl-clipboard
+  ];
 }

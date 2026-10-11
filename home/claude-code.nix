@@ -24,10 +24,9 @@
 # Upstream's wrapper sets DISABLE_AUTOUPDATER, so the binary does not try to
 # update itself out of the store.
 #
-# Pasting an image (Ctrl+V) works by shelling out to `xclip` or `wl-paste`
-# from the caller's PATH, and the wrapper adds neither. wl-clipboard was
-# only ever inside home/screenshot.nix's own closure, so a screenshot sat
-# on the clipboard as image/png and the paste silently found nothing.
+# Pasting an image (Ctrl+V) shells out to `xclip` or `wl-paste` from PATH,
+# which the wrapper doesn't add; on niri hosts modules/desktop/niri.nix
+# installs wl-clipboard system-wide.
 {
   pkgs,
   lib,
@@ -36,8 +35,5 @@
   ...
 }:
 lib.mkIf osConfig.features.development {
-  home.packages = [
-    (pkgs.callPackage "${claude-code}/package.nix" { })
-    pkgs.wl-clipboard
-  ];
+  home.packages = [ (pkgs.callPackage "${claude-code}/package.nix" { }) ];
 }
