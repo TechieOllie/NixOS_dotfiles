@@ -24,18 +24,57 @@
 # Being unfree, it needs its name in modules/system/unfree.nix — the usual
 # useGlobalPkgs consequence, same as home/vscode.nix.
 #
-# Package only. IDEA writes its whole configuration — keymaps, plugins,
-# per-project SDK paths, the IDE's own JVM options — into a versioned
-# ~/.config/JetBrains/IntelliJIdea<version> directory that it migrates
-# between releases on first launch, and it has JetBrains' own Settings Sync
-# for carrying that between machines. Same call as home/vscode.nix: Nix's
-# job here is making sure the binary exists.
+# Package (plus the launcher below) only. IDEA writes its whole
+# configuration — keymaps, plugins, per-project SDK paths, the IDE's own JVM
+# options — into a versioned ~/.config/JetBrains/IntelliJIdea<version>
+# directory that it migrates between releases on first launch, and it has
+# JetBrains' own Settings Sync for carrying that between machines. Same call
+# as home/vscode.nix: Nix's job here is making sure the binary exists.
+#
+# `idea [dir]` opens a project (default: the current directory) the way
+# launching it from a terminal inside that project would, minus the
+# terminal. Two things that matters for:
+#   - setsid detaches it. Started from a shell, IDEA is part of that shell's
+#     session and dies with the terminal window.
+#   - direnv exec gives it the project's environment even when `idea` is run
+#     from somewhere else, and IDEA hands that environment to everything it
+#     starts (Gradle, run configurations). A blocked .envrc makes direnv
+#     refuse to run anything at all, so that case falls back to a plain
+#     launch. Caveat: IDEA is one process per user, so a second `idea` only
+#     opens a window in the running instance, which keeps the *first*
+#     project's environment. Quit IDEA to switch which shell it carries.
 {
   pkgs,
   lib,
   osConfig,
   ...
 }:
+let
+  idea = pkgs.writeShellApplication {
+    name = "idea";
+    runtimeInputs = [
+      pkgs.direnv
+      pkgs.util-linux
+      pkgs.coreutils
+    ];
+    text = ''
+      target=$(realpath -- "''${1:-.}")
+      dir=$target
+      [ -d "$dir" ] || dir=$(dirname -- "$dir")
+
+      run=(intellij-idea "$target")
+      if direnv exec "$dir" true >/dev/null 2>&1; then
+        run=(direnv exec "$dir" "''${run[@]}")
+      else
+        echo "idea: $dir's .envrc is blocked (direnv allow); opening without it" >&2
+      fi
+      setsid -f "''${run[@]}" >/dev/null 2>&1 </dev/null
+    '';
+  };
+in
 lib.mkIf osConfig.features.development {
-  home.packages = [ pkgs.intellij-idea ];
+  home.packages = [
+    pkgs.intellij-idea
+    idea
+  ];
 }
