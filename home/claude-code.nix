@@ -23,6 +23,11 @@
 # with `allowUnfree = true` and would silently bypass the allow-list above.
 # Upstream's wrapper sets DISABLE_AUTOUPDATER, so the binary does not try to
 # update itself out of the store.
+#
+# Pasting an image (Ctrl+V) works by shelling out to `xclip` or `wl-paste`
+# from the caller's PATH, and the wrapper adds neither. wl-clipboard was
+# only ever inside home/screenshot.nix's own closure, so a screenshot sat
+# on the clipboard as image/png and the paste silently found nothing.
 {
   pkgs,
   lib,
@@ -31,5 +36,8 @@
   ...
 }:
 lib.mkIf osConfig.features.development {
-  home.packages = [ (pkgs.callPackage "${claude-code}/package.nix" { }) ];
+  home.packages = [
+    (pkgs.callPackage "${claude-code}/package.nix" { })
+    pkgs.wl-clipboard
+  ];
 }

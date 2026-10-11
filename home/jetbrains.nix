@@ -31,18 +31,10 @@
 # JetBrains' own Settings Sync for carrying that between machines. Same call
 # as home/vscode.nix: Nix's job here is making sure the binary exists.
 #
-# `idea [dir]` opens a project (default: the current directory) the way
-# launching it from a terminal inside that project would, minus the
-# terminal. Two things that matters for:
-#   - setsid detaches it. Started from a shell, IDEA is part of that shell's
-#     session and dies with the terminal window.
-#   - direnv exec gives it the project's environment even when `idea` is run
-#     from somewhere else, and IDEA hands that environment to everything it
-#     starts (Gradle, run configurations). A blocked .envrc makes direnv
-#     refuse to run anything at all, so that case falls back to a plain
-#     launch. Caveat: IDEA is one process per user, so a second `idea` only
-#     opens a window in the running instance, which keeps the *first*
-#     project's environment. Quit IDEA to switch which shell it carries.
+# `idea [dir]` opens a project (default: the current directory) detached
+# with setsid: started from a shell, IDEA is part of that shell's session
+# and dies with the terminal window. It inherits the calling shell's
+# environment as-is, so run it from inside a project for its dev shell.
 {
   pkgs,
   lib,
@@ -52,26 +44,9 @@
 let
   idea = pkgs.writeShellApplication {
     name = "idea";
-    runtimeInputs = [
-      pkgs.direnv
-      pkgs.jq
-      pkgs.util-linux
-      pkgs.coreutils
-    ];
+    runtimeInputs = [ pkgs.util-linux ];
     text = ''
-      target=$(realpath -- "''${1:-.}")
-      dir=$target
-      [ -d "$dir" ] || dir=$(dirname -- "$dir")
-
-      # Asks rather than probing with `direnv exec … true`: that would run the
-      # project's shellHook once more just to throw the result away.
-      run=(intellij-idea "$target")
-      case $(cd "$dir" && direnv status --json | jq -r '.state.foundRC.allowed // "none"') in
-        0) run=(direnv exec "$dir" "''${run[@]}") ;;
-        none) ;;
-        *) echo "idea: $dir's .envrc is blocked (direnv allow); opening without it" >&2 ;;
-      esac
-      setsid -f "''${run[@]}" >/dev/null 2>&1 </dev/null
+      setsid -f intellij-idea "''${1:-.}" >/dev/null 2>&1 </dev/null
     '';
   };
 in
