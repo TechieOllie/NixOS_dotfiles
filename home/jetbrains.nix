@@ -54,6 +54,7 @@ let
     name = "idea";
     runtimeInputs = [
       pkgs.direnv
+      pkgs.jq
       pkgs.util-linux
       pkgs.coreutils
     ];
@@ -62,12 +63,14 @@ let
       dir=$target
       [ -d "$dir" ] || dir=$(dirname -- "$dir")
 
+      # Asks rather than probing with `direnv exec … true`: that would run the
+      # project's shellHook once more just to throw the result away.
       run=(intellij-idea "$target")
-      if direnv exec "$dir" true >/dev/null 2>&1; then
-        run=(direnv exec "$dir" "''${run[@]}")
-      else
-        echo "idea: $dir's .envrc is blocked (direnv allow); opening without it" >&2
-      fi
+      case $(cd "$dir" && direnv status --json | jq -r '.state.foundRC.allowed // "none"') in
+        0) run=(direnv exec "$dir" "''${run[@]}") ;;
+        none) ;;
+        *) echo "idea: $dir's .envrc is blocked (direnv allow); opening without it" >&2 ;;
+      esac
       setsid -f "''${run[@]}" >/dev/null 2>&1 </dev/null
     '';
   };
