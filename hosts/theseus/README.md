@@ -6,7 +6,7 @@ password hash. It's the desktop's setup on a laptop: `profiles/gaming.nix`,
 development, CAD and KDE Connect, and the Noctalia desktop, but on
 **Umbriel** instead of niri.
 
-Two properties no other host has:
+Three properties no other host has:
 
 - **Encrypted disk.** LUKS2 → LVM (swap + btrfs root), unlocked by the TPM at
   boot, with the install passphrase kept as a fallback slot. See
@@ -15,6 +15,13 @@ Two properties no other host has:
   `sudo` and polkit. **Not** for the greeter: the password typed there is
   what unlocks gnome-keyring, and with it the GitHub SSH key from
   `secrets.nix`. See `modules/desktop/greetd.nix`.
+- **Touchscreen.** Nothing is declared for it, on purpose. Umbriel enables
+  touch by default and, without `input.touch.map_to_output`, maps the screen
+  to the device's reported output, or else to the one built-in panel (`eDP-*`).
+  That means touch stays on the laptop screen when an external monitor is
+  plugged in. Add `[input.touch] map_to_output` to
+  `home/umbriel/cfg/input.toml`'s generator in `home/umbriel.nix` only if
+  that guess turns out wrong on the hardware.
 
 Not yet in `flake.nix`'s `nixosConfigurations`, deliberately: its
 `hardware-configuration.nix` doesn't exist until the machine has booted the
@@ -50,6 +57,9 @@ Left to do before this host can be installed, in order:
   - Wi-Fi
   - Steam under Umbriel's Xwayland
   - the panel's scale, which may need an `[output.eDP-1]` table
+  - the touchscreen: taps land where touched, and stay on the laptop panel
+    with an external monitor connected (`libinput list-devices` should show
+    it with the `touch` capability)
 
 See `CLAUDE.md`'s "Hosts" section for the authoritative, kept-current
 status.
