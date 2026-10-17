@@ -102,9 +102,9 @@ Responsibilities:
 
 In practice most of that wiring lives one level down, in `lib/mkHost.nix` —
 `flake.nix` itself is now little more than inputs plus one `mkHost { … }` call
-per host (today: `the-entertaining-nios-vm` and `the-entertaining-nios-laptop`;
-`hosts/the-entertaining-nios-desktop/` exists but is deliberately unwired until
-it's bootstrapped) and the `installer-iso` package. Note there is no per-host
+per host (`CLAUDE.md`'s "Hosts" table is the current list; `hosts/theseus/`
+exists but is deliberately unwired until its `hardware-configuration.nix` is
+generated at install) and the `installer-iso` package. Note there is no per-host
 `pkgs` construction and no overlay: `pkgs` comes from `nixosSystem` itself and
 is shared with Home Manager via `home-manager.useGlobalPkgs = true`.
 `home-manager.useUserPackages = true` goes with it, so `home.packages` are
@@ -185,8 +185,9 @@ Each physical machine has its own directory:
 ```
 hosts/
     the-entertaining-nios-vm/        # bootstrapped; the dev/verification host
-    the-entertaining-nios-laptop/    # wired and eval-clean, not yet installed
-    the-entertaining-nios-desktop/   # scaffold only, no nixosConfigurations entry
+    the-entertaining-nios-desktop/   # bootstrapped; the daily driver, niri
+    inotmac/                         # bootstrapped; the shared GNOME iMac
+    theseus/                         # scaffold only, no nixosConfigurations entry yet
     installer/                       # not a host: operator identity for installer-iso
 ```
 
@@ -198,7 +199,7 @@ public key isn't a secret, so none of the sops machinery applies there.
 Example:
 
 ```
-hosts/the-entertaining-nios-laptop/
+hosts/theseus/
     default.nix
     hardware-configuration.nix
     variables.nix
@@ -331,8 +332,11 @@ modules/
         unfree.nix         # nixpkgs.config.allowUnfreePredicate allow-list — moved here
                            # from desktop/ in Phase 7, see below
 
-    desktop/           # all gated on config.features.niri
-        niri.nix           # compositor package + session, system-level only
+    desktop/           # the shared stack gated on config.features.desktop,
+                       # each compositor on its own flag
+        session.nix        # what every compositor's session needs (OZONE, keyring, clipboard)
+        niri.nix           # compositor package + session, system-level only (features.niri)
+        umbriel.nix        # the other compositor, same shape (features.umbriel)
         greetd.nix
         noctalia.nix       # Noctalia Shell — native theming, replaces Stylix (see Phase 3)
         theming.nix        # cursor/icon-theme packages installed system-wide, for the greeter (see Phase 5)
@@ -376,7 +380,7 @@ umu-launcher, the only other pieces, are user-level and live in
 **Note that `features.gaming` gates four modules across two directories**
 (`programs/steam.nix`, `hardware/controllers.nix`, `home/heroic.nix`,
 `home/prismlauncher.nix`), exactly
-as `features.niri` gates all of `modules/desktop/`. One flag per *capability*,
+as `features.desktop` gates the shared half of `modules/desktop/`. One flag per *capability*,
 not one flag per file — a module owning one responsibility does not imply a
 capability owning one module.
 
@@ -454,7 +458,7 @@ Prefer `builtin_ids`/`community_ids` whenever the official template's own output
 `features.nix` holds only **capability toggles** — set as the `features` option (declared once in `modules/options.nix`, see above), expected to be overridden per host, and read via `config.features.x` with `lib.mkIf` inside modules. Being a module itself (not plain data), it sets `features` directly at normal priority, which overrides any `mkDefault` a profile set:
 
 ```nix
-# hosts/the-entertaining-nios-laptop/features.nix
+# hosts/<name>/features.nix
 { ... }:
 {
   features = {
@@ -463,23 +467,36 @@ Prefer `builtin_ids`/`community_ids` whenever the official template's own output
 }
 ```
 
-Only two flags exist today — `snapshots` and `niri`. Anything a host doesn't
+`modules/options.nix` is the full list of flags. Anything a host doesn't
 name simply keeps the `false` default; there's no need to spell out every
 flag per host.
 
 **Not every capability needs its own flag.** Bluetooth was originally planned as one (`features.bluetooth`, `modules/hardware/bluetooth.nix`), but was dropped once it became clear no host in this repo, real or planned, would ever want a desktop environment (Niri + Noctalia Shell) *without* Bluetooth — the only thing that would have driven a per-host difference. Noctalia's own `programs.noctalia.recommendedServices.enable` now turns Bluetooth on directly (`modules/desktop/noctalia.nix`), rather than through a flag that could never actually differ between hosts. The lesson generalizes: a flag earns its place by expressing a *real* axis of variation between hosts, not just because a capability is optional in the abstract — reserve `features.*` for toggles a host or profile might genuinely set differently.
 
-**`features.niri` is the canonical example of a flag read from both sides.**
-It gates the entire desktop stack, and does so through two different
+**`features.desktop` is the canonical example of a flag read from both sides.**
+It gates the entire Noctalia desktop stack, and does so through two different
 mechanisms depending on which side is asking. System modules
-(`modules/desktop/{niri,greetd,noctalia,theming,nautilus,unfree}.nix`) read
-`config.features.niri` and wrap themselves in `lib.mkIf`. Home Manager modules
-can't see NixOS `config` at all, so they self-gate on `osConfig.features.niri`
-instead (`home/niri.nix`, `home/noctalia.nix`, `home/cursor.nix`, ...) — which
+(`modules/desktop/{session,greetd,noctalia,theming,nautilus}.nix`) read
+`config.features.desktop` and wrap themselves in `lib.mkIf`. Home Manager modules
+can't see NixOS `config` at all, so they self-gate on `osConfig.features.desktop`
+instead (`home/noctalia.nix`, `home/cursor.nix`, ...) — which
 is why `home/default.nix` can import every user module unconditionally and
 still produce an inert result on a host without a desktop. Adding a
 desktop-only Home Manager module means adding that `osConfig` gate; forgetting
 it is the one way to leak desktop config onto a headless host.
+
+**The compositor is a separate, narrower flag.** Until 2026-10-17
+`features.niri` *was* the desktop flag, which was fine while niri was the only
+compositor. Adding Umbriel as a second one split it: `features.desktop` is the
+stack, while `features.niri` and `features.umbriel` each gate only what is
+their compositor's own: its system module (package, session entry, niri's
+xwayland-satellite), its `home/` module and live config, and the few
+compositor-specific pieces inside shared modules (Noctalia's per-compositor
+builtin template, greetd's `--session`). Neither is meaningful alone, so
+`modules/options.nix` asserts that a `desktop` host sets exactly one of them,
+and that neither is set without `desktop`. Bools plus an assertion rather
+than an enum, so each compositor's modules gate the same way every other
+module does.
 
 Modules consume the merged value, never hardcode it:
 
@@ -640,6 +657,8 @@ Filesystem is a per-host decision made in that host's `disko.nix`, not a repo-wi
 Mount options on every data subvolume: `compress=zstd` (see above) and `noatime` — btrfs is copy-on-write, so even a read-triggered atime update becomes a real write elsewhere on disk; skipping atime avoids that write amplification, at the cost of the handful of atime-dependent tools (some mail servers, `tmpreaper`-style cleaners) this repo doesn't use anyway.
 
 **Swap** is a plain (non-btrfs) partition, sized to match the host's RAM, with disko's `resumeDevice = true` wiring NixOS's hibernation (suspend-to-disk) support automatically. Swap-on-a-btrfs-file is possible but needs extra no-CoW/subvolume ceremony that a dedicated partition avoids entirely — not worth it when a whole partition is cheap on a modern disk.
+
+**The one exception is an encrypted host** (`theseus`): there, swap is an LVM logical volume beside the btrfs root, both inside a single LUKS2 container (LVM-on-LUKS). The reason is that a separate swap partition would need its own encryption. That means a second container with a second TPM enrollment and a second recovery key to keep in step, and swap must be encrypted, because hibernation writes all of RAM to it, unlocked keyring included. With one container, one unlock covers root, swap and resume. The btrfs subvolume layout inside it is unchanged. Unlock is by TPM (`tpm2-device=auto` in crypttab, so the systemd initrd), with the install passphrase as the fallback slot; enrollment is a post-install step, see `docs/bootstrapping-a-host.md`.
 
 **Snapshot service, not a bootloader change:** automatic snapshots are handled by `modules/services/snapper.nix`, gated behind `config.features.snapshots` like any other capability toggle (declared in `modules/options.nix` alongside `docker`, `steam`, etc.). This deliberately does *not* involve switching away from `systemd-boot` to GRUB + `grub-btrfs` for per-snapshot boot menu entries — NixOS's own generation rollback (`nixos-rebuild switch --rollback`) already covers "boot into a previous system state," so a second, overlapping mechanism for that isn't worth the extra bootloader complexity. Snapper's snapshots are for file-level recovery (an accidentally deleted file, browsing `/home` history), used via the `snapper` CLI after a normal boot — not a boot-time concern at all.
 

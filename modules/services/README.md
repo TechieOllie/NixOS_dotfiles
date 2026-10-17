@@ -27,7 +27,8 @@ flag (see `modules/options.nix`):
   installs them. Reachable over the tailnet only — the GameStream ports are
   deliberately not opened to the LAN.
 
-The first four are enabled on the laptop and desktop; `moonshine.nix` is on
-the desktop alone, and the VM deliberately runs none of them.
+The first four are enabled on the desktop and theseus, and so is
+`kdeconnect.nix`; `moonshine.nix` is on the desktop alone, and the VM
+deliberately runs none of them.
 
 Full rationale: [`ARCHITECTURE.md`](../../ARCHITECTURE.md).

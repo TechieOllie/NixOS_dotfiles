@@ -80,8 +80,9 @@ daily use unless you mean to replace what's currently on it.
 git clone <this repo> ~/.dotfiles
 ```
 
-Not optional on any host with `features.niri`: niri's KDL config and
-Noctalia's wallpaper directory are symlinked *live* into this clone rather
+Not optional on any host with `features.desktop`: the compositor's config
+(niri's KDL or Umbriel's TOML) and Noctalia's wallpaper directory are
+symlinked *live* into this clone rather
 than copied into the Nix store, so without it those symlinks dangle — the
 build still succeeds and the switch still reports success, which is exactly
 what makes this easy to miss. See [`live-dotfiles.md`](./live-dotfiles.md).
@@ -145,6 +146,79 @@ effect. `inotmac` is the host this applies to.
 
 If a change ever breaks the boot, `nixos-rebuild switch --rollback` covers
 NixOS and integrated Home Manager together.
+
+## Encrypted host (LUKS + TPM)
+
+`theseus` is the only host so far whose disk is encrypted. The steps above
+still apply; these are the differences, in the order they come up. Its
+`disko.nix` has the layout and the reasoning behind it.
+
+**Before booting the installer**, turn Secure Boot **off** in the firmware.
+Framework's own NixOS guide requires it, and a stock NixOS doesn't boot with
+it on. The TPM unlock below still works with Secure Boot off; see the last
+paragraph for what that costs.
+
+**Step 2 happens during the install instead.** The target has no other
+Linux install to read, so let nixos-anywhere generate the file on the
+target itself. **Step 6** also needs the LUKS passphrase. Put it in a local
+file only you can read, then pass both:
+
+```bash
+install -m 600 /dev/null /tmp/theseus-disk.key
+$EDITOR /tmp/theseus-disk.key   # the passphrase; a trailing newline is ignored
+nixos-anywhere --flake .#theseus \
+  --disk-encryption-keys /tmp/disk.key /tmp/theseus-disk.key \
+  --generate-hardware-config nixos-generate-config ./hosts/theseus/hardware-configuration.nix \
+  --extra-files ./extra-files \
+  root@<installer-ip>
+shred -u /tmp/theseus-disk.key
+```
+
+`--disk-encryption-keys` copies the local file to the installer's
+`/tmp/disk.key`, the path `disko.nix`'s `passwordFile` reads. The
+passphrase becomes LUKS keyslot 0 and stays the fallback for good, so
+**choose one you can type**: it's what you'll be asked for whenever the TPM
+won't release the key, for example after a firmware update.
+
+`.#theseus` has to exist in `flake.nix` for this command to resolve, and
+`hosts/README.md` keeps it out until `hardware-configuration.nix` is real.
+That's a chicken-and-egg problem. Break it by adding the entry *uncommitted*
+for this one run, and commit the entry and the generated file **together**
+afterwards. nixos-anywhere (1.13) takes care of the rest of step 2: it runs
+`nixos-generate-config --no-filesystems`, so there are no scanned
+`fileSystems` to strip, and it marks the new file `git add --intent-to-add`
+before evaluating, so the flake can see it.
+
+**After first boot**, three things are machine state no module can declare:
+
+```bash
+# Let the TPM unlock the disk from now on. PCR 7 is the Secure Boot state,
+# which stays stable across kernel and NixOS updates, unlike PCRs that
+# measure the kernel or initrd themselves. Asks for the passphrase once.
+sudo systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=7 /dev/disk/by-partlabel/disk-main-luks
+
+# A high-entropy recovery key in its own slot. It's printed once: store it
+# off this machine (password manager or paper), never in this repo.
+sudo systemd-cryptenroll --recovery-key /dev/disk/by-partlabel/disk-main-luks
+
+# The fingerprint, for the lock screen, sudo and polkit (not the greeter;
+# see modules/desktop/greetd.nix).
+fprintd-enroll
+```
+
+Reboot once to confirm the disk now opens without a prompt. `sudo
+cryptsetup luksDump /dev/disk/by-partlabel/disk-main-luks` should list three
+keyslots or tokens: the passphrase, the `systemd-tpm2` token and the
+`systemd-recovery` one.
+
+**What TPM unlock with Secure Boot off protects against**: a drive taken out
+of the machine. The key is sealed to this board's TPM, so the NVMe alone is
+unreadable. It does **not** protect against someone with the whole laptop
+and time, who can replace the unencrypted kernel or initrd on `/boot` with
+one that keeps the key once the TPM releases it, because with Secure Boot off
+nothing checks what boots. Closing that gap means lanzaboote (signed boot
+with Secure Boot on) and re-enrolling with `--wipe-slot=tpm2`, and needs no
+reinstall.
 
 ## Adding a subvolume to an installed host
 

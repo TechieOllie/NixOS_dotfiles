@@ -4806,6 +4806,182 @@ no systemd-boot entry limit.
   alone, or also off-site) and contents (the suggested default was `/home`
   minus caches, Trash and the `@steam`/`@games` subvolumes).
 
+## theseus: a Framework laptop, Umbriel, disk encryption and a fingerprint reader (2026-10-17)
+
+The operator's new laptop is a Framework 13 Pro (Intel Core Ultra 5 325,
+Series 3). It replaced the never-installed `the-entertaining-nios-laptop`
+outright: same role, different machine. The old host's age key had never
+left the operator's machine and its password hash was still wanted, so both
+were kept. The `.sops.yaml` recipient and the key file were renamed and
+`secrets.yaml` was moved with `git mv`, so nothing was re-encrypted. The
+operator asked for the desktop's setup "to some degree" (gaming,
+development, CAD, KDE Connect), full-disk encryption, fingerprint login,
+and Umbriel instead of niri "for now". The operator chose the name
+`theseus` over `talos`, because a Framework is the Ship of Theseus made
+literal, and because Talos Linux would muddy every search for the other
+name.
+
+### The login flow, and why the fingerprint never touches the greeter
+
+There are three separate prompts, and the fingerprint reader can only ever
+serve the last two:
+
+1. **Disk unlock**, in the initrd, before fprintd exists. LUKS needs a
+   secret, not a match.
+2. **Greeter login.** The password typed here is what pam_gnome_keyring
+   unlocks the login keyring with, and that keyring holds the gcr SSH
+   agent's passphrase cache (the GitHub key), VS Code's secrets and Zen's
+   logins. A fingerprint gives it nothing to unlock with.
+3. **Everything after**: lock screen, `sudo`, polkit.
+
+Four options were laid out:
+
+- A: passphrase at boot, then password at the greeter.
+- B: the LUKS passphrase handed to PAM by `pam_systemd_loadkey`, one
+  password per boot, but the passphrase must equal the login password and
+  it's a less-trodden path with greetd.
+- C: TPM unlock plus a fingerprint at the greeter. The keyring prompts
+  later anyway, and without Secure Boot it protects much less.
+- D: C with lanzaboote.
+
+The operator asked for **a mix of A and C**: the TPM unlocks the disk, the
+password is typed once at the greeter, and the fingerprint covers what comes
+after. That is one typed password per cold boot, and it's the one that
+matters.
+
+Two facts found while checking that this actually works:
+
+- **`services.fprintd.enable` puts pam_fprintd on every PAM service by
+  default**, greetd included. noctalia-greeter can only hold one PAM
+  conversation, so a password typed at a fingerprint-enabled greeter queues
+  until the scan times out (its own `docs/user/troubleshooting.md` says so).
+  `modules/desktop/greetd.nix` therefore sets
+  `security.pam.services.greetd.fprintAuth = false` for every host, which is
+  a no-op where fprintd is off.
+- **Noctalia's lock screen needed nothing.** It authenticates against
+  `login`, strips pam_fprintd from that stack itself, and drives the reader
+  over fprintd's D-Bus API in parallel with the password field
+  (`src/shell/lockscreen/lock_screen.cpp`, `lockscreen.fingerprint`
+  defaulting true).
+
+Evaluated: greetd has `fprintAuth = false` and `enableGnomeKeyring = true`;
+`sudo`, `polkit-1` and `login` have `fprintAuth = true`.
+
+### Disk layout: LVM-on-LUKS, an exception to the swap-partition rule
+
+The layout is one LUKS2 container holding an LVM volume group, with a swap
+LV and a btrfs LV using the usual subvolumes (plus `@steam`/`@games`, since
+this is a gaming host too). A plain swap partition beside a LUKS partition
+would need its own container, which means a second TPM enrollment and a
+second recovery key, and swap has to be encrypted because hibernation
+writes the unlocked keyring to it. `crypttabExtraOpts = [ "tpm2-device=auto" ]`
+needs `boot.initrd.systemd.enable`; the scripted initrd ignores crypttab
+options. disko has no TPM enrollment (only FIDO2), so the TPM slot is
+enrolled after first boot with `--tpm2-pcrs=7`. PCR 7 is the Secure Boot
+state, which doesn't change with each kernel the way PCRs 4/9/11 would.
+
+Read from disko's own source rather than assumed:
+
+- an LV whose size contains `100%` gets a higher creation priority and is
+  turned into `-l 100%FREE`, so root can't swallow swap;
+- `size = "CHANGEME"` passes straight to `lvcreate -L` and fails, which
+  makes it a usable loud placeholder like the disk path;
+- `luksFormat` reads `/tmp/disk.key` through `echo -n "$(cat …)"`, so a
+  trailing newline in the key file is harmless.
+
+Accepted and documented trade-off: with Secure Boot off, which Framework's
+guide requires for a plain NixOS install, PCR 7 sealing defends against a
+removed drive, not against tampering with the unencrypted `/boot`.
+lanzaboote closes that later without a reinstall.
+
+### `features.desktop`, split out of `features.niri`
+
+Umbriel as a second compositor exposed that `features.niri` had long meant
+"the Noctalia desktop": greetd, the shell, theming, Nautilus and about thirty
+`home/` app modules all gated on it. Two shapes were considered:
+
+- a new `features.desktop` for the stack, with `niri`/`umbriel` only
+  choosing the compositor;
+- `niri || umbriel` repeated in every gate.
+
+The operator picked the first. The compositor flags stay plain bools rather
+than an enum, so their own modules gate like every other module, and
+`modules/options.nix` asserts that exactly one is set on a desktop host. All
+three bad combinations were checked to fail with the intended message.
+
+Things that turned out to be niri's only by accident moved to a new
+`modules/desktop/session.nix`:
+
+- `NIXOS_OZONE_WL`
+- `wl-clipboard`
+- **`services.gnome.gnome-keyring.enable`**, which only `programs.niri`
+  had been turning on (mkDefault). Umbriel's module doesn't, so without
+  the move greetd's keyring unlock would have had no daemon to talk to on
+  theseus.
+
+What stays niri-only:
+
+- `xwayland-satellite`
+- Noctalia's `niri` builtin template, `niri-style` and its seed
+- Moonshine's Desktop entry
+- `home/gpu-screen-recorder.nix`, whose watcher reads `niri msg
+  event-stream`
+
+**Verified as a pure refactor**: the desktop, VM and inotmac
+`system.build.toplevel.drvPath`s were byte-identical before and after. The
+same held after the Umbriel and theseus commits, so nothing on an installed
+host changed.
+
+### Umbriel
+
+Umbriel (v0.1.0, `github:noctalia-dev/umbriel/cachix`) is unfollowed for its
+Cachix cache, for the same reason as `noctalia`. Its package wraps plain
+Xwayland onto the compositor's PATH, so Steam needs no xwayland-satellite
+there. Its module brings polkit, dconf and the GTK portal through nixpkgs'
+`wayland-session.nix`, but not the keyring (see above), and it routes no
+Secret portal; `modules/desktop/umbriel.nix` sends that to gnome-keyring as
+`programs.niri` does.
+
+`home/umbriel/` is a port of `home/niri/`, live-symlinked the same way.
+`umbriel config validate` accepts it, and was first confirmed to reject an
+unknown key and an unknown action (so that "ok" means something). What
+didn't port is listed in `home/umbriel/README.md`.
+
+Two Umbriel/Noctalia interactions were read from source and then tested:
+
+- **Include paths resolve against the symlink's directory**, not the clone
+  (`config_merge.cpp`: `expandPath(entry, path.parent_path())`), so
+  `~/.config/umbriel/noctalia.toml` is found.
+- **Noctalia's `umbriel` template rewrites `config.toml` with `cp`** unless
+  `[include.optional] files` already ends in `"noctalia.toml"`, and `cp`
+  through the live symlink would edit the clone. The declared line is in
+  that final form. Running the hook against it, made read-only, exited 0
+  and left it untouched; swapping the two entries made it attempt the
+  write.
+
+The corner radius reaches Umbriel as a plain Home Manager file,
+`umbriel/style.toml`, rendered from `home/noctalia.nix`'s `style` block. It
+has no palette, so unlike niri's `niri-style` it needs neither a template nor
+an activation seed.
+
+### Why theseus has no flake entry yet
+
+`hosts/README.md` keeps a host out of `nixosConfigurations` until its
+`hardware-configuration.nix` is real, and on this machine that file can
+only come from the machine itself (`nixos-anywhere --generate-hardware-config`,
+which also runs `--no-filesystems` and `git add --intent-to-add`s the
+result). What stood in for the missing entry:
+
+- `system.build.toplevel` was evaluated from a scratch copy of the repo,
+  with a stub hardware file and a temporary entry.
+- disko's `formatScript` was built and read.
+- The four out-of-tree kernel modules (xone, xpadneo, xpad-noone,
+  framework-laptop-kmod) were built against `linuxPackages_latest` (7.2.9).
+
+**Nothing has run on the hardware.** TPM unlock, fingerprint enrollment,
+the keyring after a greeter login, hibernate/resume through LUKS, Wi-Fi,
+Steam under Umbriel's Xwayland and the panel's scale are all unverified.
+
 ## Host verification log (moved from CLAUDE.md, 2026-10-03)
 
 Dated live-verification record; `CLAUDE.md`'s Hosts table keeps only current

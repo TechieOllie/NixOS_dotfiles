@@ -14,8 +14,8 @@ and `nautilus.nix` gate on `config.features.desktop` — the session plumbing,
 greeter, shell, theming packages and file manager are the same whichever
 compositor draws them. `niri.nix` gates on `config.features.niri` and only
 carries what is niri's own (its package, session entry and
-xwayland-satellite); a second compositor gets its own file and flag the same
-way. `modules/options.nix` asserts that a `desktop` host picks exactly one.
+xwayland-satellite). `umbriel.nix` is the second compositor, the same shape on
+`config.features.umbriel`. `modules/options.nix` asserts that a `desktop` host picks exactly one.
 `gnome.nix` is the separate GDM + GNOME Shell stack, on `config.features.gnome`.
 `theming.nix` (Theming phase) only installs cursor/icon-theme packages
 system-wide, for noctalia-greeter's benefit — everything else (icon theme

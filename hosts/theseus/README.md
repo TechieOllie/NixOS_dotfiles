@@ -42,7 +42,10 @@ Left to do before this host can be installed, in order:
   - TPM unlock, and the passphrase fallback
   - fingerprint at the lock screen, `sudo` and polkit, and password-only at
     the greeter
-  - the keyring unlocked after login (`ssh-add -l` lists `ol@theseus`)
+  - the keyring unlocked after a greeter login: `secret-tool store` and then
+    `lookup` work without a prompt, and `ssh -T git@github.com` authenticates
+    as `ol@theseus`. Not `ssh-add -l`, whose list is transient (see
+    `docs/decisions.md`)
   - suspend, and hibernate/resume through LUKS
   - Wi-Fi
   - Steam under Umbriel's Xwayland

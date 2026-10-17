@@ -87,12 +87,23 @@ flake checkout it's invoked from, never this clone.
     applications as systemd user services bound to
     `graphical-session.target` (see `home/niri.nix`'s comment on the
     convention) rather than niri's `spawn-sh-at-startup`.
+  - `home/umbriel/config.toml` and the static `home/umbriel/cfg/*.toml`
+    files (`animation`, `keybinds`, `layout`, `misc`, `rules`), on
+    `features.umbriel` hosts (`home/umbriel.nix`). Umbriel watches its
+    config and every include through the symlinks and reloads on save, and
+    `umbriel config validate` checks an edit before you rely on it. Leave
+    `config.toml`'s `[include.optional]` line exactly as it is: Noctalia's
+    `umbriel` template writes into this file through the symlink, so into the
+    clone, if that line isn't already in its final form. See the comment in
+    the file.
 - **Still store-copied** (needs a rebuild to take effect): everything else,
   which is the default — including static assets like
   `home/noctalia-templates/*.tmpl` and `home/vesktop-{config,assets}/*`.
-  The only file that *couldn't* be live even if wanted is
-  `home/niri/cfg/input.kdl`, which is generated with Nix-side logic (the
-  per-host XKB layout lookup) rather than being a static file at all.
+  The only files that *couldn't* be live even if wanted are
+  `home/niri/cfg/input.kdl` and Umbriel's `cfg/input.toml`, which are
+  generated with Nix-side logic (the per-host XKB layout lookup,
+  `lib/xkb.nix`) rather than being static files at all, and Umbriel's
+  `style.toml`, rendered from `home/noctalia.nix`'s `style` block.
 
 ## Checking whether a file is actually live
 
