@@ -60,6 +60,17 @@ Left to do before this host can be installed, in order:
   - the touchscreen: taps land where touched, and stay on the laptop panel
     with an external monitor connected (`libinput list-devices` should show
     it with the `touch` capability)
+  - the AZERTY binds: `Mod+&`…`Mod+ç` switch workspaces, `Mod+)`/`Mod+=`
+    resize
+  - scratchpads: `Mod+Shift+Return`, `Mod+M` and `Mod+D` launch, then show
+    and hide, the dropdown Ghostty, Feishin and Vesktop. Vesktop starts
+    hidden after login. Feishin's app_id is assumed to be `feishin` (from
+    its package.json) and has not been seen live (`umbriel windows`)
+  - the replay buffer: `systemctl --user status replay-auto` is running,
+    starting a Proton game turns the buffer on, and `Alt+F10` saves to
+    `~/Videos/Replays`. Needs `UMBRIEL_SOCKET` (or `WAYLAND_DISPLAY`) in the
+    user manager's environment, which Umbriel publishes itself
+  - games keep the pointer inside them (`confine_pointer`)
 
 See `CLAUDE.md`'s "Hosts" section for the authoritative, kept-current
 status.

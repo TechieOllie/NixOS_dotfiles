@@ -20,6 +20,30 @@ Three files in `~/.config/umbriel/` don't come from here:
 - `noctalia.toml`: written at runtime by Noctalia's builtin `umbriel`
   template (colors).
 
+## Added on top of the niri port
+
+- **Scratchpads** (`cfg/scratchpad.toml`): a dropdown Ghostty
+  (`Mod+Shift+Return`), Feishin (`Mod+M`) and Vesktop (`Mod+D`). The first
+  press launches the app if it isn't running, and later presses show and
+  hide it. Vesktop autostarts, so it is already waiting, hidden, after login.
+- **Game rules** (`cfg/rules.toml`): pointer confinement and adaptive sync
+  for Proton games and for any window that declares itself a game.
+- **The cursor hides while typing** (`cfg/misc.toml`).
+- **The replay buffer** works here too (`Alt+F10`, `Alt+Shift+F10`).
+  `home/gpu-screen-recorder.nix` reads `umbriel subscribe windows` instead
+  of niri's event stream.
+
+## AZERTY and keybinds
+
+Umbriel matches a bind against the key's **unshifted** symbol in the
+active layout, and only borrows another layout's symbol when several are
+configured. This config has only `fr`, so the number row is bound by what it
+types without Shift (`ampersand`, `eacute`, `quotedbl`, `apostrophe`,
+`parenleft`, `minus`, `egrave`, `underscore`, `ccedilla`), and `minus` is
+the 6 key. A bind written as `Mod+1` is accepted by `umbriel config validate`
+and never fires. The column-width keys moved to `parenright`/`equal`, the
+two keys left of Backspace, because `minus` is workspace 6.
+
 ## What didn't carry over from niri
 
 - **`center-visible-columns`** (`Mod+Ctrl+C`): no equivalent action. Unbound.
@@ -38,10 +62,6 @@ Three files in `~/.config/umbriel/` don't come from here:
   (800/900/1000): Umbriel has one `windows_move` event, set to 900.
 - **Animations for the config notification and the screenshot UI**: Umbriel
   has neither.
-- **The replay buffer binds** (`Alt+F10`, `Alt+Shift+F10`): `home/gpu-screen-recorder.nix`
-  follows `niri msg --json event-stream` to start the buffer with games, so
-  it stays gated on `features.niri`. Porting it means rewriting that watcher
-  against `umbriel subscribe windows`.
 
 Display layout (niri's `cfg/display.kdl`) isn't ported. It described the
 desktop's two monitors, and a laptop's single panel needs no `[output]`

@@ -3,6 +3,13 @@
 # few that don't are listed in home/umbriel/README.md. Every action is from
 # Umbriel's docs/user/actions.md.
 #
+# AZERTY: Umbriel matches a bind against the key's *unshifted* symbol in the
+# active layout (src/input/shortcut_keysym.cpp, level 0), and only borrows
+# another layout's symbol when several are configured — this host has just
+# `fr`. So the number row is named by what it types unshifted (ampersand,
+# eacute, quotedbl, …), never 1-9, and `minus` is the 6 key. Binds named
+# after a US layout would parse, validate and never fire.
+#
 # niri's hotkey-overlay-title strings have no equivalent: Umbriel's
 # cheatsheet (cheatsheet-toggle) lists the binds themselves.
 
@@ -21,7 +28,6 @@
 "Mod+Return" = { action = "spawn:ghostty", repeat = false }
 "Mod+Z" = { action = "spawn:zen-beta || zen-twilight || zen", repeat = false }
 "Mod+B" = { action = "spawn:obsidian", repeat = false }
-"Mod+D" = { action = "spawn:vesktop", repeat = false }
 "Mod+E" = { action = "spawn:nautilus", repeat = false }
 "Mod+Shift+S" = { action = "spawn:screenshot", repeat = false }
 
@@ -61,11 +67,13 @@
 "Mod+C" = "column-center"
 # niri's set-column-width/set-window-height "±10%". In the scrolling
 # layout the primary extent is the column's width and the secondary one
-# the window's height within it.
-"Mod+Minus" = "window-modify-primary-extent:-0.1"
-"Mod+Equal" = "window-modify-primary-extent:0.1"
-"Mod+Shift+Minus" = "window-modify-secondary-extent:-0.1"
-"Mod+Shift+Equal" = "window-modify-secondary-extent:0.1"
+# the window's height within it. On the two keys left of Backspace, the
+# AZERTY counterparts of US -/=: `minus` itself is the 6 key here, which
+# is workspace 6.
+"Mod+parenright" = "window-modify-primary-extent:-0.1"
+"Mod+equal" = "window-modify-primary-extent:0.1"
+"Mod+Shift+parenright" = "window-modify-secondary-extent:-0.1"
+"Mod+Shift+equal" = "window-modify-secondary-extent:0.1"
 
 # ── Outputs ───────────────────────────────────────────────────────────────
 "Mod+Shift+Left" = "output-focus-left"
@@ -102,26 +110,40 @@
 "Mod+Ctrl+Down" = { action = "column-move-to-workspace-next", cooldown_ms = 150 }
 "Mod+Ctrl+J" = { action = "column-move-to-workspace-next", cooldown_ms = 150 }
 
-"Mod+1" = "workspace-switch:1"
-"Mod+2" = "workspace-switch:2"
-"Mod+3" = "workspace-switch:3"
-"Mod+4" = "workspace-switch:4"
-"Mod+5" = "workspace-switch:5"
-"Mod+6" = "workspace-switch:6"
-"Mod+7" = "workspace-switch:7"
-"Mod+8" = "workspace-switch:8"
-"Mod+9" = "workspace-switch:9"
-"Mod+Ctrl+1" = "column-move-to-workspace:1"
-"Mod+Ctrl+2" = "column-move-to-workspace:2"
-"Mod+Ctrl+3" = "column-move-to-workspace:3"
-"Mod+Ctrl+4" = "column-move-to-workspace:4"
-"Mod+Ctrl+5" = "column-move-to-workspace:5"
-"Mod+Ctrl+6" = "column-move-to-workspace:6"
-"Mod+Ctrl+7" = "column-move-to-workspace:7"
-"Mod+Ctrl+8" = "column-move-to-workspace:8"
-"Mod+Ctrl+9" = "column-move-to-workspace:9"
+# The AZERTY number row, by its unshifted symbols (see the top of this file).
+"Mod+ampersand" = "workspace-switch:1"
+"Mod+eacute" = "workspace-switch:2"
+"Mod+quotedbl" = "workspace-switch:3"
+"Mod+apostrophe" = "workspace-switch:4"
+"Mod+parenleft" = "workspace-switch:5"
+"Mod+minus" = "workspace-switch:6"
+"Mod+egrave" = "workspace-switch:7"
+"Mod+underscore" = "workspace-switch:8"
+"Mod+ccedilla" = "workspace-switch:9"
+"Mod+Ctrl+ampersand" = "column-move-to-workspace:1"
+"Mod+Ctrl+eacute" = "column-move-to-workspace:2"
+"Mod+Ctrl+quotedbl" = "column-move-to-workspace:3"
+"Mod+Ctrl+apostrophe" = "column-move-to-workspace:4"
+"Mod+Ctrl+parenleft" = "column-move-to-workspace:5"
+"Mod+Ctrl+minus" = "column-move-to-workspace:6"
+"Mod+Ctrl+egrave" = "column-move-to-workspace:7"
+"Mod+Ctrl+underscore" = "column-move-to-workspace:8"
+"Mod+Ctrl+ccedilla" = "column-move-to-workspace:9"
 "Mod+Tab" = { action = "workspace-focus-last", repeat = false }
 "Mod+O" = { action = "overview-toggle", repeat = false }
+
+# ── Scratchpads ───────────────────────────────────────────────────────────
+# See cfg/scratchpad.toml. The first press launches the app if it isn't
+# running yet; after that the key shows and hides it.
+"Mod+Shift+Return" = { action = "scratchpad-toggle:terminal", repeat = false }
+"Mod+M" = { action = "scratchpad-toggle:music", repeat = false }
+# Mod+D was niri's "spawn vesktop"; here it summons the one already running.
+"Mod+D" = { action = "scratchpad-toggle:discord", repeat = false }
+
+# ── Replay buffer ─────────────────────────────────────────────────────────
+# home/gpu-screen-recorder.nix: the same two keys as on niri.
+"Alt+Shift+F10" = { action = "spawn:replay toggle", repeat = false }
+"Alt+F10" = { action = "spawn:replay save", repeat = false }
 
 # ── Session ───────────────────────────────────────────────────────────────
 "Mod+Escape" = { action = "shortcuts-inhibit-toggle", allow_when_inhibited = true, repeat = false }

@@ -28,12 +28,8 @@ default_floating_size_px = { width = 800, height = 600 }
 match.app_id = ["^zen(-\\w+)?$", "^md\\.obsidian\\.Obsidian$", "^steam$"]
 default_maximize = true
 
-# niri's open-on-output pinned Vesktop to the desktop's second monitor by
-# name; there is only one output here, so only the rest carries over.
-[[window_rule]]
-match.app_id = "^vesktop$"
-default_maximize = true
-default_focused = false
+# Vesktop has no rule here: it lives in the discord scratchpad
+# (cfg/scratchpad.toml) instead of niri's maximized-on-the-second-monitor.
 
 [[window_rule]]
 match.app_id = "^steam$"
@@ -47,3 +43,27 @@ match.title = "^Picture-in-Picture$"
 default_floating = true
 default_floating_size_px = { width = 480, height = 270 }
 default_position = { x = 32, y = 32, anchor = "bottom_right" }
+
+# ── Games ─────────────────────────────────────────────────────────────────
+# Two ways to recognise one. `steam_app_<id>` is the window class Proton
+# gives every game, Heroic's included (umu passes them SteamAppId 0) — the
+# same test home/gpu-screen-recorder.nix uses. content_type "game" catches
+# anything that declares itself a game over the content-type protocol,
+# whatever launched it; few X11 games do, so it is the second net, not the
+# first.
+#
+# confine_pointer keeps the pointer inside the game while it has focus, for
+# games that drop their pointer lock in menus — a touchpad swipe otherwise
+# lands on the bar. vrr turns on adaptive sync for the game's output while
+# it has focus; on a panel without it (outputs --json shows
+# `adaptive_sync: null`) it does nothing. Tearing is left off: it needs an
+# output-level opt-in and only earns it on an external high-refresh monitor.
+[[window_rule]]
+match.app_id = "^steam_app_[0-9]+$"
+confine_pointer = true
+vrr = "always"
+
+[[window_rule]]
+match.content_type = "game"
+confine_pointer = true
+vrr = "always"

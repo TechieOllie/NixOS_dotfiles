@@ -1,14 +1,19 @@
 # Replay buffer ("save the last minute"), started automatically while a game
-# is open and also driven by niri keybinds, rather than by GPU Screen
+# is open and also driven by compositor keybinds, rather than by GPU Screen
 # Recorder's own overlay. The overlay (gsr-ui) was tried first and dropped
 # the same day, before it ever ran: to catch its Alt+Z hotkey on Wayland it
 # grabs every physical keyboard and re-emits input through a virtual one,
 # which is a lot to keep running in front of the keyboard all session when
-# niri can bind the two keys itself.
+# the compositor can bind the two keys itself.
+#
+# Works under either features.desktop compositor. Only two things differ,
+# both spliced in from `ipc` below: how to ask which output has focus, and
+# where window events come from. Everything else — the unit, the save
+# signal, the watcher's bookkeeping — is shared.
 #
 #   replay toggle   start the buffer on the focused monitor, or stop it
 #   replay save     write the buffer out to ~/Videos/Replays
-#   replay watch    follow niri's window events and start the buffer when
+#   replay watch    follow the compositor's window events and start the buffer when
 #                   a game window opens, stopping it once the last one has
 #                   been gone for a grace period (the replay-auto unit)
 #
@@ -18,11 +23,12 @@
 # KillSignal is SIGINT because that is the recorder's own "stop" — in
 # replay mode it stops without writing anything.
 #
-# The monitor is asked of niri at start time rather than named here: a
-# connector name is host cabling (see the greeter's output pin), and "the
-# monitor the game is on" is whichever one has focus when it starts.
-# Bound in home/niri/cfg/keybinds.kdl; the capture helper's capability
-# wrapper is modules/programs/gpu-screen-recorder.nix.
+# The monitor is asked of the compositor at start time rather than named
+# here: a connector name is host cabling (see the greeter's output pin), and
+# "the monitor the game is on" is whichever one has focus when it starts.
+# Bound in home/niri/cfg/keybinds.kdl and home/umbriel/cfg/keybinds.toml;
+# the capture helper's capability wrapper is
+# modules/programs/gpu-screen-recorder.nix.
 {
   pkgs,
   lib,
@@ -40,6 +46,48 @@ let
   # Linux game matches neither and needs Alt+Shift+F10.
   gamePattern = ''^steam_app_[0-9]+$|\.exe$'';
 
+  # The compositor-specific half. The filter turns the event stream into the
+  # watcher's own small vocabulary: "reset" followed by "game <id>" for every
+  # game window there is, or "game"/"other"/"closed" with a window id.
+  #
+  # niri sends deltas — one snapshot at subscription, then per-window
+  # changes. Umbriel only ever sends whole snapshots (docs/user/ipc.md:
+  # "Payloads are full snapshots rather than deltas"), so every event becomes
+  # a reset plus the current game windows, which the loop already handles.
+  # Umbriel also knows a window's content_type, so a window that declares
+  # itself a game counts even without a Proton class.
+  #
+  # Neither compositor's CLI is a runtimeInput: it has to be the same build
+  # as the running compositor, which is the one on the session's PATH.
+  ipc =
+    if osConfig.features.niri then
+      {
+        name = "niri";
+        focusedOutput = "niri msg --json focused-output | jq -r .name";
+        events = "niri msg --json event-stream";
+        filter = ''
+          def game: (.app_id // "") | test($pattern; "i");
+          if .WindowsChanged then
+            "reset", (.WindowsChanged.windows[] | select(game) | "game \(.id)")
+          elif .WindowOpenedOrChanged then
+            .WindowOpenedOrChanged.window
+            | if game then "game \(.id)" else "other \(.id)" end
+          elif .WindowClosed then
+            "closed \(.WindowClosed.id)"
+          else empty end'';
+      }
+    else
+      {
+        name = "umbriel";
+        focusedOutput = "umbriel outputs --json | jq -r '.[] | select(.focused) | .name'";
+        events = "umbriel subscribe windows";
+        filter = ''
+          def game: ((.app_id // "") | test($pattern; "i")) or .content_type == "game";
+          if .event == "windows" then
+            "reset", (.data[] | select(game) | "game \(.id)")
+          else empty end'';
+      };
+
   replay = pkgs.writeShellApplication {
     name = "replay";
     runtimeInputs = with pkgs; [
@@ -49,9 +97,6 @@ let
       systemd
       coreutils
     ];
-    # niri itself deliberately isn't a runtimeInput: `niri msg` has to be
-    # the same build as the running compositor, which is the one on the
-    # session's PATH.
     text = ''
       unit=gsr-replay
       dir="$HOME/Videos/Replays"
@@ -69,7 +114,7 @@ let
       }
 
       start() {
-        output=$(niri msg --json focused-output | jq -r .name)
+        output=$(${ipc.focusedOutput})
         mkdir -p "$dir"
         # 60 s at 60 fps, kept in RAM (the recorder's default storage;
         # disk mode would write to the NVMe continuously). Desktop audio
@@ -96,15 +141,7 @@ let
         # quotes on purpose: the $pattern and \(…) in it are jq's, not bash's.
         # shellcheck disable=SC2016
         filter='
-          def game: (.app_id // "") | test($pattern; "i");
-          if .WindowsChanged then
-            "reset", (.WindowsChanged.windows[] | select(game) | "game \(.id)")
-          elif .WindowOpenedOrChanged then
-            .WindowOpenedOrChanged.window
-            | if game then "game \(.id)" else "other \(.id)" end
-          elif .WindowClosed then
-            "closed \(.WindowClosed.id)"
-          else empty end'
+          ${ipc.filter}'
 
         declare -A games=()
         ours=0      # did this watcher start the buffer? never stop one it didn't
@@ -124,7 +161,7 @@ let
             if (( rc > 128 )); then
               continue  # timed out: re-check the deadline
             elif (( rc )); then
-              break     # niri has gone away
+              break     # ${ipc.name} has gone away
             fi
           else
             read -r event id || break
@@ -144,7 +181,7 @@ let
           elif (( ours )) && (( ! deadline )); then
             deadline=$(( $(date +%s) + grace ))
           fi
-        done < <(niri msg --json event-stream | jq --unbuffered -r --arg pattern '${gamePattern}' "$filter")
+        done < <(${ipc.events} | jq --unbuffered -r --arg pattern '${gamePattern}' "$filter")
       }
 
       case "''${1:-}" in
@@ -174,10 +211,10 @@ let
     '';
   };
 in
-lib.mkIf (osConfig.features.gaming && osConfig.features.niri) {
+lib.mkIf (osConfig.features.gaming && osConfig.features.desktop) {
   home.packages = [ replay ];
 
-  # The watcher only reads niri's event stream; it holds no device and
+  # The watcher only reads the compositor's event stream; it holds no device and
   # records nothing until a game window appears. `systemctl --user stop
   # replay-auto` turns automatic starts off for the session.
   systemd.user.services.replay-auto = {

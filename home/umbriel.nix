@@ -41,6 +41,7 @@ lib.mkIf osConfig.features.umbriel {
     "umbriel/cfg/layout.toml".source = mkLiveFile "cfg/layout.toml";
     "umbriel/cfg/animation.toml".source = mkLiveFile "cfg/animation.toml";
     "umbriel/cfg/rules.toml".source = mkLiveFile "cfg/rules.toml";
+    "umbriel/cfg/scratchpad.toml".source = mkLiveFile "cfg/scratchpad.toml";
     "umbriel/cfg/misc.toml".source = mkLiveFile "cfg/misc.toml";
 
     # Generated rather than live, because the keyboard layout comes from

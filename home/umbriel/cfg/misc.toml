@@ -15,6 +15,9 @@ enabled = false
 [input.cursor]
 theme = "Bibata-Modern-Classic"
 size = 22
+# A laptop's pointer usually rests over whatever is being typed into. It
+# comes back on the next touchpad or mouse movement.
+hide_when_typing = true
 
 # niri's `environment {}` block. Same limit as there: these reach Umbriel's
 # own spawned children, and modules/desktop/session.nix's

@@ -16,6 +16,7 @@ files = [
   "cfg/layout.toml",
   "cfg/animation.toml",
   "cfg/rules.toml",
+  "cfg/scratchpad.toml",
   "cfg/misc.toml",
 ]
 
