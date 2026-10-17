@@ -29,7 +29,8 @@ nixos-rebuild switch --flake .#<host>
 # Roll back (covers NixOS and integrated Home Manager together)
 nixos-rebuild switch --rollback
 
-# Bootstrap a brand-new host over SSH
+# Bootstrap a brand-new host over SSH (an encrypted host also needs its
+# LUKS passphrase — see docs/bootstrapping-a-host.md, "Encrypted host")
 nixos-anywhere --flake .#<host> root@<installer-ip>
 ```
 
@@ -37,9 +38,10 @@ nixos-anywhere --flake .#<host> root@<installer-ip>
 
 | Host | State | Notes |
 | --- | --- | --- |
-| `the-entertaining-nios-vm` | bootstrapped, verified live | ext4. The verification target — disposable, driven entirely over SSH ([`docs/testing-on-the-vm.md`](./docs/testing-on-the-vm.md)). |
-| `the-entertaining-nios-desktop` | wired and eval-clean, not installed | btrfs + swap. AMD, still running CachyOS. The only gaming host, and carries the full niri desktop stack. |
-| `theseus` | scaffolded, no flake entry yet, not installed | LUKS2 (TPM unlock) → LVM → btrfs + swap. Framework 13 Pro, Intel Core Ultra 5 325. Gaming and the Noctalia desktop, on Umbriel. |
+| `the-entertaining-nios-vm` | bootstrapped, verified live | ext4. Noctalia desktop on niri. The verification target — disposable, driven entirely over SSH ([`docs/testing-on-the-vm.md`](./docs/testing-on-the-vm.md)). |
+| `the-entertaining-nios-desktop` | bootstrapped, verified live | btrfs + swap. AMD Ryzen 5 5600X / RX 6600. The daily driver: Noctalia desktop on niri, gaming, Moonshine streaming. |
+| `inotmac` | bootstrapped, verified live | ext4. Mid-2011 iMac shared by four people — the only GNOME host and the only multi-user one. Rebuilt from the public flake, no clone. |
+| `theseus` | scaffolded, not installed, no flake entry yet | LUKS2 (TPM unlock) → LVM → btrfs + swap. Framework 13 Pro, Intel Core Ultra 5 325. Gaming and the Noctalia desktop on Umbriel; fingerprint for the lock screen, `sudo` and polkit. |
 
 `hosts/installer/` is not a machine — it holds only the operator identity the
 installer ISO needs. `CLAUDE.md`'s "Hosts" section is the kept-current,
@@ -53,7 +55,7 @@ authoritative version of this table; each host directory also has its own
 | `flake.nix` | composition root — inputs, hosts, wiring |
 | `hosts/` | one directory per machine — identity, feature overrides, disk layout |
 | `profiles/` | machine roles — module bundles + default features |
-| `modules/` | machine-agnostic NixOS configuration, one feature per file |
+| `modules/` | machine-agnostic NixOS configuration, one feature per file. Each module turns on from a `features.*` flag a host sets — for example `features.desktop` for the Noctalia desktop, with `features.niri` or `features.umbriel` choosing its compositor |
 | `home/` | Home Manager (user) configuration |
 | `lib/` | helper functions, introduced only once proven necessary |
 | `docs/` | runbooks and the decision log |
@@ -72,6 +74,7 @@ Each of these has its own short `README.md` with more detail.
 
 ## Status
 
-Early-stage personal infrastructure. The VM is bootstrapped and is where every
-change is verified; both real machines are fully wired and evaluate clean but
-have not been installed yet. See `CLAUDE.md` for the current detail.
+Personal infrastructure in daily use. The VM, the desktop and the iMac are
+installed and verified live; the VM is where changes are tried first.
+`theseus`, the Framework laptop, is scaffolded and waiting on its hardware. See
+`CLAUDE.md` for the current detail.
