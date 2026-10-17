@@ -6,6 +6,7 @@
 {
   imports = [
     ./niri.nix
+    ./umbriel.nix
     ./noctalia.nix
     ./cursor.nix
     ./gtk.nix

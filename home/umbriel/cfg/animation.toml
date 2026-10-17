@@ -1,0 +1,28 @@
+# Ported from home/niri/cfg/animation.kdl. Umbriel's springs take the same
+# two numbers niri's do — "spring:<damping ratio>,<stiffness>" — so these
+# are niri's values unchanged, and a spring picks its own duration exactly as
+# it did there. niri's two duration-based curves (window open/close) map to
+# Umbriel's named easings.
+#
+# niri tuned events Umbriel has no table for (config-notification,
+# screenshot-ui); those are dropped.
+
+[animation.workspaces]
+curve = "spring:1,1000"
+
+[animation.windows_in]
+duration_ms = 200
+curve = "easeout"
+
+[animation.windows_out]
+duration_ms = 200
+curve = "easeout"
+
+# niri's horizontal-view-movement, window-movement and window-resize are one
+# event here, which covers moves, resizes and reflow alike. 900 is the
+# middle of niri's 800/900/1000.
+[animation.windows_move]
+curve = "spring:1,900"
+
+[animation.overview]
+curve = "spring:1,900"

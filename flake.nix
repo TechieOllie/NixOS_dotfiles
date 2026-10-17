@@ -113,6 +113,15 @@
       url = "github:nix-community/nix-index-database";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # Umbriel, Noctalia's own wlroots compositor — features.umbriel's
+    # compositor, the alternative to niri. Not following this repo's
+    # nixpkgs, for exactly noctalia's reason above: upstream's docs say a
+    # `.follows` defeats its Cachix cache, which would mean building a
+    # wlroots/SceneFX compositor from source on every host. Pinned to the
+    # `cachix` branch for the same reason too — it only ever points at a
+    # commit the cache already holds. Imported by modules/desktop/umbriel.nix.
+    umbriel.url = "github:noctalia-dev/umbriel/cachix";
   };
 
   outputs =
@@ -130,6 +139,7 @@
       moonshine,
       claude-code,
       nix-index-database,
+      umbriel,
       ...
     }:
     let
@@ -151,6 +161,7 @@
           moonshine
           claude-code
           nix-index-database
+          umbriel
           ;
       };
 

@@ -1,0 +1,28 @@
+# Ported from home/niri/cfg/misc.kdl.
+
+[general]
+# niri's hotkey-overlay skip-at-startup.
+show_cheatsheet = false
+
+# Blur is OFF on niri at the operator's request (see the banner in
+# home/niri/cfg/rules.kdl), and with home/transparency.nix at 1.0 there is no
+# client-side alpha for it to show through anyway. Umbriel enables it by
+# default, so it is switched off explicitly to match. Turning it back on:
+# delete this, then follow the niri banner's steps for the Noctalia half.
+[appearance.blur]
+enabled = false
+
+[input.cursor]
+theme = "Bibata-Modern-Classic"
+size = 22
+
+# niri's `environment {}` block. Same limit as there: these reach Umbriel's
+# own spawned children, and modules/desktop/session.nix's
+# environment.sessionVariables covers user services. XDG_CURRENT_DESKTOP and
+# XDG_SESSION_TYPE are not repeated, because Umbriel publishes its own and
+# refuses to have them overridden.
+[environment]
+ELECTRON_OZONE_PLATFORM_HINT = "auto"
+QT_QPA_PLATFORM = "wayland"
+QT_QPA_PLATFORMTHEME = "qt6ct"
+QT_WAYLAND_DISABLE_WINDOWDECORATION = "1"

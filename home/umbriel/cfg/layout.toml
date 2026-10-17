@@ -1,0 +1,12 @@
+# Ported from home/niri/cfg/layout.kdl. Only the gap differs from Umbriel's
+# defaults: the scrolling layout, center_focused = "never" and the
+# 1/3-1/2-2/3 extent presets are all already what niri was set to, so they
+# aren't restated.
+
+[layout]
+gap = 16
+
+[workspaces]
+# niri's workspace-auto-back-and-forth: pressing the current workspace's
+# number again returns to the previous one.
+back_and_forth = true

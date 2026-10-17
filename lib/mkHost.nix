@@ -14,6 +14,7 @@
   moonshine,
   claude-code,
   nix-index-database,
+  umbriel,
 }:
 { system, hostPath }:
 let
@@ -28,7 +29,8 @@ nixpkgs.lib.nixosSystem {
   # chaotic/millennium get the identical treatment for the gaming stack:
   # modules/programs/steam.nix imports them, so a host that isn't a gaming
   # host never pulls either into its closure. moonshine likewise, imported
-  # by modules/services/moonshine.nix.
+  # by modules/services/moonshine.nix, and umbriel by
+  # modules/desktop/umbriel.nix.
   specialArgs = {
     inherit
       vars
@@ -37,6 +39,7 @@ nixpkgs.lib.nixosSystem {
       chaotic
       millennium
       moonshine
+      umbriel
       ;
   };
   modules = [

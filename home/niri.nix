@@ -12,18 +12,7 @@
   ...
 }:
 let
-  # Console keymaps (vars.system.keyMap) and XKB layout/variant pairs are
-  # different naming schemes; only one mapping exists because only one
-  # keymap value exists across all hosts so far.
-  xkbLayouts = {
-    "fr-pc" = {
-      layout = "fr";
-      variant = "azerty";
-    };
-  };
-  xkb =
-    xkbLayouts.${vars.system.keyMap}
-      or (throw "home/niri.nix: no XKB mapping for keyMap '${vars.system.keyMap}' — add one to xkbLayouts.");
+  xkb = import ../lib/xkb.nix vars.system.keyMap;
 
   # Static (non-templated) KDL files are symlinked straight to this repo's
   # own live clone at ~/.dotfiles instead of being copied into the Nix

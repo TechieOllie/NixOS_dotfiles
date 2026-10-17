@@ -1,0 +1,49 @@
+# Ported from home/niri/cfg/rules.kdl. The window corner radius is not set
+# here, for the same reason as there: it comes from style.toml (see
+# config.toml), which Home Manager renders from home/noctalia.nix's `style`
+# block, so it shares one number with Noctalia's bar.
+#
+# niri-only rules with nothing to port: `draw-border-with-background false`
+# (niri paints a solid backing behind windows; Umbriel does not) and the
+# noctalia-wallpaper `place-within-backdrop` layer-rule (Umbriel's overview
+# shows the wallpaper itself, overview.workspace_wallpaper). Blur is off
+# here as it is on niri — see misc.toml.
+
+# Noctalia v5's own settings window, floating rather than tiled.
+[[window_rule]]
+match.app_id = "^dev\\.noctalia\\.Noctalia$"
+default_floating = true
+default_floating_size_px = { width = 1080, height = 920 }
+
+# Umbriel's own screencast picker, floating as upstream's example config has
+# it.
+[[window_rule]]
+match.app_id = "^dev\\.noctalia\\.UmbrielSharePicker$"
+default_floating = true
+default_floating_size_px = { width = 800, height = 600 }
+
+# niri's open-maximized: a full-width column, gaps kept. See
+# docs/decisions.md for why these three open that way.
+[[window_rule]]
+match.app_id = ["^zen(-\\w+)?$", "^md\\.obsidian\\.Obsidian$", "^steam$"]
+default_maximize = true
+
+# niri's open-on-output pinned Vesktop to the desktop's second monitor by
+# name; there is only one output here, so only the rest carries over.
+[[window_rule]]
+match.app_id = "^vesktop$"
+default_maximize = true
+default_focused = false
+
+[[window_rule]]
+match.app_id = "^steam$"
+match.title = "^notificationtoasts_\\d+_desktop$"
+default_position = { x = 10, y = 10, anchor = "bottom_right" }
+default_focused = false
+
+[[window_rule]]
+match.app_id = "^zen(-\\w+)?$"
+match.title = "^Picture-in-Picture$"
+default_floating = true
+default_floating_size_px = { width = 480, height = 270 }
+default_position = { x = 32, y = 32, anchor = "bottom_right" }

@@ -21,13 +21,14 @@ jobs:
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
-            # Noctalia and chaotic-nyx are substituted from their own
-            # caches. A NixOS host gets these from its own config
-            # (modules/desktop/noctalia.nix, chaotic's module), but CI has
-            # no such config — without them, this job would build a
-            # Wayland/OpenGL shell and a kernel from source.
-            extra-substituters = https://noctalia.cachix.org https://nyx-cache.chaotic.cx
-            extra-trusted-public-keys = noctalia.cachix.org-1:pCOR47nnMEo5thcxNDtzWpOxNFQsBRglJzxWPp3dkU4= nyx-cache.chaotic.cx:dJxTrgMC3V3cFfyIiBQDQorG6k1LsqurH/srpMSq7qk=
+            # Noctalia, chaotic-nyx and Umbriel are substituted from their
+            # own caches. A NixOS host gets these from its own config
+            # (modules/desktop/{noctalia,umbriel}.nix, chaotic's module),
+            # but CI has no such config — without them, this job would
+            # build a Wayland/OpenGL shell, a kernel and a compositor from
+            # source.
+            extra-substituters = https://noctalia.cachix.org https://nyx-cache.chaotic.cx https://umbriel.cachix.org
+            extra-trusted-public-keys = noctalia.cachix.org-1:pCOR47nnMEo5thcxNDtzWpOxNFQsBRglJzxWPp3dkU4= nyx-cache.chaotic.cx:dJxTrgMC3V3cFfyIiBQDQorG6k1LsqurH/srpMSq7qk= umbriel.cachix.org-1:JfNq/2yg2S6D6z4Z2dVSZrZlDPQTKtexB6GAVLD98nw=
 
       - name: nix flake check
         run: nix flake check --print-build-logs

@@ -1,0 +1,33 @@
+# Umbriel entry point. Ported from home/niri/config.kdl and split the same
+# way: each cfg/*.toml is an out-of-store symlink into ~/.dotfiles (see
+# home/umbriel.nix and docs/live-dotfiles.md), so an edit takes effect on
+# save — Umbriel reloads its config and every include itself, and keeps the
+# last working config if the new one fails to parse.
+#
+# Include paths resolve against this file's *own* directory,
+# ~/.config/umbriel, not against the ~/.dotfiles file it points to
+# (config_merge.cpp: expandPath(entry, path.parent_path())). That is what
+# lets the two optional files below, which only exist there, be found.
+
+[include]
+files = [
+  "cfg/keybinds.toml",
+  "cfg/input.toml",
+  "cfg/layout.toml",
+  "cfg/animation.toml",
+  "cfg/rules.toml",
+  "cfg/misc.toml",
+]
+
+# style.toml: window corner radius, written by Home Manager from
+# home/noctalia.nix's `style` block. noctalia.toml: colors, written by
+# Noctalia's builtin "umbriel" template on every re-theme pass.
+#
+# Keep this table exactly as it is, and noctalia.toml last. That template's
+# post_hook (assets/templates/umbriel/apply.sh) rewrites config.toml with
+# `cp` until [include.optional] files ends in "noctalia.toml" — and through
+# this symlink the cp would land in the ~/.dotfiles clone itself. With the
+# line already in its final form, the hook's `cmp` finds nothing to change
+# and never writes.
+[include.optional]
+files = ["style.toml", "noctalia.toml"]
