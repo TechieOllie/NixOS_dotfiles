@@ -34,8 +34,7 @@ Left to do before this host can be installed, in order:
 - [ ] Boot the installer ISO (`nix build .#installer-iso`). From it, resolve
       the two placeholders in `disko.nix`: the disk's `/dev/disk/by-id/` path,
       and the swap size (`free -g`, rounded up).
-- [ ] Add the public key `ol@theseus` (printed when it was generated; also
-      `ssh-keygen -y` on the decrypted secret) to GitHub.
+- [x] Add the public key `ol@theseus` to GitHub (done 2026-10-17).
 - [ ] Install with nixos-anywhere, generating `hardware-configuration.nix`
       and passing the LUKS passphrase. Then add the flake entry and commit
       both together. Steps: `docs/bootstrapping-a-host.md`, "Encrypted host".
