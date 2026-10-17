@@ -42,6 +42,11 @@ Left to do before this host can be installed, in order:
 - [ ] First boot: enroll the TPM and a recovery key (`systemd-cryptenroll`),
       then the fingerprint (`fprintd-enroll`). These are machine state no
       module can declare.
+- [ ] Battery charge limit, also machine state: set it once in the BIOS
+      ("Battery Charge Limit", e.g. 80%) or with `sudo framework_tool
+      --charge-limit 80`, which nixos-hardware installs. Both are stored in
+      the embedded controller, not in NixOS, so they survive reinstalls.
+      `framework_tool --charge-limit` with no value reads it back.
 - [ ] Clone `~/.dotfiles`. Umbriel's config and the wallpapers are
       live-symlinked from it, as niri's are on the desktop
       (`docs/live-dotfiles.md`).
@@ -53,7 +58,13 @@ Left to do before this host can be installed, in order:
     `lookup` work without a prompt, and `ssh -T git@github.com` authenticates
     as `ol@theseus`. Not `ssh-add -l`, whose list is transient (see
     `docs/decisions.md`)
-  - suspend, and hibernate/resume through LUKS
+  - suspend, and hibernate/resume through LUKS: `systemctl hibernate`
+    tests the resume path directly. Lid closed on battery should then
+    hibernate on its own after 2 h; afterwards
+    `journalctl -b -1 -u systemd-suspend-then-hibernate` shows whether it
+    did
+  - the GPU is on `xe` (`lspci -k` shows "Kernel driver in use: xe") and
+    VA-API works (`vainfo` lists the iHD driver)
   - Wi-Fi
   - Steam under Umbriel's Xwayland
   - the panel's scale, which may need an `[output.eDP-1]` table

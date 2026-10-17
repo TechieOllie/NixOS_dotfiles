@@ -51,6 +51,36 @@
   # machine's hardware, not about the gaming role it shares.
   boot.kernelPackages = pkgs.linuxPackages_latest;
 
+  # The xe GPU driver, not i915. nixos-hardware's Series 3 module reaches the
+  # *generic* Intel GPU profile (common/gpu/intel), which defaults to i915 —
+  # loading it in the initrd for early KMS — and installs both VA-API
+  # drivers because it doesn't know the generation. Panther Lake's Xe3
+  # graphics belong to xe, which is what nixos-hardware's own Lunar Lake
+  # profile already selects for the same reason (these two settings, word
+  # for word); Series 3 simply never got a profile of its own. Without this
+  # the initrd's early-KMS driver binds nothing on this GPU, so the boot
+  # screen (and the LUKS passphrase fallback) would most likely be left on
+  # the firmware framebuffer. intel-media-driver alone: the legacy
+  # intel-vaapi-driver only covers much older generations, so it adds a
+  # VA-API driver to probe and nothing it can drive.
+  hardware.intelgpu = {
+    driver = "xe";
+    vaapiDriver = "intel-media-driver";
+  };
+
+  # Closing the lid on battery suspends, and hibernates after two hours of
+  # that, so a bag-bound laptop doesn't come back flat. Hibernation was
+  # already provisioned for: ./disko.nix sizes swap to RAM inside the LUKS
+  # container, and resume goes through the same TPM unlock as a cold boot.
+  # On external power plain suspend is enough; docked (lid shut, external
+  # monitor) stays logind's default of ignore. Noctalia locks before any of
+  # these, since its lockscreen hooks logind's PrepareForSleep.
+  services.logind.settings.Login = {
+    HandleLidSwitch = "suspend-then-hibernate";
+    HandleLidSwitchExternalPower = "suspend";
+  };
+  systemd.sleep.settings.Sleep.HibernateDelaySec = "2h";
+
   # The systemd initrd: what lets ./disko.nix's crypttab entry unlock from
   # the TPM (tpm2-device=auto), with the passphrase as the fallback prompt.
   # The scripted initrd ignores crypttab options entirely. It also resumes

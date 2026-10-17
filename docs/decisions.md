@@ -4982,6 +4982,47 @@ result). What stood in for the missing entry:
 the keyring after a greeter login, hibernate/resume through LUKS, Wi-Fi,
 Steam under Umbriel's Xwayland and the panel's scale are all unverified.
 
+### Laptop gap check, the same day
+
+A pass over theseus's evaluated config for anything a laptop wants, asked
+for after the Umbriel extras. Three changes were made:
+
+- **`hardware.intelgpu.driver = "xe"`, `vaapiDriver = "intel-media-driver"`.**
+  nixos-hardware's `framework-intel-core-ultra-series3` imports
+  `common/cpu/intel`, which pulls the *generic* `common/gpu/intel`: `i915`,
+  loaded in the initrd, plus both VA-API drivers. Its `lunar-lake` profile
+  sets exactly these two values for the same reason, and Series 3 just has
+  no profile of its own. Evaluated afterwards: the initrd loads `xe`, and
+  `intel-vaapi-driver` is gone from `hardware.graphics.extraPackages`.
+  Worth upstreaming to nixos-hardware once confirmed live.
+- **Suspend-then-hibernate on lid close, on battery, after 2 h**; plain
+  suspend on AC; docked stays logind's `ignore`. Swap was already sized and
+  encrypted for hibernation. The rendered `logind.conf` and `sleep.conf`
+  were read back from the build.
+- **A battery charge limit, as a checklist step rather than config.**
+  Framework keeps it in the EC (BIOS setting or `framework_tool
+  --charge-limit`), so there is nothing for NixOS to own.
+
+Already covered, so nothing was added:
+
+- Docker is socket-activated (`enableOnBoot = false`).
+- fstrim comes from nixos-hardware.
+- Power profiles and upower come from Noctalia, with TLP correctly off.
+
+Considered and not taken: zram (real swap exists), thermald (the power
+profiles daemon covers it), automatic time zone (no travel to justify it).
+
+Deferred, waiting on the operator's NAS:
+
+- **Backups.** restic, as decided on 2026-10-10, now with a likely
+  destination: the NAS. A laptop raises the stakes, since snapshots share
+  its disk.
+- **Notes sync.** The Obsidian vault is synced through git, to a private
+  GitHub repo. Syncthing between the machines and the NAS is the likely
+  replacement once the NAS exists.
+
+Not pursued for now: using the desktop as a remote builder for theseus.
+
 ## Host verification log (moved from CLAUDE.md, 2026-10-03)
 
 Dated live-verification record; `CLAUDE.md`'s Hosts table keeps only current
