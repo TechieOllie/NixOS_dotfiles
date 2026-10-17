@@ -15,6 +15,7 @@
   claude-code,
   nix-index-database,
   umbriel,
+  nixos-hardware,
 }:
 { system, hostPath }:
 let
@@ -30,7 +31,8 @@ nixpkgs.lib.nixosSystem {
   # modules/programs/steam.nix imports them, so a host that isn't a gaming
   # host never pulls either into its closure. moonshine likewise, imported
   # by modules/services/moonshine.nix, and umbriel by
-  # modules/desktop/umbriel.nix.
+  # modules/desktop/umbriel.nix. nixos-hardware is the one a *host* imports
+  # (hosts/theseus/default.nix): its modules describe one machine model.
   specialArgs = {
     inherit
       vars
@@ -40,6 +42,7 @@ nixpkgs.lib.nixosSystem {
       millennium
       moonshine
       umbriel
+      nixos-hardware
       ;
   };
   modules = [

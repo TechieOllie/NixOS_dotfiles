@@ -122,6 +122,18 @@
     # `cachix` branch for the same reason too — it only ever points at a
     # commit the cache already holds. Imported by modules/desktop/umbriel.nix.
     umbriel.url = "github:noctalia-dev/umbriel/cachix";
+
+    # Per-model hardware quirks, for theseus (Framework 13 Pro, Intel Core
+    # Ultra Series 3): fprintd, fwupd, the Framework EC kernel module and
+    # framework-tool, iio sensors, and the laptop power defaults. Its own
+    # nixpkgs input only feeds its formatter and tests; the modules a host
+    # imports are evaluated with *our* pkgs either way, so following just
+    # keeps a second nixpkgs out of flake.lock (claude-code's reasoning
+    # above). Imported by hosts/theseus/default.nix.
+    nixos-hardware = {
+      url = "github:NixOS/nixos-hardware";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -140,6 +152,7 @@
       claude-code,
       nix-index-database,
       umbriel,
+      nixos-hardware,
       ...
     }:
     let
@@ -162,6 +175,7 @@
           claude-code
           nix-index-database
           umbriel
+          nixos-hardware
           ;
       };
 
@@ -241,10 +255,12 @@
         hostPath = ./hosts/the-entertaining-nios-vm;
       };
 
-      nixosConfigurations.the-entertaining-nios-laptop = mkHost {
-        inherit system;
-        hostPath = ./hosts/the-entertaining-nios-laptop;
-      };
+      # theseus (Framework 13 Pro, hosts/theseus/) has no entry yet, on
+      # purpose: its hardware-configuration.nix has to be generated on the
+      # machine itself (nixos-anywhere --generate-hardware-config, see
+      # docs/bootstrapping-a-host.md), and hosts/README.md keeps a host out
+      # of this set until that file is real. Add it in the same commit as
+      # that file.
 
       # Wired in before the machine has ever been installed, deliberately:
       # the `checks` attribute below is derived from this set, so an entry

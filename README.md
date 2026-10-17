@@ -39,7 +39,7 @@ nixos-anywhere --flake .#<host> root@<installer-ip>
 | --- | --- | --- |
 | `the-entertaining-nios-vm` | bootstrapped, verified live | ext4. The verification target — disposable, driven entirely over SSH ([`docs/testing-on-the-vm.md`](./docs/testing-on-the-vm.md)). |
 | `the-entertaining-nios-desktop` | wired and eval-clean, not installed | btrfs + swap. AMD, still running CachyOS. The only gaming host, and carries the full niri desktop stack. |
-| `the-entertaining-nios-laptop` | wired and eval-clean, not installed | btrfs + swap. Intel. No desktop stack yet, by choice. |
+| `theseus` | scaffolded, no flake entry yet, not installed | LUKS2 (TPM unlock) → LVM → btrfs + swap. Framework 13 Pro, Intel Core Ultra 5 325. Gaming and the Noctalia desktop, on Umbriel. |
 
 `hosts/installer/` is not a machine — it holds only the operator identity the
 installer ISO needs. `CLAUDE.md`'s "Hosts" section is the kept-current,

@@ -1,6 +1,7 @@
 # Package only. The operator's real Obsidian config (~/.config/obsidian/
 # obsidian.json) only ever holds a vault path
-# (/home/ol/Documents/Notes on the-entertaining-nios-laptop) — genuinely
+# (/home/ol/Documents/Notes on the old CachyOS laptop, planned as the
+# since-retired the-entertaining-nios-laptop host) — genuinely
 # machine-specific runtime state pointing at a vault that doesn't exist on
 # this host, not a declarative preference to port. Same treatment as Zen
 # Browser's profile and VS Code's Settings Sync: out of scope for Nix.
