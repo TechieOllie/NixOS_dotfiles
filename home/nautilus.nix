@@ -11,7 +11,7 @@
 # internal one-time migration marker Nautilus itself writes, not a real
 # preference.
 #
-# Self-gates on osConfig.features.niri, same convention as home/gtk.nix.
+# Self-gates on osConfig.features.desktop, same convention as home/gtk.nix.
 {
   config,
   lib,
@@ -62,7 +62,7 @@ let
     "application/x-zstd-compressed-tar"
   ];
 in
-lib.mkIf osConfig.features.niri {
+lib.mkIf osConfig.features.desktop {
   # Needs home/xdg-mime-apps.nix enabled to reach disk at all.
   xdg.mimeApps.defaultApplications = lib.genAttrs archiveTypes (_: "org.gnome.Nautilus.desktop");
 

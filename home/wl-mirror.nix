@@ -10,7 +10,7 @@
 # bemenu/slurp/wl-copy on PATH; deliberately not catered for, since the
 # plugin's panel replaces exactly that role.
 #
-# Self-gates on osConfig.features.niri, same convention as the other
+# Self-gates on osConfig.features.desktop, same convention as the other
 # session-only modules here — mirroring one Wayland output onto another
 # means nothing without a compositor.
 #
@@ -22,6 +22,6 @@
   osConfig,
   ...
 }:
-lib.mkIf osConfig.features.niri {
+lib.mkIf osConfig.features.desktop {
   home.packages = [ pkgs.wl-mirror ];
 }

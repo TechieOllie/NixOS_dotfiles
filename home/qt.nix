@@ -39,7 +39,7 @@
   osConfig,
   ...
 }:
-lib.mkIf osConfig.features.niri {
+lib.mkIf osConfig.features.desktop {
   qt = {
     enable = true;
     platformTheme.name = "qtct"; # installs + wires qt5ct/qt6ct properly

@@ -9,7 +9,7 @@
 # parity across all 7 would be a large lift for something already working.
 # Nix's only job here is making sure the vscode binary exists at all.
 #
-# Self-gates on osConfig.features.niri, same convention as
+# Self-gates on osConfig.features.desktop, same convention as
 # home/gtk.nix/qt.nix/cursor.nix — a GUI app, not a terminal tool, so it
 # has a real per-host axis of variation (unlike zsh/git/ghostty, which
 # every host wants regardless of desktop environment).
@@ -19,7 +19,7 @@
   osConfig,
   ...
 }:
-lib.mkIf osConfig.features.niri {
+lib.mkIf osConfig.features.desktop {
   # Force Electron's secret storage onto libsecret. Chromium picks a password
   # store by sniffing XDG_CURRENT_DESKTOP, recognises GNOME and KDE and
   # nothing else — under "niri" it finds no keyring, warns that it is falling

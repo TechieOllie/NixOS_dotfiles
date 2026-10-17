@@ -14,13 +14,13 @@
 # custom.css pair already present there) — added to home/noctalia.nix's
 # community_ids. No conflict: nothing here manages that file.
 #
-# Self-gates on osConfig.features.niri, same convention as home/vscode.nix.
+# Self-gates on osConfig.features.desktop, same convention as home/vscode.nix.
 {
   pkgs,
   lib,
   osConfig,
   ...
 }:
-lib.mkIf osConfig.features.niri {
+lib.mkIf osConfig.features.desktop {
   home.packages = [ pkgs.feishin ];
 }

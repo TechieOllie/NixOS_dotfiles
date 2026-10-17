@@ -6,13 +6,17 @@ System-level halves of the desktop stack, each gated behind its own
 `config.features.x` flag (see `modules/options.nix`). Where a program has both
 a system half and a user half — Niri is the clearest example — only the
 package, session entry, and greetd wiring live here; keybindings, layout, and
-appearance live in `home/` instead. Currently `niri.nix`, `greetd.nix`,
-`noctalia.nix`, `theming.nix`, and `nautilus.nix` (all
-`config.features.niri` — greetd, Noctalia Shell, theming packages and a file
-manager only exist to
-support a graphical niri session, and niri is the only compositor this repo
-offers so far; see
-`greetd.nix`'s own comment if a second compositor/DE is ever added).
+appearance live in `home/` instead.
+
+The Noctalia desktop is split into a compositor-agnostic stack and the
+compositor itself. `session.nix`, `greetd.nix`, `noctalia.nix`, `theming.nix`
+and `nautilus.nix` gate on `config.features.desktop` — the session plumbing,
+greeter, shell, theming packages and file manager are the same whichever
+compositor draws them. `niri.nix` gates on `config.features.niri` and only
+carries what is niri's own (its package, session entry and
+xwayland-satellite); a second compositor gets its own file and flag the same
+way. `modules/options.nix` asserts that a `desktop` host picks exactly one.
+`gnome.nix` is the separate GDM + GNOME Shell stack, on `config.features.gnome`.
 `theming.nix` (Theming phase) only installs cursor/icon-theme packages
 system-wide, for noctalia-greeter's benefit — everything else (icon theme
 selection, GTK3/Qt wiring, the cursor theme itself) is Home Manager

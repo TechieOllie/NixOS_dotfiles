@@ -1,7 +1,8 @@
-# Gated on config.features.niri rather than its own flag: greetd only
-# exists to launch a graphical session, and niri is currently the only one
-# this repo offers. Split this onto its own feature (or key it off "is any
-# GUI compositor enabled") if a second compositor/DE is ever added.
+# Gated on config.features.desktop rather than its own flag: greetd only
+# exists to launch the Noctalia desktop's session, under whichever
+# compositor the host picked (features.niri / features.umbriel —
+# modules/options.nix asserts exactly one). GNOME hosts use GDM instead, see
+# gnome.nix.
 {
   config,
   lib,
@@ -13,15 +14,16 @@
   # which every host needs — keeps mkHost itself feature-agnostic.
   imports = [ noctalia-greeter.nixosModules.default ];
 
-  config = lib.mkIf config.features.niri {
+  config = lib.mkIf config.features.desktop {
     # noctalia-greeter's NixOS module enables and configures services.greetd
     # itself once this is turned on — no separate services.greetd.* wiring
     # needed here.
     services.displayManager.noctalia-greeter = {
       enable = true;
-      # Session name matches the Wayland session entry programs.niri.enable
-      # registers.
-      greeter-args = "--session niri";
+      # Session name matches the Wayland session entry the compositor's
+      # module registers: programs.niri's niri.desktop, or Umbriel's
+      # umbriel.desktop (its package's passthru.providedSessions).
+      greeter-args = "--session ${if config.features.niri then "niri" else "umbriel"}";
       # Cursor schema confirmed by reading the noctalia-greeter flake input's
       # own nix/nixos-module.nix (its documented example uses this shape).
       # modules/desktop/theming.nix installs the bibata-cursors package
@@ -69,5 +71,19 @@
     # greeter wants it, and it is a property of the login path, not of one
     # machine's hardware.
     security.pam.services.greetd.enableGnomeKeyring = true;
+
+    # ...and therefore the greeter must take a *password*, never a finger.
+    # services.fprintd.enable (nixos-hardware's Framework module turns it on)
+    # adds pam_fprintd to every PAM service by default, greetd included. Two
+    # things go wrong if it stays: a fingerprint gives pam_gnome_keyring no
+    # secret to unlock the keyring with, so the session starts with it
+    # locked; and noctalia-greeter can only run one PAM conversation, so the
+    # password box queues behind the fingerprint prompt until it times out
+    # (its own docs/user/troubleshooting.md, "Fingerprint blocks password
+    # login"). The fingerprint stays for what comes after login — sudo,
+    # polkit, and Noctalia's lock screen, which strips pam_fprintd from the
+    # `login` stack itself and drives the reader over D-Bus in parallel with
+    # the password field. A no-op on hosts without fprintd.
+    security.pam.services.greetd.fprintAuth = false;
   };
 }

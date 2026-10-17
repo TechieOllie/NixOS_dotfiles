@@ -13,7 +13,7 @@
 # (Qt, a second toolkit for one app), leaving it to the browser (the case
 # loupe.nix already argued against).
 #
-# Self-gates on osConfig.features.niri, same convention as home/loupe.nix.
+# Self-gates on osConfig.features.desktop, same convention as home/loupe.nix.
 #
 # Verified live on the desktop 2026-08-22: a PDF opened via xdg-open lands
 # in Papers rather than the browser.
@@ -48,7 +48,7 @@ let
     "application/x-cbt"
   ];
 in
-lib.mkIf osConfig.features.niri {
+lib.mkIf osConfig.features.desktop {
   home.packages = [ pkgs.papers ];
 
   # Papers ships these associations in its own desktop entry, but that only

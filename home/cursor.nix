@@ -1,5 +1,5 @@
 # Cursor theme — single source of truth for GTK/Qt/Wayland toolkit apps via
-# Home Manager's own home.pointerCursor. Self-gates on osConfig.features.niri,
+# Home Manager's own home.pointerCursor. Self-gates on osConfig.features.desktop,
 # same convention as home/niri.nix/home/noctalia.nix. The system-level half
 # (installing the package so noctalia-greeter can reference it too, since the
 # greeter runs outside any user's Home Manager profile) lives in
@@ -29,7 +29,7 @@
   osConfig,
   ...
 }:
-lib.mkIf osConfig.features.niri {
+lib.mkIf osConfig.features.desktop {
   home.pointerCursor = {
     enable = true; # explicit — implicit-enable-on-set is deprecated upstream
     package = pkgs.bibata-cursors;

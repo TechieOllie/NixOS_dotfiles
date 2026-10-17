@@ -11,8 +11,8 @@
 # nothing, it only produces files — so there is no default to set.
 #
 # Gated on both flags: features.printing because without SANE there is
-# nothing to scan from, features.niri because without a graphical session
-# there is nowhere to show it (the laptop has printing but no desktop yet).
+# nothing to scan from, features.desktop because without a graphical session
+# there is nowhere to show it.
 #
 # No `scanner` group membership needed for this: eSCL is a network scanner
 # reached over HTTP, not a udev-gated device node. A USB scanner would need
@@ -29,7 +29,7 @@
 let
   scanDir = "${config.xdg.userDirs.documents}/Scanned Documents";
 in
-lib.mkIf (osConfig.features.niri && osConfig.features.printing) {
+lib.mkIf (osConfig.features.desktop && osConfig.features.printing) {
   home.packages = [ pkgs.simple-scan ];
 
   # The preferences set by hand in the app on the desktop, read back with

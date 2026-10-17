@@ -17,7 +17,7 @@
 # exists on a fresh host. home/nautilus.nix pins it in the sidebar, and a
 # bookmark pointing at a missing directory is a dead entry.
 #
-# Self-gates on osConfig.features.niri, same convention as home/nautilus.nix
+# Self-gates on osConfig.features.desktop, same convention as home/nautilus.nix
 # — XDG user dirs only matter for GUI apps (file managers, browsers' save
 # dialogs, ...), all niri-gated in this repo today.
 {
@@ -26,7 +26,7 @@
   osConfig,
   ...
 }:
-lib.mkIf osConfig.features.niri {
+lib.mkIf osConfig.features.desktop {
   xdg.userDirs = {
     enable = true;
     createDirectories = true;

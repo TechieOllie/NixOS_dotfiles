@@ -48,7 +48,7 @@
 # .desktop file assuming it was right (nixpkgs' own says "Vesktop", capital,
 # which is wrong for the actual running process).
 #
-# Self-gates on osConfig.features.niri, same convention as home/vscode.nix.
+# Self-gates on osConfig.features.desktop, same convention as home/vscode.nix.
 #
 # Autostart: a systemd.user.services unit bound to graphical-session.target,
 # not Vesktop's own native autostart toggle (src/main/autoStart.ts) — on
@@ -67,7 +67,7 @@
   pkgs,
   ...
 }:
-lib.mkIf osConfig.features.niri {
+lib.mkIf osConfig.features.desktop {
   programs.vesktop = {
     enable = true;
     settings = builtins.fromJSON (builtins.readFile ./vesktop-config/settings.json);

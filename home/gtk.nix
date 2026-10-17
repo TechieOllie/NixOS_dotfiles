@@ -1,5 +1,5 @@
 # Icon theme (Papirus-Dark) and GTK3 shape theme (adw-gtk3) — self-gates on
-# osConfig.features.niri, same convention as home/niri.nix/home/cursor.nix.
+# osConfig.features.desktop, same convention as home/niri.nix/home/cursor.nix.
 #
 # GTK4 has no theme set here on purpose: GTK4 apps already render rounded,
 # libadwaita-style widgets by default, and home-manager's own gtk4 module
@@ -14,7 +14,7 @@
   osConfig,
   ...
 }:
-lib.mkIf osConfig.features.niri {
+lib.mkIf osConfig.features.desktop {
   gtk = {
     enable = true;
 

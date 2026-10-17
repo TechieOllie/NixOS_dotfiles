@@ -12,7 +12,7 @@
 # by construction rather than whatever the session happens to export.
 # Bound to Mod+Shift+S in home/niri/cfg/keybinds.kdl.
 #
-# Self-gates on osConfig.features.niri: slurp/grim are Wayland-only.
+# Self-gates on osConfig.features.desktop: slurp/grim are Wayland-only.
 {
   pkgs,
   lib,
@@ -59,6 +59,6 @@ let
     '';
   };
 in
-lib.mkIf osConfig.features.niri {
+lib.mkIf osConfig.features.desktop {
   home.packages = [ screenshot ];
 }

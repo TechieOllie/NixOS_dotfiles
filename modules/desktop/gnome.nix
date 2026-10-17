@@ -1,5 +1,5 @@
-# GNOME desktop — the alternate desktop stack to modules/desktop/{niri,greetd,
-# noctalia,theming,nautilus}.nix, which are all gated on config.features.niri
+# GNOME desktop — the alternate desktop stack to modules/desktop/{session,greetd,
+# noctalia,theming,nautilus}.nix, which are all gated on config.features.desktop
 # and therefore inert here. Gated on its own config.features.gnome so the two
 # stacks can never both apply to one host by accident.
 #

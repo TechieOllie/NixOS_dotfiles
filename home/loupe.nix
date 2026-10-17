@@ -12,7 +12,7 @@
 # keyboard-only and unthemed, wrong fit next to Nautilus), qimgv (Qt, a
 # second toolkit for one app), eog (upstream-superseded by Loupe).
 #
-# Self-gates on osConfig.features.niri, same convention as
+# Self-gates on osConfig.features.desktop, same convention as
 # home/nautilus.nix — a GUI viewer only means anything where there's a
 # graphical session.
 #
@@ -51,7 +51,7 @@ let
     "image/qoi"
   ];
 in
-lib.mkIf osConfig.features.niri {
+lib.mkIf osConfig.features.desktop {
   home.packages = [ pkgs.loupe ];
 
   # Loupe already ships these associations in its own desktop entry, but

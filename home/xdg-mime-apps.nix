@@ -43,7 +43,7 @@
 # which is why the discord handler is restated below rather than inherited
 # from whatever Vesktop happened to write.
 #
-# Self-gates on osConfig.features.niri, same convention as
+# Self-gates on osConfig.features.desktop, same convention as
 # home/xdg-user-dirs.nix — default applications only matter where there are
 # GUI applications to launch.
 #
@@ -54,7 +54,7 @@
 # app-specific belongs here, or this turns back into the central list that
 # every module has to be kept in sync with.
 { lib, osConfig, ... }:
-lib.mkIf osConfig.features.niri {
+lib.mkIf osConfig.features.desktop {
   xdg.mimeApps.enable = true;
 
   # See the note above: home-manager won't overwrite the pre-existing

@@ -73,21 +73,21 @@ lib.mkIf osConfig.features.workstation {
     # git skips a missing include silently, so before Noctalia's first
     # template pass delta just keeps its defaults. Includes come after the
     # main settings, so the rendered [delta] keys win over programs.delta's.
-    includes = lib.optional osConfig.features.niri { path = deltaThemePath; };
+    includes = lib.optional osConfig.features.desktop { path = deltaThemePath; };
   };
 
   # delta as git's pager: syntax-highlighted diffs, with `n`/`N` jumping
   # between files. A separate programs.* module since Home Manager split it
   # out of programs.git, and the git hookup now has to be asked for. Colours
-  # come from the Noctalia-rendered include above; without Noctalia (the
-  # laptop) delta keeps its defaults. lazygit uses it too: home/lazygit.nix.
+  # come from the Noctalia-rendered include above; without Noctalia
+  # delta keeps its defaults. lazygit uses it too: home/lazygit.nix.
   programs.delta = {
     enable = true;
     enableGitIntegration = true;
     options.navigate = true;
   };
 
-  programs.noctalia.settings.theme.templates.user.delta = lib.mkIf osConfig.features.niri {
+  programs.noctalia.settings.theme.templates.user.delta = lib.mkIf osConfig.features.desktop {
     input_path = deltaTemplate;
     output_path = [ deltaThemePath ];
   };

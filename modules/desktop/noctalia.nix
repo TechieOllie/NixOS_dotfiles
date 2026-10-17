@@ -1,6 +1,6 @@
-# Gated on config.features.niri like greetd.nix — Noctalia Shell is a
-# niri-companion bar/shell, not useful without a compositor, and niri is
-# the only one this repo offers so far.
+# Gated on config.features.desktop like greetd.nix — Noctalia Shell is the
+# bar/shell half of the Noctalia desktop, the same under niri or Umbriel, and
+# not useful without one of them.
 {
   config,
   lib,
@@ -10,7 +10,7 @@
 {
   imports = [ noctalia.nixosModules.default ];
 
-  config = lib.mkIf config.features.niri {
+  config = lib.mkIf config.features.desktop {
     programs.noctalia.enable = true;
 
     # Enables NetworkManager (already on unconditionally), Bluetooth,

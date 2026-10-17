@@ -13,13 +13,13 @@
 # one's own snippets/ folder — added to home/noctalia.nix's community_ids.
 # No conflict: nothing here manages any vault content.
 #
-# Self-gates on osConfig.features.niri, same convention as home/vscode.nix.
+# Self-gates on osConfig.features.desktop, same convention as home/vscode.nix.
 {
   pkgs,
   lib,
   osConfig,
   ...
 }:
-lib.mkIf osConfig.features.niri {
+lib.mkIf osConfig.features.desktop {
   home.packages = [ pkgs.obsidian ];
 }

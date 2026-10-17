@@ -1,4 +1,4 @@
-# System-wide cursor/icon-theme packages — gated on config.features.niri
+# System-wide cursor/icon-theme packages — gated on config.features.desktop
 # like greetd.nix/noctalia.nix. noctalia-greeter runs outside any user's Home
 # Manager profile (before login), so the packages Home Manager installs for
 # the user session (home/cursor.nix, home/gtk.nix) aren't visible to it —
@@ -12,7 +12,7 @@
   ...
 }:
 {
-  config = lib.mkIf config.features.niri {
+  config = lib.mkIf config.features.desktop {
     environment.systemPackages = [
       pkgs.bibata-cursors
       pkgs.papirus-icon-theme

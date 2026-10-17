@@ -9,7 +9,7 @@
 # The prompt is defined ONCE, as `prompt` below — a function of a colour
 # set — and reaches each kind of host by a different route:
 #
-#   - niri hosts: Noctalia's template engine owns ~/.config/starship.toml
+#   - desktop hosts: Noctalia's template engine owns ~/.config/starship.toml
 #     outright, re-rendering it on every wallpaper/palette change, so Home
 #     Manager must not manage that path (the conflict class this repo
 #     already fixed once for niri/noctalia.kdl). `prompt` is called with
@@ -17,7 +17,7 @@
 #     at build time, and registered as a custom user template — the same
 #     generate-the-template-input shape as niriStyleTemplate in
 #     home/noctalia.nix.
-#   - every other host (inotmac, the laptop): no template pass ever runs,
+#   - every other host (inotmac): no template pass ever runs,
 #     so without Home Manager writing the file Starship silently falls back
 #     to its built-in default prompt. `prompt` is called with static named
 #     colours and becomes programs.starship.settings.
@@ -164,7 +164,7 @@ in
 {
   programs.starship.enable = true;
 
-  programs.starship.settings = lib.mkIf (!osConfig.features.niri) (prompt {
+  programs.starship.settings = lib.mkIf (!osConfig.features.desktop) (prompt {
     frame = "blue";
     path = "cyan";
     accent = "purple";
@@ -176,7 +176,7 @@ in
   # prompt, no daemon/signal to restart. Gated on the same flag as
   # home/noctalia.nix's whole config, since the option only means
   # something where Noctalia runs.
-  programs.noctalia.settings.theme.templates.user.starship = lib.mkIf osConfig.features.niri {
+  programs.noctalia.settings.theme.templates.user.starship = lib.mkIf osConfig.features.desktop {
     input_path = noctaliaTemplate;
     output_path = [ "$XDG_CONFIG_HOME/starship.toml" ];
   };

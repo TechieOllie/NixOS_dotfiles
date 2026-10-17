@@ -10,6 +10,7 @@
     ./hardware-configuration.nix
     ./secrets.nix
     ../../profiles/base.nix
+    ../../modules/desktop/session.nix
     ../../modules/desktop/niri.nix
     ../../modules/desktop/greetd.nix
     ../../modules/desktop/noctalia.nix

@@ -1,4 +1,4 @@
-# System half of Nautilus — gated on config.features.niri like the rest of
+# System half of Nautilus — gated on config.features.desktop like the rest of
 # this directory, since it's only useful with a graphical session. The user
 # half (dconf preferences) lives in home/nautilus.nix, same split as niri.
 #
@@ -27,7 +27,7 @@
   pkgs,
   ...
 }:
-lib.mkIf config.features.niri {
+lib.mkIf config.features.desktop {
   environment.systemPackages = [ pkgs.nautilus ];
 
   programs.dconf.enable = true;

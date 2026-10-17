@@ -54,9 +54,10 @@ in
     ../../modules/services/moonshine.nix
     ../../modules/services/kdeconnect.nix
 
-    # The desktop stack, the same five modules the VM imports — this is the
-    # machine's daily driver session, not a headless box. features.niri in
-    # ./features.nix is the matching flag; the two are one edit.
+    # The desktop stack, the same six modules the VM imports — this is the
+    # machine's daily driver session, not a headless box. features.desktop
+    # and .niri in ./features.nix are the matching flags; one edit.
+    ../../modules/desktop/session.nix
     ../../modules/desktop/niri.nix
     ../../modules/desktop/greetd.nix
     ../../modules/desktop/noctalia.nix

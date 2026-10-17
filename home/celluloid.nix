@@ -28,7 +28,7 @@
 # needing a "Try Anyway" click per file (upstream issues #298 and #277).
 # Switch back only once a GoPro clip plays without that prompt.
 #
-# Self-gates on osConfig.features.niri, same convention as home/loupe.nix and
+# Self-gates on osConfig.features.desktop, same convention as home/loupe.nix and
 # home/papers.nix.
 {
   pkgs,
@@ -84,7 +84,7 @@ let
     "video/x-theora+ogg"
   ];
 in
-lib.mkIf osConfig.features.niri {
+lib.mkIf osConfig.features.desktop {
   home.packages = [ pkgs.celluloid ];
 
   # Celluloid ships these associations in its own desktop entry, but that only

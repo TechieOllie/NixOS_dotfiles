@@ -32,7 +32,7 @@
 # with the channel. If the channel ever changes again, re-check the built
 # package's own .desktop and icon names before assuming they line up.
 #
-# Self-gates on osConfig.features.niri, same convention as home/vscode.nix.
+# Self-gates on osConfig.features.desktop, same convention as home/vscode.nix.
 #
 # Transparent Zen mod opacity: the mod itself (installed manually via Zen's
 # own Mods UI, not Nix-managed — see below) makes the webpage backplate
@@ -122,7 +122,7 @@ in
 {
   imports = [ zen-browser.homeModules.beta ];
 
-  config = lib.mkIf osConfig.features.niri {
+  config = lib.mkIf osConfig.features.desktop {
     programs.zen-browser = {
       enable = true;
       setAsDefaultBrowser = true;

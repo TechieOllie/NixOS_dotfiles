@@ -1,6 +1,7 @@
 # Machine-agnostic entry point: every host's Home Manager user points here
 # (see lib/mkHost.nix). Every home/*.nix module is imported from here; the
-# modules themselves self-gate where they need to (osConfig.features.niri).
+# modules themselves self-gate where they need to (osConfig.features.desktop,
+# or .niri/.umbriel for the compositor-specific ones).
 { vars, ... }:
 {
   imports = [

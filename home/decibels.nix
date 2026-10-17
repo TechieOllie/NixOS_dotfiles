@@ -14,7 +14,7 @@
 # inode/directory in its desktop entry, which would have had to be left
 # unclaimed anyway so Nautilus keeps owning folders.
 #
-# Self-gates on osConfig.features.niri, same convention as home/loupe.nix and
+# Self-gates on osConfig.features.desktop, same convention as home/loupe.nix and
 # home/celluloid.nix.
 #
 # Verified live on the desktop 2026-08-23: music opens in Decibels.
@@ -61,7 +61,7 @@ let
     "audio/x-ms-wma"
   ];
 in
-lib.mkIf osConfig.features.niri {
+lib.mkIf osConfig.features.desktop {
   home.packages = [ pkgs.decibels ];
 
   # Decibels ships most of these associations in its own desktop entry, but

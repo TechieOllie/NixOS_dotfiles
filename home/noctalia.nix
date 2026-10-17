@@ -1,7 +1,9 @@
 # User half of Noctalia Shell v5 (theming, wallpaper) — the system half
 # (package, Bluetooth/UPower/power-profiles wiring, Cachix substituter)
-# lives in modules/desktop/noctalia.nix. Self-gates on osConfig.features.niri
-# the same way home/niri.nix does.
+# lives in modules/desktop/noctalia.nix. Self-gates on
+# osConfig.features.desktop: the shell is the same under either compositor,
+# and only the few compositor-specific pieces below (the "niri" builtin
+# template, niri-style and its seed) gate on features.niri on top of that.
 {
   lib,
   pkgs,
@@ -72,7 +74,7 @@ in
 {
   imports = [ noctalia.homeModules.default ];
 
-  config = lib.mkIf osConfig.features.niri {
+  config = lib.mkIf osConfig.features.desktop {
     programs.noctalia = {
       enable = true;
       # Supervised (restart-on-failure, journalctl logging) rather than a
@@ -551,14 +553,19 @@ in
             # because that module already declares color_theme = "noctalia",
             # and the script's first branch is a no-op when that exact line
             # is present. Keep the two in step.
-            builtin_ids = [
-              "btop"
-              "ghostty"
-              "gtk3"
-              "gtk4"
-              "niri"
-              "qt"
-            ];
+            #
+            # The compositor's own template is the only per-host entry, so
+            # the list is sorted rather than spliced by hand.
+            builtin_ids = lib.sort lib.lessThan (
+              [
+                "btop"
+                "ghostty"
+                "gtk3"
+                "gtk4"
+                "qt"
+              ]
+              ++ lib.optional osConfig.features.niri "niri"
+            );
 
             # Deliberately NOT "neovim" here — its official community
             # template turned out to be a *different* file from the
@@ -686,13 +693,13 @@ in
               # and reloads on change, which is the same thing the builtin
               # "niri" color template relies on. Adding one would be a second,
               # redundant reload path.
-              niri-style = {
+              niri-style = lib.mkIf osConfig.features.niri {
                 input_path = niriStyleTemplate;
                 output_path = [ "$XDG_CONFIG_HOME/niri/noctalia-style.kdl" ];
               };
 
               # starship: declared in home/starship.nix, which generates
-              # its input from the same definition as the non-niri prompt.
+              # its input from the same definition as the non-Noctalia prompt.
 
               lazygit = {
                 input_path = ./noctalia-templates/lazygit-theme.yml.tmpl;
@@ -786,10 +793,12 @@ in
     # is nothing to preserve and no fight to lose — but changing style.radius
     # does need to reach the file even when it already exists, which a
     # create-if-missing seed would silently skip.
-    home.activation.seedNiriStyle = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      run mkdir -p "$HOME/.config/niri"
-      run cp -f "${niriStyleTemplate}" "$HOME/.config/niri/noctalia-style.kdl"
-      run chmod u+w "$HOME/.config/niri/noctalia-style.kdl"
-    '';
+    home.activation.seedNiriStyle = lib.mkIf osConfig.features.niri (
+      lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+        run mkdir -p "$HOME/.config/niri"
+        run cp -f "${niriStyleTemplate}" "$HOME/.config/niri/noctalia-style.kdl"
+        run chmod u+w "$HOME/.config/niri/noctalia-style.kdl"
+      ''
+    );
   };
 }

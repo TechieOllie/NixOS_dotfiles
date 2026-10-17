@@ -1,4 +1,4 @@
-{ lib, ... }:
+{ config, lib, ... }:
 {
   options.features = lib.mkOption {
     type = lib.types.submodule {
@@ -8,10 +8,20 @@
           default = false;
           description = "Enable automatic btrfs snapshots (snapper) of / and /home.";
         };
+        desktop = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Enable the Noctalia desktop: greetd + noctalia-greeter, Noctalia Shell, theming, Nautilus and the graphical apps in home/. Compositor-agnostic; pair it with exactly one of features.niri / features.umbriel.";
+        };
         niri = lib.mkOption {
           type = lib.types.bool;
           default = false;
-          description = "Enable the Niri Wayland compositor (system package + session entry only; user config lives in home/niri.nix).";
+          description = "Use Niri as features.desktop's compositor (system package + session entry; user config lives in home/niri.nix).";
+        };
+        umbriel = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Use Umbriel as features.desktop's compositor (system package + session entry; user config lives in home/umbriel.nix).";
         };
         gaming = lib.mkOption {
           type = lib.types.bool;
@@ -61,11 +71,35 @@
         gnome = lib.mkOption {
           type = lib.types.bool;
           default = false;
-          description = "Enable the GNOME desktop (GDM + GNOME Shell), independent of features.niri. A separate desktop stack for hosts that aren't running Niri/Noctalia.";
+          description = "Enable the GNOME desktop (GDM + GNOME Shell), independent of features.desktop. A separate desktop stack for hosts that aren't running Noctalia.";
         };
       };
     };
     default = { };
     description = "Feature flags controlling optional functionality. Every toggle a host or profile can set must be declared here.";
   };
+
+  # The compositor flags only choose *which* compositor features.desktop runs
+  # on; neither means anything alone, and the shared modules (greetd's
+  # --session, Noctalia's compositor template) assume exactly one. An
+  # assertion rather than an enum so each compositor keeps a plain bool that
+  # its own modules can gate on, like every other flag here.
+  config.assertions =
+    let
+      f = config.features;
+      compositors = lib.filter (x: x) [
+        f.niri
+        f.umbriel
+      ];
+    in
+    [
+      {
+        assertion = f.desktop -> lib.length compositors == 1;
+        message = "features.desktop needs exactly one compositor: set one of features.niri / features.umbriel.";
+      }
+      {
+        assertion = compositors != [ ] -> f.desktop;
+        message = "features.niri / features.umbriel only pick features.desktop's compositor; set features.desktop = true as well.";
+      }
+    ];
 }
