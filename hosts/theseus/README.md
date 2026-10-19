@@ -58,19 +58,20 @@ Installed 2026-10-19. Left to do, in order:
   - the touchscreen, on the panel alone
   - the AZERTY workspace binds, `Mod+&`…`Mod+ç`
   - the scratchpads, `Mod+Shift+Return`, `Mod+M` and `Mod+D`
+  - the resize binds, `Mod+)`/`Mod+=`
+  - hibernate and resume through the TPM unlock
+  - Steam (Millennium) under Umbriel's Xwayland, once `~/.steam/steam` was
+    repaired by hand — see `modules/programs/steam.nix`
+  - the replay buffer: `Alt+F10` saves to `~/Videos/Replays`
 
   Still untested:
   - the LUKS passphrase fallback, at the AZERTY prompt — easiest after the
     next firmware update, when the TPM refuses anyway
-  - hibernate/resume through LUKS: `systemctl hibernate` tests the resume
-    path directly. Lid closed on battery should then hibernate on its own
-    after 2 h; afterwards `journalctl -b -1 -u systemd-suspend-then-hibernate`
-    shows whether it did
-  - Steam under Umbriel's Xwayland
-  - the replay buffer: starting a Proton game turns the buffer on, and
-    `Alt+F10` saves to `~/Videos/Replays` (`replay-auto` itself is running)
-  - games keep the pointer inside them (`confine_pointer`)
-  - the resize binds, `Mod+)`/`Mod+=`
+  - the lid-closed suspend-then-hibernate after 2 h on battery: afterwards
+    `journalctl -b -1 -u systemd-suspend-then-hibernate` shows whether it
+    did
+  - a Proton game: it runs, `replay-auto` turns the buffer on by itself,
+    and the pointer stays inside it (`confine_pointer`)
   - the touchscreen staying on the laptop panel with an external monitor
     connected
 
