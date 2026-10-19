@@ -22,6 +22,7 @@
 # its owner expects is worth having even on a machine visited only to fix
 # something.
 {
+  config,
   pkgs,
   lib,
   osConfig,
@@ -42,4 +43,22 @@ lib.mkIf osConfig.features.workstation {
       "shell-integration-features" = "ssh-env,ssh-terminfo";
     };
   };
+
+  # Home Manager validates this config (`ghostty +validate-config`) as its
+  # onChange, and on a fresh install that runs before Noctalia's first
+  # template pass has written themes/noctalia — so the unknown theme failed
+  # the whole home-manager-ol.service on theseus's first boot, skipping
+  # every activation step after it. An empty theme is valid, and the
+  # template renders the whole file over it. Create-if-missing only, so it
+  # never clobbers a rendered palette. Same shape as seedNiriStyle in
+  # home/noctalia.nix.
+  home.activation.seedGhosttyTheme =
+    lib.hm.dag.entryBetween [ "onFilesChange" ] [ "writeBoundary" ]
+      ''
+        theme="${config.xdg.configHome}/ghostty/themes/noctalia"
+        if [ ! -e "$theme" ]; then
+          run mkdir -p "$(dirname "$theme")"
+          run touch "$theme"
+        fi
+      '';
 }
