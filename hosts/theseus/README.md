@@ -63,6 +63,7 @@ Installed 2026-10-19. Left to do, in order:
   - Steam (Millennium) under Umbriel's Xwayland, once `~/.steam/steam` was
     repaired by hand — see `modules/programs/steam.nix`
   - the replay buffer: `Alt+F10` saves to `~/Videos/Replays`
+  - a Proton game, through Steam
 
   Still untested:
   - the LUKS passphrase fallback, at the AZERTY prompt — easiest after the
@@ -70,8 +71,10 @@ Installed 2026-10-19. Left to do, in order:
   - the lid-closed suspend-then-hibernate after 2 h on battery: afterwards
     `journalctl -b -1 -u systemd-suspend-then-hibernate` shows whether it
     did
-  - a Proton game: it runs, `replay-auto` turns the buffer on by itself,
-    and the pointer stays inside it (`confine_pointer`)
+  - `replay-auto` turning the buffer on by itself when a game opens (it
+    logs nothing either way: `pgrep gpu-screen-rec` while the game runs,
+    without having pressed the toggle), and the pointer staying inside the
+    game (`confine_pointer`)
   - the touchscreen staying on the laptop panel with an external monitor
     connected
 
