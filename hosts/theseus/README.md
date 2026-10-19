@@ -37,12 +37,12 @@ Installed 2026-10-19. Left to do, in order:
 - [ ] First boot: enroll the TPM and a recovery key (`systemd-cryptenroll`),
       then the fingerprint (`fprintd-enroll`). These are machine state no
       module can declare.
-- [ ] Battery charge limit, also machine state: set it once in the BIOS
+- [x] Battery charge limit, also machine state: set it once in the BIOS
       ("Battery Charge Limit", e.g. 80%) or with `sudo framework_tool
       --charge-limit 80`, which nixos-hardware installs. Both are stored in
       the embedded controller, not in NixOS, so they survive reinstalls.
       `framework_tool --charge-limit` with no value reads it back.
-- [ ] Clone `~/.dotfiles`. Umbriel's config and the wallpapers are
+- [x] Clone `~/.dotfiles`. Umbriel's config and the wallpapers are
       live-symlinked from it, as niri's are on the desktop
       (`docs/live-dotfiles.md`).
 - [ ] Verify live, since none of this has run on the real hardware yet:
@@ -58,9 +58,9 @@ Installed 2026-10-19. Left to do, in order:
     hibernate on its own after 2 h; afterwards
     `journalctl -b -1 -u systemd-suspend-then-hibernate` shows whether it
     did
-  - the GPU is on `xe` (`lspci -k` shows "Kernel driver in use: xe") and
-    VA-API works (`vainfo` lists the iHD driver)
-  - Wi-Fi
+  - ~~the GPU is on `xe` and VA-API works (iHD)~~ — verified 2026-10-19
+    (`/sys/class/drm/card0/device/driver` is `xe`; `lspci` isn't installed)
+  - ~~Wi-Fi~~ — verified 2026-10-19
   - Steam under Umbriel's Xwayland
   - the panel's scale, which may need an `[output.eDP-1]` table
   - the touchscreen: taps land where touched, and stay on the laptop panel
