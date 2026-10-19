@@ -41,6 +41,10 @@
       # it could not reach a machine only after that machine was installed
       # is exactly how inotmac's first boot went.
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINK969JoQS2K7NuxD5TYEP+2QXevdSdwpc6BAb/lAWRt ol@the-entertaining-nios-desktop"
+      # theseus's own per-host identity (its ~/.ssh/id_ed25519, from that
+      # host's secrets.nix), on every host for the same reason as the
+      # desktop's above: it is the operator's main machine since 2026-10-19.
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIP7MsiDVffOJo/MxQ699qjQj7SMyysXK0RXQ+ytT7Hbb ol@theseus"
     ];
 
   };

@@ -35,6 +35,9 @@
       # The desktop's own per-host key (~/.ssh/id_ed25519), so the machine
       # running nixos-anywhere can reach the installer as itself.
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINK969JoQS2K7NuxD5TYEP+2QXevdSdwpc6BAb/lAWRt ol@the-entertaining-nios-desktop"
+      # theseus's own per-host key, likewise: the operator's main machine
+      # since 2026-10-19.
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIP7MsiDVffOJo/MxQ699qjQj7SMyysXK0RXQ+ytT7Hbb ol@theseus"
     ];
   };
 }
