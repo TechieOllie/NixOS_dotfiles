@@ -71,6 +71,35 @@ here, `./extra-files/var/lib/sops-nix/key.txt` should hold the host's private
 age key (matching `sops.age.keyFile` in that host's `secrets.nix`), so the
 machine boots already able to decrypt its own secrets.
 
+**Check that the staged key is this host's before running.** `extra-files/`
+is gitignored and reused from one install to the next, so it holds whatever
+the *previous* install staged. For theseus it still held the desktop's key.
+Installed like that, the host can't decrypt anything, its `neededForUsers`
+password hash included, so nobody can log in. The two lines must match:
+
+```bash
+age-keygen -y extra-files/var/lib/sops-nix/key.txt
+grep '&<name> ' .sops.yaml
+```
+
+Afterwards, `shred -u extra-files/var/lib/sops-nix/key.txt`. The original
+stays in `~/.config/sops/age/<name>.txt`, and `.sops.yaml`'s recovery key
+covers it beyond that (see `secrets.md`).
+
+**Evaluate before wiping anything.** Once the installer is up, the host's
+`hardware-configuration.nix` can be generated over SSH exactly as
+nixos-anywhere will generate it. That lets `driver.sh check` evaluate the
+real host before step 6 touches the disk:
+
+```bash
+ssh root@<installer-ip> nixos-generate-config --no-filesystems --show-hardware-config \
+  > hosts/<name>/hardware-configuration.nix
+git add -N hosts/<name>/hardware-configuration.nix
+```
+
+nixos-anywhere's `--generate-hardware-config` then overwrites it with
+identical content.
+
 **This step wipes the target disk.** Never run it against a machine still in
 daily use unless you mean to replace what's currently on it.
 
@@ -122,6 +151,18 @@ After that gnome-keyring caches the passphrase across reboots. See
 `docs/decisions.md` for why `ssh-add -l` is the wrong way to check this
 worked.
 
+**First launches on a fresh desktop host.** Noctalia's first theme pass runs
+before any themed app has started, which no already-provisioned host ever
+exercised. theseus's first boot hit two such bugs, both fixed in the repo
+since: Ghostty's config check failing the whole Home Manager service, and
+the Steam template turning `~/.steam/steam` into a directory (see the
+fresh-install gotcha in `CLAUDE.md`). Expect `systemctl --failed` and
+`systemctl --user --failed` to be empty after the first login. If either
+isn't, read that unit's journal before anything else. Separately, Steam's
+first launch downloads its ~500 MB client behind a small updater window
+before the real one appears. That reads as "Steam won't start" and isn't a
+fault.
+
 ## 9. Verify
 
 ```bash
@@ -129,7 +170,11 @@ nixos-rebuild switch --flake .#<name>
 ```
 
 should now work directly on the host for all future changes, from a clone
-of this repo.
+of this repo. **Pull first.** The flake builds whatever the clone has
+checked out, so a switch without `git pull` succeeds and silently deploys
+the old commit. It happened on theseus the first time it took a repo-side
+change. `git -C ~/.dotfiles log --oneline -1` against `origin/main` shows
+which commit you're on.
 
 A host that has no clone — because nobody works on it, so there is no
 reason to give it a git identity — rebuilds straight from the public
@@ -165,7 +210,7 @@ file only you can read, then pass both:
 
 ```bash
 install -m 600 /dev/null /tmp/theseus-disk.key
-$EDITOR /tmp/theseus-disk.key   # the passphrase; a trailing newline is ignored
+read -rs -p "LUKS passphrase: " p && printf '%s' "$p" > /tmp/theseus-disk.key; unset p; echo
 nixos-anywhere --flake .#theseus \
   --disk-encryption-keys /tmp/disk.key /tmp/theseus-disk.key \
   --generate-hardware-config nixos-generate-config ./hosts/theseus/hardware-configuration.nix \
@@ -178,7 +223,18 @@ shred -u /tmp/theseus-disk.key
 `/tmp/disk.key`, the path `disko.nix`'s `passwordFile` reads. The
 passphrase becomes LUKS keyslot 0 and stays the fallback for good, so
 **choose one you can type**: it's what you'll be asked for whenever the TPM
-won't release the key, for example after a firmware update.
+won't release the key, for example after a firmware update. Only the local
+file has to exist. `/tmp/disk.key` is the path *on the installer*, which
+nixos-anywhere creates, so finding nothing there locally is expected.
+**Don't skip the `shred`.** On theseus it was skipped, and the passphrase sat
+in plaintext in `/tmp` until the cleanup afterwards.
+
+**The initrd needs the keyboard layout too.** On a non-US keyboard, set
+`console.earlySetup = true` on an encrypted host (theseus does). Without it,
+the systemd initrd has no `vconsole.conf`, reads keys as US, and rejects a
+correct passphrase typed on AZERTY. It's the disk-level version of inotmac's
+GDM lockout. Check with
+`nix eval .#nixosConfigurations.<name>.config.boot.initrd.systemd.contents --apply 'c: c ? "/etc/vconsole.conf"'`.
 
 `.#theseus` has to exist in `flake.nix` for this command to resolve, and
 `hosts/README.md` keeps it out until `hardware-configuration.nix` is real.
@@ -189,7 +245,12 @@ afterwards. nixos-anywhere (1.13) takes care of the rest of step 2: it runs
 `fileSystems` to strip, and it marks the new file `git add --intent-to-add`
 before evaluating, so the flake can see it.
 
-**After first boot**, three things are machine state no module can declare:
+**After first boot**, before any of the following: the installed system
+has no Wi-Fi profile (the installer's connection doesn't carry over), so
+connect first with `nmcli device wifi connect "<SSID>" --ask`. Unlike
+inotmac, theseus declares no network profile, on purpose, since a laptop
+moves between networks. Then three things are machine state no module can
+declare:
 
 ```bash
 # Let the TPM unlock the disk from now on. PCR 7 is the Secure Boot state,
@@ -209,7 +270,15 @@ fprintd-enroll
 Reboot once to confirm the disk now opens without a prompt. `sudo
 cryptsetup luksDump /dev/disk/by-partlabel/disk-main-luks` should list three
 keyslots or tokens: the passphrase, the `systemd-tpm2` token and the
-`systemd-recovery` one.
+`systemd-recovery` one. Without root, the unlock's duration tells you which
+one opened it:
+
+```bash
+journalctl -b -o short-precise -u systemd-cryptsetup@cryptroot.service | grep -E 'Starting|Finished'
+```
+
+On theseus that was 80 s on first boot (typed) and 1.5 s after enrollment
+(TPM).
 
 **What TPM unlock with Secure Boot off protects against**: a drive taken out
 of the machine. The key is sealed to this board's TPM, so the NVMe alone is

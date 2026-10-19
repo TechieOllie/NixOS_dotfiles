@@ -4966,6 +4966,10 @@ an activation seed.
 
 ### Why theseus has no flake entry yet
 
+*Superseded 2026-10-19: the entry landed with the install. See "theseus
+installed" below. Kept as the record of what was checked before any
+hardware existed.*
+
 `hosts/README.md` keeps a host out of `nixosConfigurations` until its
 `hardware-configuration.nix` is real, and on this machine that file can
 only come from the machine itself (`nixos-anywhere --generate-hardware-config`,
@@ -4978,7 +4982,7 @@ result). What stood in for the missing entry:
 - The four out-of-tree kernel modules (xone, xpadneo, xpad-noone,
   framework-laptop-kmod) were built against `linuxPackages_latest` (7.2.9).
 
-**Nothing has run on the hardware.** TPM unlock, fingerprint enrollment,
+**Nothing had run on the hardware** at the time. TPM unlock, fingerprint enrollment,
 the keyring after a greeter login, hibernate/resume through LUKS, Wi-Fi,
 Steam under Umbriel's Xwayland and the panel's scale are all unverified.
 
@@ -5022,6 +5026,107 @@ Deferred, waiting on the operator's NAS:
   replacement once the NAS exists.
 
 Not pursued for now: using the desktop as a remote builder for theseus.
+
+## theseus installed (2026-10-19)
+
+Installed with nixos-anywhere from the installer ISO, driven from the
+operator's CachyOS laptop over Wi-Fi (installer at 192.168.1.21). The
+runbook was `docs/bootstrapping-a-host.md`, "Encrypted host", which now
+carries the lessons below as steps.
+
+### Pre-flight: three things that would have gone wrong
+
+Read from the installer: Framework Laptop 13 Pro (Core Ultra Series 3),
+Secure Boot already off (the `SecureBoot` efivar's value byte was 0), TPM
+2.0 present, a blank 1 TB WD_BLACK SN7100, and `MemTotal` 30.9 GiB. That
+resolved `disko.nix`'s two placeholders: the disk by id
+(`nvme-WD_BLACK_SN7100_1TB_26011T802238`) and 32G of swap.
+
+- **The staged age key was the desktop's.** `extra-files/` is gitignored and
+  had last been filled for the desktop's install. Comparing
+  `age-keygen -y` of the staged key against `.sops.yaml` caught it. Installed
+  as-is, theseus couldn't have decrypted its `neededForUsers` password hash,
+  and so would have had no login at all. Restaged from
+  `~/.config/sops/age/theseus.txt`.
+- **The initrd would have read the passphrase as US.** `console.earlySetup`
+  was false, so the systemd initrd shipped no `vconsole.conf`, and a
+  passphrase typed on this AZERTY keyboard would have been rejected at the
+  very first boot. It's now set in `hosts/theseus/default.nix`, and
+  `/etc/vconsole.conf` is in the initrd's contents. The disk-level twin of
+  inotmac's GDM lockout.
+- **Eval before wiping.** `hardware-configuration.nix` was generated over SSH
+  from the installer (`nixos-generate-config --no-filesystems
+  --show-hardware-config`, the same thing nixos-anywhere runs), so
+  `driver.sh check` could evaluate the real host first. The checks: systemd
+  initrd with TPM2, `cryptroot` with `tpm2-device=auto`, resume on
+  `/dev/pool/swap`, all eight mounts, and kernel 7.2.9. nixos-anywhere later
+  regenerated the file byte-identically.
+
+`system.stateVersion` stayed `26.05`, the latest *released* stable on
+install day (nixpkgs itself is a 26.11 pre-release).
+
+### First boot: two fresh-install ordering bugs
+
+Neither shows up in eval, in a closure build, or on any host that was themed
+after its apps had run. Both are now a standing gotcha in `CLAUDE.md`.
+
+- **`home-manager-ol.service` failed.** Home Manager's Ghostty module runs
+  `ghostty +validate-config` as the config file's `onChange`. At 22:59 that
+  ran before Noctalia's first template pass (23:09) had written
+  `themes/noctalia`, so `theme = "noctalia"` was unknown, exit 1, and every
+  activation step after it was skipped. Reproduced on theseus (missing theme
+  exit 1, empty theme exit 0). `home/ghostty.nix` now seeds an empty theme
+  if absent, between `writeBoundary` and `onFilesChange`.
+- **Steam: "Couldn't set up Steam data".** Noctalia's community `steam`
+  template writes `~/.steam/steam/steamui/skins/Material-Theme/css/main/colors/matugen.css`
+  and creates every missing parent. On a host where Steam hasn't run yet,
+  that makes `~/.steam/steam` a real directory, where Steam's bootstrap
+  expects its own symlink to `~/.local/share/Steam`. The `@steam` mount and
+  ownership were fine, which ruled out the first suspect.
+  `modules/programs/steam.nix` now pre-creates the link with a tmpfiles `L`
+  rule (dry-run against fresh and broken trees: it creates the link on the
+  first and leaves the directory on the second). On theseus the directory
+  was replaced by hand. The comment in `home/noctalia.nix` calling these
+  templates harmless was wrong for this one and now says so. A second "Steam
+  won't run" after the fix was the first-launch ~500 MB client download, not
+  a fault.
+
+### Smaller findings
+
+- **Panel scale 1.6.** 2880x1920 on 280 mm is about 260 DPI, and it came up
+  at 1.0. 1.6 divides it exactly (1800x1200 logical). It was trialled live by
+  appending a table to the clone's `cfg/layout.toml`, picked on the real
+  screen over 1.5 and 2.0, then committed there. That's not a new
+  `cfg/display.toml`, because a new include needs a switch to create its
+  symlink first.
+- **The touchscreen** is `CSW1322:00 3558:14FD` (I2C-HID); it needed nothing.
+- **`lspci` isn't installed**, so the GPU driver check is
+  `/sys/class/drm/card0/device/driver` (`xe`).
+- **The first switch after a repo change deployed the old commit**, because
+  the clone hadn't been pulled. The runbook's step 9 now says to pull first.
+
+### Keys, afterwards
+
+- **A recovery age key** was added as a recipient on every host's rule; its
+  private half lives only in the password manager. Prompted by the
+  operator's CachyOS laptop, which holds three of the four host age keys,
+  being due for a reset. The VM, theseus and desktop files were
+  re-encrypted, and each decrypts with the recovery key alone to the same
+  plaintext the host key gives. inotmac's file isn't re-encrypted yet,
+  because its key exists only on inotmac, which is offline. See
+  `docs/secrets.md`, "Recovery key". A private repo of raw keys was
+  considered first and dropped for this, since it would mean one secret to
+  keep instead of five, and nothing new on GitHub.
+- **theseus's `ol@theseus` key** is authorized on every host and on the
+  installer, as the operator's new main machine. Live on theseus (a
+  key-only login to its own sshd); the others pick it up at their next
+  switch. The desktop's key was confirmed against its real private key
+  (derived from its sops secret), not just its comment, on all four hosts
+  and the installer.
+- **The installer ISO was rebuilt** with that key and written to the
+  Verbatim stick. Root's `authorized_keys` was read back out of the image's
+  squashfs, and the stick was verified byte-for-byte with `cmp` against the
+  ISO.
 
 ## Host verification log (moved from CLAUDE.md, 2026-10-03)
 
@@ -5076,3 +5181,17 @@ state. Where a fuller write-up exists, the entry points at it.
   normal.
 - `liz`, `regis` and `jolan` have since all logged in and their sessions
   work.
+
+**`theseus`**
+
+- Installed 2026-10-19; see "theseus installed (2026-10-19)". Verified live
+  the same day: TPM unlock (1.5 s, no prompt; 80 s typed before enrollment),
+  fingerprint at the lock screen and `sudo` with password-only at the
+  greeter, the keyring after a greeter login, SSH to GitHub as `ol@theseus`,
+  `xe` and VA-API on iHD, Wi-Fi and the tailnet, touch, the AZERTY workspace
+  and resize binds, the three scratchpads, hibernate/resume through the TPM
+  unlock, Steam (Millennium) under Xwayland, a Proton game, and `Alt+F10`
+  replay saves. Charge limit 80 in the EC.
+- Untested: `replay-auto` starting the buffer by itself, `confine_pointer`,
+  the lid-timed suspend-then-hibernate, the LUKS passphrase fallback, and
+  touch with an external monitor connected.

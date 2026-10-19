@@ -102,9 +102,8 @@ Responsibilities:
 
 In practice most of that wiring lives one level down, in `lib/mkHost.nix` —
 `flake.nix` itself is now little more than inputs plus one `mkHost { … }` call
-per host (`CLAUDE.md`'s "Hosts" table is the current list; `hosts/theseus/`
-exists but is deliberately unwired until its `hardware-configuration.nix` is
-generated at install) and the `installer-iso` package. Note there is no per-host
+per host (`CLAUDE.md`'s "Hosts" table is the current list) and the
+`installer-iso` package. Note there is no per-host
 `pkgs` construction and no overlay: `pkgs` comes from `nixosSystem` itself and
 is shared with Home Manager via `home-manager.useGlobalPkgs = true`.
 `home-manager.useUserPackages = true` goes with it, so `home.packages` are
