@@ -7,6 +7,7 @@
   config,
   lib,
   pkgs,
+  vars,
   chaotic,
   millennium,
   ...
@@ -83,5 +84,25 @@
     # else running a 32-bit title through Proton needs it just as much, and
     # a future change to Steam's own module shouldn't silently take it away.
     hardware.graphics.enable32Bit = true;
+
+    # ~/.steam/steam as the symlink Steam itself would make, created before
+    # Steam has ever run. Noctalia's community "steam" template (home/
+    # noctalia.nix) writes its Material-Theme colors *through* this path and
+    # creates any missing parent as it goes — so on a fresh install, its
+    # first theme pass beat Steam's first launch, left ~/.steam/steam a real
+    # directory, and Steam's bootstrap then died with "Couldn't set up Steam
+    # data" (theseus, 2026-10-19). `L` only creates a missing link and never
+    # replaces anything, so on a host where Steam already made it this is a
+    # no-op — and it can't repair the directory once it exists either; that
+    # takes `rm -rf ~/.steam/steam` by hand. tmpfiles runs after
+    # local-fs.target, so the @steam mount it points at is already there.
+    systemd.tmpfiles.rules =
+      let
+        home = "/home/${vars.user.name}";
+      in
+      [
+        "d ${home}/.steam 0755 ${vars.user.name} users -"
+        "L ${home}/.steam/steam - - - - ${home}/.local/share/Steam"
+      ];
   };
 }

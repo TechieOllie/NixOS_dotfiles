@@ -669,7 +669,11 @@ in
               # theme file into the app's config directory, so on a host
               # where the app is absent it produces an unread file rather
               # than an error, and gating would mean this list differed per
-              # host for no behavioural gain.
+              # host for no behavioural gain. One exception to "harmless":
+              # "steam" writes through ~/.steam/steam and creates it as a
+              # directory if Steam hasn't run yet, which breaks Steam's
+              # first launch — modules/programs/steam.nix pre-creates the
+              # symlink for that reason.
               "heroiclauncher"
               "prismlauncher"
               "steam"
