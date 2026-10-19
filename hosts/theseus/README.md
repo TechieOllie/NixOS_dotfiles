@@ -34,7 +34,7 @@ Installed 2026-10-19. Left to do, in order:
 - [x] Install with nixos-anywhere, generating `hardware-configuration.nix`
       and passing the LUKS passphrase. Then add the flake entry and commit
       both together. Steps: `docs/bootstrapping-a-host.md`, "Encrypted host".
-- [ ] First boot: enroll the TPM and a recovery key (`systemd-cryptenroll`),
+- [x] First boot: enroll the TPM and a recovery key (`systemd-cryptenroll`),
       then the fingerprint (`fprintd-enroll`). These are machine state no
       module can declare.
 - [x] Battery charge limit, also machine state: set it once in the BIOS
@@ -46,7 +46,9 @@ Installed 2026-10-19. Left to do, in order:
       live-symlinked from it, as niri's are on the desktop
       (`docs/live-dotfiles.md`).
 - [ ] Verify live, since none of this has run on the real hardware yet:
-  - TPM unlock, and the passphrase fallback
+  - ~~TPM unlock~~ — verified 2026-10-19 (cryptroot opened in 1.5 s with
+    no prompt, against 80 s typed on first boot); the passphrase fallback
+    is still untested
   - fingerprint at the lock screen, `sudo` and polkit, and password-only at
     the greeter
   - the keyring unlocked after a greeter login: `secret-tool store` and then
