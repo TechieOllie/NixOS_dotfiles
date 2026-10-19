@@ -14,7 +14,8 @@ age key is used instead of deriving one from the host's SSH key, see
    ```
 
 2. Add its public key to `.sops.yaml`, as both a `keys:` anchor and a
-   `creation_rules:` entry scoped to that host's secrets only:
+   `creation_rules:` entry scoped to that host's secrets only, with the
+   recovery key (see below) beside it:
 
    ```yaml
    keys:
@@ -25,6 +26,7 @@ age key is used instead of deriving one from the host's SSH key, see
        key_groups:
          - age:
              - *<host>
+             - *recovery
    ```
 
 3. Write and encrypt `hosts/<host>/secrets/secrets.yaml`:
@@ -87,6 +89,41 @@ re-encrypt anything:
 ```bash
 sops updatekeys hosts/<host>/secrets/secrets.yaml
 ```
+
+## Recovery key
+
+Every `creation_rules` entry carries a second recipient, `*recovery`: one
+operator-held age key whose private half is stored **only in the password
+manager** — not in `~/.config/sops/age/`, not on any host, never in this
+repo. Any one recipient can decrypt, so it opens every host's secrets on its
+own. It exists so that losing a host's key (a reset laptop, a dead disk) is a
+rotation rather than a loss: decrypt with the recovery key, generate the host
+a new key, swap its `.sops.yaml` entry, `updatekeys`, and stage the new key
+onto the host. Created 2026-10-19.
+
+To use it, put it in a file for the duration and point sops at it:
+
+```bash
+install -m 600 /dev/null /tmp/recovery.txt
+$EDITOR /tmp/recovery.txt    # paste the full key from the password manager
+SOPS_AGE_KEY_FILE=/tmp/recovery.txt sops -d hosts/<host>/secrets/secrets.yaml
+shred -u /tmp/recovery.txt
+```
+
+A new host gets it for free by following step 2 above. **inotmac's file
+doesn't carry it yet**: `.sops.yaml` lists it, but re-encrypting needs a key
+that can already decrypt, and inotmac's age key exists only on inotmac
+(`/var/lib/sops-nix/key.txt`). Until that's done, losing inotmac means
+re-creating its secrets (password hash, Wi-Fi PSK) by hand. To close it, on
+inotmac or with that key copied over temporarily:
+
+```bash
+SOPS_AGE_KEY_FILE=<inotmac's key> sops updatekeys hosts/inotmac/secrets/secrets.yaml
+```
+
+Check any file with `grep -c age12rx83grkey hosts/<host>/secrets/secrets.yaml`
+(1 means the recovery key is a recipient), and test it for real by decrypting
+with the recovery key alone.
 
 ## `neededForUsers`
 

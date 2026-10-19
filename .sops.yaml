@@ -1,4 +1,10 @@
 keys:
+  # The operator's recovery key, a recipient on every file below. Its
+  # private half lives only in the password manager, never on a machine, so
+  # any secret here stays decryptable when a host's own age key is lost —
+  # and that host's key can then be rotated rather than its secrets
+  # rewritten. See docs/secrets.md, "Recovery key".
+  - &recovery age12rx83grkeyccf9u2zqess7eltfpjjwep840zxl84dpduusltyyvq7qjvf8
   - &the-entertaining-nios-vm age1hsaqjyj4mtmdyyqtetjn0twlfeppn0vxla724tl9uy702lv0qp7sxmejq5
   - &theseus age182ymkfkp0gx8lu66gd4c5dfhq8632p42898h5a4p20xdln75j4fq5ssa6y
   - &the-entertaining-nios-desktop age189gntjuuenp0jgc4knr2dmg290psrfu469s02zfu9zwdlk0f9cksazeysc
@@ -8,15 +14,19 @@ creation_rules:
     key_groups:
       - age:
           - *the-entertaining-nios-vm
+          - *recovery
   - path_regex: hosts/theseus/secrets/.*\.yaml$
     key_groups:
       - age:
           - *theseus
+          - *recovery
   - path_regex: hosts/the-entertaining-nios-desktop/secrets/.*\.yaml$
     key_groups:
       - age:
           - *the-entertaining-nios-desktop
+          - *recovery
   - path_regex: hosts/inotmac/secrets/.*\.yaml$
     key_groups:
       - age:
           - *inotmac
+          - *recovery
