@@ -45,40 +45,34 @@ Installed 2026-10-19. Left to do, in order:
 - [x] Clone `~/.dotfiles`. Umbriel's config and the wallpapers are
       live-symlinked from it, as niri's are on the desktop
       (`docs/live-dotfiles.md`).
-- [ ] Verify live, since none of this has run on the real hardware yet:
-  - ~~TPM unlock~~ — verified 2026-10-19 (cryptroot opened in 1.5 s with
-    no prompt, against 80 s typed on first boot); the passphrase fallback
-    is still untested
-  - fingerprint at the lock screen, `sudo` and polkit, and password-only at
-    the greeter
-  - the keyring unlocked after a greeter login: `secret-tool store` and then
-    `lookup` work without a prompt, and `ssh -T git@github.com` authenticates
-    as `ol@theseus`. Not `ssh-add -l`, whose list is transient (see
-    `docs/decisions.md`)
-  - suspend, and hibernate/resume through LUKS: `systemctl hibernate`
-    tests the resume path directly. Lid closed on battery should then
-    hibernate on its own after 2 h; afterwards
-    `journalctl -b -1 -u systemd-suspend-then-hibernate` shows whether it
-    did
-  - ~~the GPU is on `xe` and VA-API works (iHD)~~ — verified 2026-10-19
-    (`/sys/class/drm/card0/device/driver` is `xe`; `lspci` isn't installed)
-  - ~~Wi-Fi~~ — verified 2026-10-19
+- [ ] Verify live. Confirmed on the hardware on 2026-10-19:
+  - TPM unlock: cryptroot opened in 1.5 s with no prompt, against 80 s
+    typed on first boot
+  - fingerprint at the lock screen and `sudo`; password at the greeter
+  - the keyring unlocked after a greeter login (`secret-tool store`, then
+    `lookup`, with no prompt) and `ssh -T git@github.com` as `ol@theseus`
+  - the GPU on `xe` (`/sys/class/drm/card0/device/driver`; `lspci` isn't
+    installed) and VA-API on iHD
+  - Wi-Fi and the tailnet
+  - the panel's scale: 1.6, in `home/umbriel/cfg/layout.toml`
+  - the touchscreen, on the panel alone
+  - the AZERTY workspace binds, `Mod+&`…`Mod+ç`
+  - the scratchpads, `Mod+Shift+Return`, `Mod+M` and `Mod+D`
+
+  Still untested:
+  - the LUKS passphrase fallback, at the AZERTY prompt — easiest after the
+    next firmware update, when the TPM refuses anyway
+  - hibernate/resume through LUKS: `systemctl hibernate` tests the resume
+    path directly. Lid closed on battery should then hibernate on its own
+    after 2 h; afterwards `journalctl -b -1 -u systemd-suspend-then-hibernate`
+    shows whether it did
   - Steam under Umbriel's Xwayland
-  - the panel's scale, which may need an `[output.eDP-1]` table
-  - the touchscreen: taps land where touched, and stay on the laptop panel
-    with an external monitor connected (`libinput list-devices` should show
-    it with the `touch` capability)
-  - the AZERTY binds: `Mod+&`…`Mod+ç` switch workspaces, `Mod+)`/`Mod+=`
-    resize
-  - scratchpads: `Mod+Shift+Return`, `Mod+M` and `Mod+D` launch, then show
-    and hide, the dropdown Ghostty, Feishin and Vesktop. Vesktop starts
-    hidden after login. Feishin's app_id is assumed to be `feishin` (from
-    its package.json) and has not been seen live (`umbriel windows`)
-  - the replay buffer: `systemctl --user status replay-auto` is running,
-    starting a Proton game turns the buffer on, and `Alt+F10` saves to
-    `~/Videos/Replays`. Needs `UMBRIEL_SOCKET` (or `WAYLAND_DISPLAY`) in the
-    user manager's environment, which Umbriel publishes itself
+  - the replay buffer: starting a Proton game turns the buffer on, and
+    `Alt+F10` saves to `~/Videos/Replays` (`replay-auto` itself is running)
   - games keep the pointer inside them (`confine_pointer`)
+  - the resize binds, `Mod+)`/`Mod+=`
+  - the touchscreen staying on the laptop panel with an external monitor
+    connected
 
 See `CLAUDE.md`'s "Hosts" section for the authoritative, kept-current
 status.

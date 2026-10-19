@@ -64,5 +64,7 @@ two keys left of Backspace, because `minus` is workspace 6.
   has neither.
 
 Display layout (niri's `cfg/display.kdl`) isn't ported. It described the
-desktop's two monitors, and a laptop's single panel needs no `[output]`
-table until its scale has been checked on the real screen.
+desktop's two monitors. The laptop panel's one `[output]` table, its scale,
+sits at the end of `cfg/layout.toml` rather than in a `cfg/display.toml` of
+its own: a new include needs a Home Manager switch to create its symlink,
+while a live file already in place takes effect on save.

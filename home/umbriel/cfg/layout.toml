@@ -10,3 +10,12 @@ gap = 16
 # niri's workspace-auto-back-and-forth: pressing the current workspace's
 # number again returns to the previous one.
 back_and_forth = true
+
+# theseus's built-in panel: 2880x1920 on 280 mm, about 260 DPI, so 1.0 is far
+# too small. 1.6 divides the panel exactly (1800x1200 logical) and was picked
+# on the real screen on 2026-10-19 over 1.5 and 2.0. By connector rather than
+# monitor identity: it is the laptop's only internal port, and this panel
+# reports no serial. An external monitor needs no table until it has been
+# looked at; Umbriel enables it at its preferred mode.
+[output.eDP-1]
+scale = 1.6
