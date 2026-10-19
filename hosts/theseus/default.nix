@@ -87,9 +87,15 @@
   # from hibernation inside the same unlocked container.
   boot.initrd.systemd.enable = true;
 
-  # Provisional: the latest released stable at scaffold time. Reconfirm
-  # against the actually-released version when this host is bootstrapped for
-  # real, then leave it untouched — it only marks the compatibility baseline
+  # The French keymap in the initrd too, not only from stage 2 on. That
+  # passphrase prompt is typed on this AZERTY keyboard, and without early
+  # setup the initrd has no vconsole.conf and reads keys as US: a correct
+  # passphrase is then simply rejected. The only host that needs this,
+  # since it is the only one that asks for anything before stage 2.
+  console.earlySetup = true;
+
+  # The latest released stable at first install (2026-10-19; 26.11 is not
+  # out yet). Leave it untouched — it only marks the compatibility baseline
   # from first install, same rule as the-entertaining-nios-vm.
   system.stateVersion = "26.05";
 }

@@ -187,7 +187,7 @@ hosts/
     the-entertaining-nios-vm/        # bootstrapped; the dev/verification host
     the-entertaining-nios-desktop/   # bootstrapped; the daily driver, niri
     inotmac/                         # bootstrapped; the shared GNOME iMac
-    theseus/                         # scaffold only, no nixosConfigurations entry yet
+    theseus/                         # installed; the Framework laptop, Umbriel
     installer/                       # not a host: operator identity for installer-iso
 ```
 

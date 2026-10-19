@@ -30,12 +30,10 @@ in
   # container means one unlock covers root, swap and resume alike.
   disko.devices = {
     disk.main = {
-      # Placeholder until the machine has booted the installer: an
-      # obviously-invalid path, so a premature nixos-anywhere run fails
-      # instead of formatting the wrong disk. Resolve it by
-      # /dev/disk/by-id/ (`ls -l /dev/disk/by-id/` from the installer), as
-      # on the desktop — kernel enumeration order is not a promise.
-      device = "/dev/disk/by-id/CHANGEME";
+      # The 1T WD_BLACK SN7100, by /dev/disk/by-id/ as on the desktop —
+      # kernel enumeration order is not a promise. Read from the installer
+      # (`ls -l /dev/disk/by-id/`) on 2026-10-19.
+      device = "/dev/disk/by-id/nvme-WD_BLACK_SN7100_1TB_26011T802238";
       type = "disk";
       content = {
         type = "gpt";
@@ -87,10 +85,9 @@ in
       type = "lvm_vg";
       lvs = {
         swap = {
-          # Matches RAM, so hibernation fits. Placeholder like the device
-          # path above — read `free -g` from the installer. Left invalid on
-          # purpose: lvcreate -L rejects it, so it cannot be forgotten.
-          size = "CHANGEME";
+          # Matches RAM (32G, MemTotal 30.9 GiB from the installer), so
+          # hibernation fits.
+          size = "32G";
           content = {
             type = "swap";
             resumeDevice = true;

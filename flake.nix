@@ -255,12 +255,11 @@
         hostPath = ./hosts/the-entertaining-nios-vm;
       };
 
-      # theseus (Framework 13 Pro, hosts/theseus/) has no entry yet, on
-      # purpose: its hardware-configuration.nix has to be generated on the
-      # machine itself (nixos-anywhere --generate-hardware-config, see
-      # docs/bootstrapping-a-host.md), and hosts/README.md keeps a host out
-      # of this set until that file is real. Add it in the same commit as
-      # that file.
+      # Framework 13 Pro: the only encrypted host (LUKS2 + TPM).
+      nixosConfigurations.theseus = mkHost {
+        inherit system;
+        hostPath = ./hosts/theseus;
+      };
 
       # Wired in before the machine has ever been installed, deliberately:
       # the `checks` attribute below is derived from this set, so an entry

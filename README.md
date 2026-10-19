@@ -41,7 +41,7 @@ nixos-anywhere --flake .#<host> root@<installer-ip>
 | `the-entertaining-nios-vm` | bootstrapped, verified live | ext4. Noctalia desktop on niri. The verification target — disposable, driven entirely over SSH ([`docs/testing-on-the-vm.md`](./docs/testing-on-the-vm.md)). |
 | `the-entertaining-nios-desktop` | bootstrapped, verified live | btrfs + swap. AMD Ryzen 5 5600X / RX 6600. The daily driver: Noctalia desktop on niri, gaming, Moonshine streaming. |
 | `inotmac` | bootstrapped, verified live | ext4. Mid-2011 iMac shared by four people — the only GNOME host and the only multi-user one. Rebuilt from the public flake, no clone. |
-| `theseus` | scaffolded, not installed, no flake entry yet | LUKS2 (TPM unlock) → LVM → btrfs + swap. Framework 13 Pro, Intel Core Ultra 5 325. Gaming and the Noctalia desktop on Umbriel; touchscreen; fingerprint for the lock screen, `sudo` and polkit. |
+| `theseus` | installed, first boot pending | LUKS2 (TPM unlock) → LVM → btrfs + swap. Framework 13 Pro, Intel Core Ultra 5 325. Gaming and the Noctalia desktop on Umbriel; touchscreen; fingerprint for the lock screen, `sudo` and polkit. |
 
 `hosts/installer/` is not a machine — it holds only the operator identity the
 installer ISO needs. `CLAUDE.md`'s "Hosts" section is the kept-current,
@@ -76,5 +76,5 @@ Each of these has its own short `README.md` with more detail.
 
 Personal infrastructure in daily use. The VM, the desktop and the iMac are
 installed and verified live; the VM is where changes are tried first.
-`theseus`, the Framework laptop, is scaffolded and waiting on its hardware. See
+`theseus`, the Framework laptop, is installed (2026-10-19) but not yet verified live. See
 `CLAUDE.md` for the current detail.

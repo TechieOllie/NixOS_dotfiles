@@ -23,19 +23,15 @@ Three properties no other host has:
   `home/umbriel/cfg/input.toml`'s generator in `home/umbriel.nix` only if
   that guess turns out wrong on the hardware.
 
-Not yet in `flake.nix`'s `nixosConfigurations`, deliberately: its
-`hardware-configuration.nix` doesn't exist until the machine has booted the
-installer (see `hosts/README.md`).
+Installed 2026-10-19. Left to do, in order:
 
-Left to do before this host can be installed, in order:
-
-- [ ] Firmware: Secure Boot **off** (Framework's guide; NixOS doesn't boot
+- [x] Firmware: Secure Boot **off** (Framework's guide; NixOS doesn't boot
       with it on without lanzaboote).
-- [ ] Boot the installer ISO (`nix build .#installer-iso`). From it, resolve
+- [x] Boot the installer ISO (`nix build .#installer-iso`). From it, resolve
       the two placeholders in `disko.nix`: the disk's `/dev/disk/by-id/` path,
       and the swap size (`free -g`, rounded up).
 - [x] Add the public key `ol@theseus` to GitHub (done 2026-10-17).
-- [ ] Install with nixos-anywhere, generating `hardware-configuration.nix`
+- [x] Install with nixos-anywhere, generating `hardware-configuration.nix`
       and passing the LUKS passphrase. Then add the flake entry and commit
       both together. Steps: `docs/bootstrapping-a-host.md`, "Encrypted host".
 - [ ] First boot: enroll the TPM and a recovery key (`systemd-cryptenroll`),
