@@ -19,10 +19,13 @@ back_and_forth = true
 # looked at; Umbriel enables it at its preferred mode.
 [output.eDP-1]
 scale = 1.6
-# The panel advertises PQ over BT.2020 (`umbriel color`), so HDR is always
-# on rather than "auto"; SDR content is mapped to sdr_white.
-hdr = "on"
-bit_depth = 10
+# The panel advertises PQ over BT.2020 (`umbriel color`). HDR was always on
+# (10-bit) on 2026-10-20 until brief "loose cable" artifacting appeared right
+# after login, at the switch into the HDR format; it stopped with HDR off.
+# Off for now, by choice. "auto" also tested clean at login: it turns HDR on
+# only while a fullscreen window on this output shows HDR content. Use it
+# without bit_depth, since the HDR format is 10-bit by itself.
+hdr = "off"
 
 # Docked: lid shut on an external monitor. logind leaves the machine running
 # then (HandleLidSwitchDocked defaults to ignore, see hosts/theseus), so the

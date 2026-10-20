@@ -5153,6 +5153,32 @@ after its apps had run. Both are now a standing gotcha in `CLAUDE.md`.
   squashfs, and the stick was verified byte-for-byte with `cmp` against the
   ISO.
 
+## theseus's HDR: off, with "auto" tested (2026-10-20)
+
+HDR went on for eDP-1 as `hdr = "on"` plus `bit_depth = 10`
+(`home/umbriel/cfg/layout.toml`). Within the day, some logins showed a few
+seconds of "loose cable" artifacting before the screen settled. Neither the
+kernel nor Umbriel logged anything: the session's only display lines are the
+modeset and, about a second later, `selected HDR render format XR30`. The
+timing first pointed at the same day's greetd PAM change, which touches no
+display code; HDR had been switched on hours earlier.
+
+Live test, through the config's live symlink and Umbriel's hot reload, so no
+rebuild: with `hdr = "off"` two logins were clean, and with `hdr = "auto"`
+two more were clean. In Umbriel's source (`Output::autoHdrEligible`), "auto"
+enables HDR only while a fullscreen view on that output carries an HDR image
+description, so the desktop and every login run SDR. Under "on", desktop SDR
+was only mapped into the HDR container, so nothing visible is lost.
+`bit_depth` was dropped as well: the HDR tier picks a 10-bit format by itself,
+and the key only adds 10-bit SDR.
+
+The operator chose to leave HDR off for now, so `hdr = "off"` is what is
+committed. "auto" is the setting to go back to.
+
+Not ruled out: the xe driver's panel self-refresh (`xe.enable_psr=0`) as the
+underlying cause of the glitch at the format switch. If it shows up when HDR
+content goes fullscreen, try that before turning HDR off entirely.
+
 ## Host verification log (moved from CLAUDE.md, 2026-10-03)
 
 Dated live-verification record; `CLAUDE.md`'s Hosts table keeps only current
