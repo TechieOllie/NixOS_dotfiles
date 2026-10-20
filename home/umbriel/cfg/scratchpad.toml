@@ -48,3 +48,16 @@ spawn_when_empty = "vesktop"
 match.app_id = "^vesktop$"
 default_scratchpad = "discord"
 default_floating_size = { width = 0.8, height = 0.8 }
+
+# Bitwarden autostarts (home/bitwarden.nix) so the browser extension can
+# unlock with a fingerprint; same shape as Vesktop above — the login window
+# is stored hidden, and Mod+X summons it.
+[[scratchpad]]
+name = "bitwarden"
+spawn_when_empty = "bitwarden"
+
+# Electron's Wayland app_id, read live with `umbriel windows`.
+[[window_rule]]
+match.app_id = "^bitwarden$"
+default_scratchpad = "bitwarden"
+default_floating_size = { width = 0.6, height = 0.7 }

@@ -63,6 +63,7 @@ in
     ../../modules/desktop/noctalia.nix
     ../../modules/desktop/theming.nix
     ../../modules/desktop/nautilus.nix
+    ../../modules/programs/bitwarden.nix
   ];
 
   # Pin the login greeter to the primary monitor. amdgpu exposes a

@@ -5179,6 +5179,41 @@ Not ruled out: the xe driver's panel self-refresh (`xe.enable_psr=0`) as the
 underlying cause of the glitch at the format switch. If it shows up when HDR
 content goes fullscreen, try that before turning HDR off entirely.
 
+## Bitwarden's fingerprint unlock (2026-10-20)
+
+The browser extension can't use biometrics by itself. It asks the running
+Bitwarden desktop app over native messaging, and the app asks polkit
+(`com.bitwarden.Bitwarden.unlock`, `auth_self`), which accepts a finger on
+theseus. `bitwarden-cli` was considered and can't do this: it has no
+native-messaging host, no IPC server and no biometric support.
+
+- **polkit action:** nixpkgs extracts it into the package's
+  `share/polkit-1/actions`, but polkit reads only the system profile, so
+  `modules/programs/bitwarden.nix` puts the package in
+  `environment.systemPackages` as well as Home Manager's.
+- **Where Zen looks:** asked of a throwaway headless Zen 1.23.1b over
+  Marionette (`-remote-allow-system-access`, chrome context,
+  `Services.dirsvc`): `XREUserNativeManifests` is `~/.mozilla`, while
+  `DefProfRt` is `~/.config/zen`, and creating `~/.mozilla` leaves the
+  latter unchanged.
+- **Who writes the manifest:** the app, on every start (`main.ts` calls
+  `generateManifests()` unconditionally). It copies `desktop_proxy` into
+  `~/.mozilla/native-messaging-hosts/` (hard-linking fails across btrfs
+  subvolumes) and writes a manifest pointing at that copy, but only if
+  `~/.mozilla` already exists; otherwise it logs `Firefox not found,
+  skipping`. That directory was missing on theseus, so the fix is one
+  tmpfiles `d`.
+- **Rejected: `programs.zen-browser.nativeMessagingHosts`.** Zen's pname
+  isn't `firefox*`, so nixpkgs' `wrapFirefox` has no `MOZ_SYSTEM_DIR` route
+  for it and instead runs `ln -sfLt ~/.mozilla/native-messaging-hosts …` on
+  every launch. That replaces the app's manifest with a store symlink; the
+  app's next `fs.writeFile` follows it into the read-only store, throws, and
+  skips `listen()`, so the bridge goes down entirely.
+- **IPC:** the proxy connects to `~/.cache/com.bitwarden.desktop/s.bw`,
+  which doesn't depend on where the proxy binary sits.
+- **app_id:** `bitwarden`, read with `umbriel windows`. It goes in a
+  scratchpad on `Mod+X`, the same autostart-and-store shape as Vesktop.
+
 ## Host verification log (moved from CLAUDE.md, 2026-10-03)
 
 Dated live-verification record; `CLAUDE.md`'s Hosts table keeps only current

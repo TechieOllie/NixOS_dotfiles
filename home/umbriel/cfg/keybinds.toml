@@ -139,6 +139,7 @@
 "Mod+M" = { action = "scratchpad-toggle:music", repeat = false }
 # Mod+D was niri's "spawn vesktop"; here it summons the one already running.
 "Mod+D" = { action = "scratchpad-toggle:discord", repeat = false }
+"Mod+X" = { action = "scratchpad-toggle:bitwarden", repeat = false }
 
 # ── Replay buffer ─────────────────────────────────────────────────────────
 # home/gpu-screen-recorder.nix: the same two keys as on niri.

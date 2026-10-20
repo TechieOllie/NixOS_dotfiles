@@ -16,6 +16,7 @@
     ../../modules/desktop/noctalia.nix
     ../../modules/desktop/theming.nix
     ../../modules/desktop/nautilus.nix
+    ../../modules/programs/bitwarden.nix
   ];
 
   networking.hostName = vars.system.hostName;
