@@ -117,6 +117,14 @@ in
         shell = {
           launch_apps_as_systemd_services = true;
 
+          # Day/month/year on every host. Upstream's default is "%A, %x",
+          # and %x is the locale's short date: month/day/year under en_US,
+          # which the desktop runs; theseus's en_GB has the right order but
+          # a two-digit year. Read by the control center's
+          # calendar, the desktop calendar widget and plugins
+          # (noctalia.dateFormat()); the lock screen's date is hard-coded ISO.
+          date_format = "%A %d/%m/%Y";
+
           # No avatar_path, deliberately: unset, Noctalia shows the account's
           # AccountsService picture, which modules/system/users.nix declares
           # for the greeter too. Setting it here would be a second source.
