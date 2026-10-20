@@ -3,6 +3,11 @@
     hostName = "theseus";
     timeZone = "Europe/Paris";
     keyMap = "fr-pc";
+    # UK English for the interface, dates and numbers; French for currency,
+    # paper size and units. hosts/theseus/default.nix splits them between
+    # i18n.defaultLocale and extraLocaleSettings.
+    locale = "en_GB.UTF-8";
+    regionalLocale = "fr_FR.UTF-8";
   };
 
   user = {

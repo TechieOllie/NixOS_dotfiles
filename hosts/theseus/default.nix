@@ -1,4 +1,5 @@
 {
+  lib,
   pkgs,
   vars,
   nixos-hardware,
@@ -41,6 +42,33 @@
   networking.hostName = vars.system.hostName;
   time.timeZone = vars.system.timeZone;
   console.keyMap = vars.system.keyMap;
+
+  # Language from `locale`, the regional categories from `regionalLocale`:
+  # French currency, paper size, units, addresses and phone numbers.
+  # Everything else stays on the default, deliberately including two
+  # regional ones:
+  #   - LC_NUMERIC, because fr_FR's decimal comma (1,5) breaks scripts and
+  #     CLI tools that parse or print decimals, for no visible gain.
+  #   - LC_TIME, so dates and weekdays read in English. en_GB already has
+  #     day/month order, a 24-hour clock and a Monday week start; the only
+  #     loss is %x's two-digit year (20/10/26), and Noctalia's date_format
+  #     spells %Y out anyway.
+  # Both locales are generated without further wiring:
+  # i18n.supportedLocales defaults to defaultLocale plus every
+  # extraLocaleSettings value. Reaches a session through /etc/locale.conf,
+  # so it needs a fresh login, not just a switch.
+  i18n = {
+    defaultLocale = vars.system.locale;
+    extraLocaleSettings = lib.genAttrs [
+      "LC_ADDRESS"
+      "LC_IDENTIFICATION"
+      "LC_MEASUREMENT"
+      "LC_MONETARY"
+      "LC_NAME"
+      "LC_PAPER"
+      "LC_TELEPHONE"
+    ] (_: vars.system.regionalLocale);
+  };
 
   # The newest kernel rather than nixpkgs' default LTS, which Framework's
   # own NixOS guide for this board rules out ("NOT LTS kernel"): Series 3
