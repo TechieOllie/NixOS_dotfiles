@@ -70,7 +70,13 @@
     # Here rather than in the host: every host that logs in through this
     # greeter wants it, and it is a property of the login path, not of one
     # machine's hardware.
-    security.pam.services.greetd.enableGnomeKeyring = true;
+    #
+    # Set on `login`, not `greetd`: nixpkgs' greetd module now declares its
+    # PAM service with `useDefaultRules = false` and a bare `substack login`
+    # for every stack, so per-service flags on `greetd` render nothing.
+    # services.gnome.gnome-keyring already sets this one; stated anyway so
+    # the dependency is visible here.
+    security.pam.services.login.enableGnomeKeyring = true;
 
     # ...and therefore the greeter must take a *password*, never a finger.
     # services.fprintd.enable (nixos-hardware's Framework module turns it on)
@@ -84,6 +90,14 @@
     # polkit, and Noctalia's lock screen, which strips pam_fprintd from the
     # `login` stack itself and drives the reader over D-Bus in parallel with
     # the password field. A no-op on hosts without fprintd.
-    security.pam.services.greetd.fprintAuth = false;
+    #
+    # On `login` for the reason above — `greetd.fprintAuth = false` was inert
+    # once greetd started delegating to `login`, and the greeter then asked
+    # for the password *and* a finger, the finger short-circuited the stack
+    # (pam_fprintd is `sufficient`) before pam_gnome_keyring ran, and the
+    # session asked for the password a second time to unlock the keyring.
+    # Only greetd includes `login`, so this also costs the TTY login its
+    # fingerprint and nothing else.
+    security.pam.services.login.fprintAuth = false;
   };
 }

@@ -4867,6 +4867,19 @@ Two facts found while checking that this actually works:
 Evaluated: greetd has `fprintAuth = false` and `enableGnomeKeyring = true`;
 `sudo`, `polkit-1` and `login` have `fprintAuth = true`.
 
+**Corrected 2026-10-20: that evaluation proved nothing.** nixpkgs' greetd
+module sets `useDefaultRules = false` and makes every stack a single
+`substack`/`include login`, so `greetd.fprintAuth` and
+`greetd.enableGnomeKeyring` render nothing — the flags evaluated as intended
+while `/etc/pam.d/greetd` ignored them. Live, the greeter took the password
+and then waited for a finger; pam_fprintd being `sufficient` in `login`
+ended the substack before pam_gnome_keyring ran, so the session then asked
+for the password again to unlock the keyring. Both flags moved to
+`security.pam.services.login`; only greetd includes `login`, so the TTY
+login also loses the finger and nothing else does. Verified live: one
+password at the greeter, no finger, keyring unlocked. Lesson: read the
+rendered `.text` of a PAM service, never just its option values.
+
 ### Disk layout: LVM-on-LUKS, an exception to the swap-partition rule
 
 The layout is one LUKS2 container holding an LVM volume group, with a swap
