@@ -5263,6 +5263,62 @@ didn't:
   doesn't show whether the pin worked; pressing a bind inside the stream
   does.
 
+### Testing it remotely, and two teardown bugs it found
+
+The operator wasn't at the desktop, so the headless branch, the one a
+Moonlight connection takes while nobody is logged in, was run over SSH. A
+headless Weston 16 (`--backend=headless --renderer=gl`) stood in for
+Moonshine's per-stream compositor, and the installed `moonshine-desktop`
+wrapper was launched against it as a transient user unit, the way Moonshine
+launches it.
+
+Bring-up worked first time:
+
+- `graphical-session.target`, Noctalia, Vesktop, Bitwarden and the portals
+  all attached to the nested Umbriel.
+- A `grim` screenshot showed the wallpaper, the full bar and notifications.
+- `noctalia.toml` was written on Noctalia's first pass.
+- `wtype` showed the `mod_key` pin works: Alt+Return did nothing,
+  Super+Return opened Ghostty.
+
+The login-keyring prompt that appears is expected headless, since no PAM
+login ever unlocked the keyring. Ending the stream (`systemctl --user stop`
+on the unit) is where it went wrong:
+
+1. **The trap deadlocked.** Its blocking `systemctl start
+   umbriel-shutdown.target` waited on a transaction that couldn't complete
+   while the trap's own unit was still stopping. After the 90-second stop
+   timeout, systemd SIGKILLed the trap before its `unset-environment` ran.
+   That left `graphical-session.target` up and stale session variables
+   behind. `--no-block` fixes it: the job is queued, the trap finishes, and
+   the environment comes out clean.
+2. **Noctalia then hung.** It logs `Wayland display closed … shutting
+   down` when the compositor goes. It exits cleanly on its own unless a
+   SIGTERM lands during that path, in which case it sits in `deactivating`
+   until SIGKILL. That held `graphical-session.target` up for 90 seconds,
+   so a reconnect within that window would have taken the bare branch. A
+   normal Umbriel logout produces the same order: `start-umbriel` waits for
+   the compositor to exit, then starts the shutdown target. So theseus
+   probably has the same 90-second hang at logout; it hasn't logged out
+   since install, so its journal has no instance.
+
+   This is upstream's race, so the repo-side fix only bounds it:
+   `TimeoutStopSec = 5` on `noctalia.service`, in `home/noctalia.nix`.
+
+With both fixes, tested as a runtime drop-in and a patched copy of the
+wrapper before going into the repo: teardown took 6 seconds, the
+environment came out clean, and an immediate reconnect got the full
+session again.
+
+Also settled remotely:
+
+- The Samsung's EDID gives `SAM` / `LS27CG51x` / `H9JW901815` with
+  2560x1440 at 144.0 Hz as its preferred mode (range 48–165 Hz), which
+  matches the `layout.toml` key.
+- wlroots never sets `DRM_CLIENT_CAP_WRITEBACK_CONNECTORS`, so the kernel
+  never exposes `Writeback-1` to a session. Only the greeter's compositor
+  ever saw it.
+
 The niri history (`niri --session` stripping the nesting variables, the
 blank-stream symptom) stays in the Moonshine entries above. It's still the
 explanation if a nested compositor ever renders nothing.

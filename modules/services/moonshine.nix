@@ -124,8 +124,14 @@ let
       # does: umbriel-shutdown.target Conflicts= graphical-session.target, so
       # one job stops everything attached to it. Not `exec umbriel` below,
       # precisely so this trap still has a shell to run in.
+      #
+      # --no-block, unlike start-umbriel: this trap runs while Moonshine is
+      # *stopping* this very unit, and a blocking start of that job waits on
+      # a transaction that can't finish until this unit has stopped. Tested
+      # on the desktop (2026-10-20), it hung until the 90-second stop timeout
+      # SIGKILLed the trap, before it could unset the environment below.
       trap '
-        systemctl --user start --job-mode=replace-irreversibly umbriel-shutdown.target || true
+        systemctl --user start --no-block --job-mode=replace-irreversibly umbriel-shutdown.target || true
         systemctl --user unset-environment ${sessionEnv} || true
       ' EXIT
     fi
