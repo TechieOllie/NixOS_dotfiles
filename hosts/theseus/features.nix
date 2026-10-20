@@ -2,6 +2,8 @@
 {
   features = {
     snapshots = true;
+    # Battery and Wi-Fi in Noctalia's bar (home/noctalia.nix).
+    laptop = true;
     # The operator's own machines: their full terminal environment
     # (Ghostty, Git, Lazygit, Neovim, Yazi) belongs here. Off by default,
     # so a host where ol only holds an admin account — inotmac — gets

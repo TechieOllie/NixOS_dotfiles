@@ -294,11 +294,18 @@ in
           # of this file rather than being built-ins: "bar" is a generic
           # plugin widget slot, and "mini-docker" is a plugin widget named
           # after its plugin.
+          #
+          # The battery and network widgets are spliced in on
+          # features.laptop only: the desktop is wired and on mains power, so
+          # both would be permanent noise there.
           start = [
             "launcher"
             "wallpaper"
             "bar"
             "mini-docker"
+          ]
+          ++ lib.optional osConfig.features.laptop "battery"
+          ++ [
             "sysmon"
             "clock"
             "active_window"
@@ -313,6 +320,9 @@ in
             "tray"
             "notifications"
             "bluetooth"
+          ]
+          ++ lib.optional osConfig.features.laptop "network"
+          ++ [
             "volume"
             "brightness"
             "control-center"

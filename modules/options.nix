@@ -68,6 +68,11 @@
           default = false;
           description = "Enable the operator's personal terminal environment (Ghostty, Git, Lazygit, Neovim, Yazi) on the Home Manager side. Off for hosts where the operator only holds an admin account rather than actually working on the machine; Zsh and Starship are unconditional and stay either way.";
         };
+        laptop = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Mark the host as a laptop: adds the battery and Wi-Fi widgets to Noctalia's bar, which a wired, mains-powered machine has no use for.";
+        };
         gnome = lib.mkOption {
           type = lib.types.bool;
           default = false;
