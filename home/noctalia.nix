@@ -290,10 +290,10 @@ in
           # that is the same everywhere is one less thing that can differ
           # between the desktop's two outputs and the laptop's one.
           #
-          # Two of these ids resolve through [widget.*] blocks near the end
+          # Three of these ids resolve through [widget.*] blocks near the end
           # of this file rather than being built-ins: "bar" is a generic
-          # plugin widget slot, and "mini-docker" is a plugin widget named
-          # after its plugin.
+          # plugin widget slot, and "mini-docker" and "phone-connect" are
+          # plugin widgets named after their plugins.
           #
           # The battery and network widgets are spliced in on
           # features.laptop only: the desktop is wired and on mains power, so
@@ -318,6 +318,7 @@ in
           end = [
             "media"
             "tray"
+            "phone-connect"
             "notifications"
             "bluetooth"
           ]
@@ -460,6 +461,11 @@ in
           # (home/niri/cfg/keybinds.kdl); the wl-mirror binary it drives
           # comes from home/wl-mirror.nix, not from Noctalia.
           "elijaharch/wl-screen-mirror"
+
+          # KDE Connect's UI, in place of kdeconnect-indicator's tray icon.
+          # Its runtime tools (gdbus, sshfs) and the daemon itself come from
+          # home/kdeconnect.nix, not from Noctalia.
+          "icefish/phone-connect"
         ];
 
         # Per-plugin settings, keyed by the same `<author>/<name>` ids as
@@ -475,6 +481,9 @@ in
         # every time. false attaches it to its bar widget instead, which is
         # where the keybind's result should predictably appear.
         plugin_settings."elijaharch/wl-screen-mirror".controls_open_near_click = false;
+
+        # Battery as a number only, without the icon beside it.
+        plugin_settings."icefish/phone-connect".battery_display = "percent";
 
         # Per-widget settings, keyed by the same widget ids the bar layout
         # above lists. All display-independent.
@@ -503,6 +512,8 @@ in
             # to do by accident while scrolling past the bar.
             enable_scroll = false;
           };
+
+          "phone-connect".type = "icefish/phone-connect:bar";
 
           # Icons only, no text labels — the bar is dense enough with the
           # widget set above.
