@@ -64,6 +64,9 @@ Installed 2026-10-19. Left to do, in order:
     repaired by hand — see `modules/programs/steam.nix`
   - the replay buffer: `Alt+F10` saves to `~/Videos/Replays`
   - a Proton game, through Steam
+  - the docked lid hooks (`[events]` in `home/umbriel/cfg/layout.toml`):
+    on the dock, opening the lid brings eDP-1 back and shutting it takes
+    the panel out again (2026-10-20)
 
   Still untested:
   - the LUKS passphrase fallback, at the AZERTY prompt — easiest after the
@@ -77,11 +80,6 @@ Installed 2026-10-19. Left to do, in order:
     game (`confine_pointer`)
   - the touchscreen staying on the laptop panel with an external monitor
     connected
-  - the docked lid hooks (`[events]` in `home/umbriel/cfg/layout.toml`)
-    firing on their own: opening the lid on the dock should bring eDP-1
-    back with its windows, and shutting it again take it out. Applied by
-    hand once on 2026-10-20 (`umbriel msg output-disable:eDP-1`), which
-    worked
 
 See `CLAUDE.md`'s "Hosts" section for the authoritative, kept-current
 status.
