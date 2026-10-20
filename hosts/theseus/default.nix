@@ -28,7 +28,6 @@
     ../../modules/desktop/noctalia.nix
     ../../modules/desktop/theming.nix
     ../../modules/desktop/nautilus.nix
-    ../../modules/programs/bitwarden.nix
 
     # Framework 13 Pro, Intel Core Ultra 5 325 (Series 3). Turns on fprintd
     # — which reaches sudo, polkit and Noctalia's lock screen, and is kept

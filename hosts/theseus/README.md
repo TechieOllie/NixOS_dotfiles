@@ -67,8 +67,6 @@ Installed 2026-10-19. Left to do, in order:
   - the docked lid hooks (`[events]` in `home/umbriel/cfg/layout.toml`):
     on the dock, opening the lid brings eDP-1 back and shutting it takes
     the panel out again (2026-10-20)
-  - Bitwarden's fingerprint unlock in Zen, through the desktop app
-    (`home/bitwarden.nix`), and its `Mod+X` scratchpad (2026-10-20)
 
   Still untested:
   - the LUKS passphrase fallback, at the AZERTY prompt — easiest after the

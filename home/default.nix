@@ -27,7 +27,6 @@
     ./nix-index.nix
     ./vscode.nix
     ./zen-browser.nix
-    ./bitwarden.nix
     ./vesktop.nix
     ./nautilus.nix
     ./screenshot.nix
