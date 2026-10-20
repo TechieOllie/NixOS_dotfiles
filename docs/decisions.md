@@ -5323,6 +5323,43 @@ The niri history (`niri --session` stripping the nesting variables, the
 blank-stream symptom) stays in the Moonshine entries above. It's still the
 explanation if a nested compositor ever renders nothing.
 
+## No keyboard in the Moonshine "Desktop" stream (2026-10-20)
+
+Reported the first time the operator streamed the desktop from theseus:
+the mouse worked, keys did nothing, not even in the focused keyring prompt.
+
+Ruled out, end to end:
+
+- **The client.** Moonlight logged the `Ctrl+Alt+Shift+Z` capture combo,
+  and `handleKeyEvent` forwards every key to `LiSendKeyboardEvent` with no
+  capture gate.
+- **The server's input path.** A runtime drop-in setting
+  `MOONSHINE_LOG=…,input=trace,focus=debug` showed every key arriving as
+  `Key down: N`.
+- **Umbriel's keyboard handling.** A `wtype` test in the headless rehearsal
+  reached its binds.
+
+The same trace showed the cause: `No focus candidates; clearing focus
+space_windows=1`. Moonshine's `CompositorConfig` defaults `steam_mode` to
+true. With the default `SingleApplication` strategy, that promotes focus to
+`SteamControlled`, under which `build_candidates` only admits windows with
+a Steam game id (or Steam's own windows). A native Wayland window from the
+nested Umbriel has none, so keyboard focus was cleared and every key was
+dropped. The mouse kept working because pointer events are routed by
+position.
+
+`steam_mode` is a server-wide `[compositor]` setting with no per-app
+override, so turning it off would also change the Steam and Heroic
+streams. Instead, the Desktop entry's `command` carries a dummy
+`AppId=2000000000`. Moonshine's `scan_cmdline_for_app_id` accepts a
+standalone `AppId=<N>` anywhere in the window's process tree, and the
+nested Umbriel's parent is the wrapper. The wrapper ignores its arguments.
+
+Not yet confirmed on a real stream. That needs the desktop rebuilt, then
+the `focus=debug` log should show keyboard focus being set rather than
+cleared. Drop the trace drop-in afterwards
+(`sudo systemctl revert moonshine.service`).
+
 ## Standing gotchas, full text (moved from CLAUDE.md, 2026-10-20)
 
 `CLAUDE.md` keeps each standing gotcha as its symptom and rule only. This is

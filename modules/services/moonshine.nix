@@ -312,7 +312,24 @@ in
               # disappears into Moonlight's own dark app grid; this one says
               # "remote desktop" and is legible there.
               boxart = boxart "desktop" "64x64/apps/preferences-desktop-remote-desktop.svg";
-              command = [ "${desktopSession}" ];
+              # The AppId= argument is not for the wrapper, which ignores its
+              # arguments: it is what lets the keyboard reach the stream.
+              # Moonshine's compositor runs with steam_mode on (its default,
+              # and server-wide, so turning it off would change the Steam and
+              # Heroic streams too), which makes focus Steam-controlled: only
+              # a window with a Steam game id is a focus candidate. Moonshine
+              # finds that id by walking the window's process tree and
+              # scanning each command line for `AppId=<N>`
+              # (scan_cmdline_for_app_id), and the nested Umbriel's parent is
+              # this wrapper. Without it the log reads `No focus candidates;
+              # clearing focus`, keyboard focus is never set, and every key
+              # is dropped while the mouse — routed by position — still
+              # works. The number only has to be non-zero and not Steam's own
+              # (769 is Big Picture); this one is deliberately no real app.
+              command = [
+                "${desktopSession}"
+                "AppId=2000000000"
+              ];
               stdout = "journal";
               stderr = "journal";
             }
