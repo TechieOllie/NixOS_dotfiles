@@ -5355,10 +5355,11 @@ streams. Instead, the Desktop entry's `command` carries a dummy
 standalone `AppId=<N>` anywhere in the window's process tree, and the
 nested Umbriel's parent is the wrapper. The wrapper ignores its arguments.
 
-Not yet confirmed on a real stream. That needs the desktop rebuilt, then
-the `focus=debug` log should show keyboard focus being set rather than
-cleared. Drop the trace drop-in afterwards
-(`sudo systemctl revert moonshine.service`).
+Confirmed on a real stream from theseus the same day. The keyboard
+works, and the `focus=debug` log shows `get_appid_from_pid: found app_id
+… app_id=2000000000` followed by `Setting keyboard focus` on the Umbriel
+surface. The trace drop-in was a runtime override, so a reboot drops it,
+as does `sudo systemctl revert moonshine.service`.
 
 ## Standing gotchas, full text (moved from CLAUDE.md, 2026-10-20)
 
