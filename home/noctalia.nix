@@ -242,6 +242,42 @@ in
             # behind ":emo". Every other provider stays prefix-only.
             providers.emoji.global = true;
           };
+
+          # The session menu's 1-5 shortcuts, rebound for AZERTY. Upstream
+          # hard-codes the keysyms `1`…`5` and matches them exactly, but the
+          # unshifted number row on `fr` yields & é " ' ( — so on every host
+          # here (all AZERTY) the badges showed digits no key produced. Same
+          # trap as Umbriel's binds (home/umbriel/cfg/keybinds.toml); check
+          # against `xkbcli compile-keymap --layout fr`, not the keycap.
+          # Badges now show those characters, which are on the same keys.
+          #
+          # Declaring `actions` replaces upstream's list rather than merging
+          # into it (defaultSessionPanelActions() only applies when the array
+          # is absent), so all five are restated in upstream's order, and
+          # shutdown keeps its destructive styling.
+          session.actions = [
+            {
+              action = "lock";
+              shortcut = "ampersand";
+            }
+            {
+              action = "logout";
+              shortcut = "eacute";
+            }
+            {
+              action = "lock_and_suspend";
+              shortcut = "quotedbl";
+            }
+            {
+              action = "reboot";
+              shortcut = "apostrophe";
+            }
+            {
+              action = "shutdown";
+              variant = "destructive";
+              shortcut = "parenleft";
+            }
+          ];
         };
 
         # Fires after every full re-theme pass completes (confirmed via
