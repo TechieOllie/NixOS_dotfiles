@@ -43,9 +43,11 @@
     ./obsidian.nix
     ./heroic.nix
     ./prismlauncher.nix
+    ./moonlight.nix
     ./kdeconnect.nix
     ./freecad.nix
     ./kicad.nix
+    ./slicers.nix
     ./jetbrains.nix
     ./claude-code.nix
     ./gh.nix

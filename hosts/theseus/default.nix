@@ -103,10 +103,13 @@
   # container, and resume goes through the same TPM unlock as a cold boot.
   # On external power plain suspend is enough; docked (lid shut, external
   # monitor) stays logind's default of ignore. Noctalia locks before any of
-  # these, since its lockscreen hooks logind's PrepareForSleep.
+  # these, since its lockscreen hooks logind's PrepareForSleep. The power
+  # key does the same as a lid close on battery, on any power source,
+  # instead of logind's default of powering off.
   services.logind.settings.Login = {
     HandleLidSwitch = "suspend-then-hibernate";
     HandleLidSwitchExternalPower = "suspend";
+    HandlePowerKey = "suspend-then-hibernate";
   };
   systemd.sleep.settings.Sleep.HibernateDelaySec = "2h";
 
