@@ -7,10 +7,11 @@
     # so a host where ol only holds an admin account — inotmac — gets
     # Zsh and Starship and nothing else.
     workstation = true;
-    # The Noctalia desktop, on niri. desktop is the stack, niri only picks
-    # its compositor — modules/options.nix asserts the two together.
+    # The Noctalia desktop, on Umbriel (niri until 2026-10-20). desktop is
+    # the stack, umbriel only picks its compositor — modules/options.nix
+    # asserts the two together.
     desktop = true;
-    niri = true;
+    umbriel = true;
     docker = true;
     tailscale = true;
     printing = true;

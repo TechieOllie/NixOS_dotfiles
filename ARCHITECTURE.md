@@ -184,7 +184,7 @@ Each physical machine has its own directory:
 ```
 hosts/
     the-entertaining-nios-vm/        # bootstrapped; the dev/verification host
-    the-entertaining-nios-desktop/   # bootstrapped; the daily driver, niri
+    the-entertaining-nios-desktop/   # bootstrapped; the daily driver, Umbriel
     inotmac/                         # bootstrapped; the shared GNOME iMac
     theseus/                         # installed; the Framework laptop, Umbriel
     installer/                       # not a host: operator identity for installer-iso
@@ -495,7 +495,8 @@ builtin template, greetd's `--session`). Neither is meaningful alone, so
 `modules/options.nix` asserts that a `desktop` host sets exactly one of them,
 and that neither is set without `desktop`. Bools plus an assertion rather
 than an enum, so each compositor's modules gate the same way every other
-module does.
+module does. Since 2026-10-20 both real Noctalia hosts (desktop, theseus)
+run Umbriel and only the VM runs niri.
 
 Modules consume the merged value, never hardcode it:
 
@@ -912,7 +913,7 @@ and the exact packages/options verified.
 **Status: done — eval-verified, not yet run on hardware.**
 
 - Docker, Tailscale, printing: `modules/services/{docker,tailscale,printing}.nix`, gated on `features.docker`/`features.tailscale`/`features.printing`, enabled on the laptop and desktop. The VM deliberately runs none of them.
-- Moonshine (added after the phase, same shape): `modules/services/moonshine.nix`, gated on `features.moonshine`, desktop only. A headless Moonlight-compatible streaming server whose "apps" are a full niri desktop, Steam Big Picture, Heroic in console mode and a remote poweroff, each in its own isolated compositor. The two launcher entries are additionally gated on `features.gaming`, which is the flag that installs them. The module is thin because upstream's `nixosModules.moonshine` already does lingering, `uinput`/`uhid`, udev, the moonshine-wsi Vulkan layer and the system unit. Reachable over the tailnet only — `openFirewall` is deliberately `false`, since `modules/services/tailscale.nix` already trusts `tailscale0`. Config is NixOS-side (`services.moonshine.settings`) with no `home/` counterpart, deliberately. Full reasoning in `docs/decisions.md`.
+- Moonshine (added after the phase, same shape): `modules/services/moonshine.nix`, gated on `features.moonshine`, desktop only. A headless Moonlight-compatible streaming server whose "apps" are a full desktop (a nested Umbriel; niri until 2026-10-20), Steam Big Picture, Heroic in console mode and a remote poweroff, each in its own isolated compositor. The two launcher entries are additionally gated on `features.gaming`, which is the flag that installs them. The module is thin because upstream's `nixosModules.moonshine` already does lingering, `uinput`/`uhid`, udev, the moonshine-wsi Vulkan layer and the system unit. Reachable over the tailnet only — `openFirewall` is deliberately `false`, since `modules/services/tailscale.nix` already trusts `tailscale0`. Config is NixOS-side (`services.moonshine.settings`) with no `home/` counterpart, deliberately. Full reasoning in `docs/decisions.md`.
 - Gaming: `profiles/gaming.nix` + `modules/programs/steam.nix` + `modules/hardware/controllers.nix` + `home/heroic.nix`, all gated on `features.gaming`, desktop only. Steam is Millennium-patched, Proton is CachyOS's fork, and the desktop additionally pins `boot.kernelPackages = pkgs.linuxPackages_cachyos` and enables `services.lact` in its own `default.nix`.
 - Btrfs snapshots (snapper) — landed early, ahead of the rest of this phase: `modules/services/snapper.nix` and the `features.snapshots` toggle, enabled on the laptop and desktop hosts. See **Filesystem Choice and Snapshots** above; the subvolume layout itself is decided per-host at install time (in that host's `disko.nix`).
 

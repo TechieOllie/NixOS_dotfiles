@@ -50,55 +50,48 @@ let
         ${pkgs.papirus-icon-theme}/share/icons/Papirus-Dark/${iconPath}
     '';
 
-  # The Desktop entry's command, and the reason it is not just
-  # `niri-session`. niri picks its backend by sniffing the environment:
-  # WAYLAND_DISPLAY or DISPLAY set means "render nested, into that
-  # compositor", neither set means "take over a DRM device". Moonshine sets
-  # both when it launches an app — that is how an app reaches the
-  # per-stream compositor — so nesting is exactly what should happen.
+  # The Desktop entry's command: Umbriel, nested inside Moonshine's
+  # per-stream compositor. Moonshine launches each app with WAYLAND_DISPLAY
+  # and DISPLAY pointing at that compositor, and a plain `umbriel` started
+  # that way picks wlroots' Wayland backend by itself and nests. In nested
+  # mode it also leaves the systemd user environment alone (server.cpp runs
+  # its session-sync command only `if (!m_nested)`), so it can never take
+  # over a local login's session on its own.
   #
-  # But `--session` *deletes* those two variables before the backend is
-  # chosen, unconditionally: it exists for the display-manager case, where
-  # a leaked WAYLAND_DISPLAY would be a bug, and niri's own --help says
-  # "Do not set when running as a nested window". So niri logged `running
-  # as a session but WAYLAND_DISPLAY is set, removing it`, fell through to
-  # the TTY backend, found it did not own the seat (`session is not
-  # active, starting libinput in paused state`) and drew nothing anywhere.
-  # Moonshine's compositor had no client, and the stream was a blank frame
-  # with only Moonshine's own cursor on it. The `niri-session` wrapper is
-  # no escape: Moonshine launches apps as transient *user* units, so the
-  # wrapper takes its `MANAGERPID` branch and execs `niri --session`
-  # anyway.
+  # Not `start-umbriel` (the session's Exec): under a transient user unit it
+  # takes its MANAGERPID branch and execs plain `umbriel` anyway, and its
+  # other branch starts umbriel.service, the *local* session's unit, which a
+  # stream has no business touching.
   #
-  # So run plain `niri`, which keeps Moonshine's WAYLAND_DISPLAY and
-  # nests, and do by hand the session wiring `--session` would otherwise
-  # have done. That wiring has to run from niri's own startup command
-  # (`niri -- <cmd>`) rather than before it, because the values it must
-  # publish — the *nested* instance's WAYLAND_DISPLAY and NIRI_SOCKET, not
-  # Moonshine's — don't exist until niri is up, and niri exports them into
-  # that child's environment for exactly this purpose.
+  # So the session wiring that umbriel.service would otherwise do is done
+  # here by hand, from Umbriel's own startup command (`umbriel -s <cmd>`)
+  # rather than before it: the values to publish are the *nested* instance's
+  # WAYLAND_DISPLAY and UMBRIEL_SOCKET, not Moonshine's, and they don't exist
+  # until Umbriel is up. Umbriel exports them, plus XDG_CURRENT_DESKTOP, into
+  # that child's environment (verified on theseus, 2026-10-20).
+  #
+  # Until 2026-10-20 this was a nested niri, which needed more of this by
+  # hand (`niri --session` strips the very variables that make it nest, and
+  # nested niri sets no XDG_CURRENT_DESKTOP); docs/decisions.md has that
+  # history.
 
-  # The variables `niri --session` imports, verbatim. Publishing them is
-  # what makes graphical-session.target's units — Noctalia above all —
+  # The variables Umbriel's own native session publishes
+  # (sessionEnvironmentCommand() in server.cpp), verbatim. Publishing them
+  # is what makes graphical-session.target's units — Noctalia above all —
   # attach to the streamed compositor instead of nothing.
-  sessionEnv = "WAYLAND_DISPLAY DISPLAY XDG_CURRENT_DESKTOP NIRI_SOCKET";
+  sessionEnv = "WAYLAND_DISPLAY DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP XDG_SESSION_TYPE XCURSOR_THEME XCURSOR_SIZE UMBRIEL_SOCKET";
 
-  # Run inside the nested niri, as its startup command, and only when the
+  # Run inside the nested Umbriel, as its startup command, and only when the
   # wrapper below decided this stream owns the session (see there).
   desktopStartup = pkgs.writeShellScript "moonshine-desktop-startup" ''
     export PATH=/run/current-system/sw/bin:$PATH
 
     if [ "''${MOONSHINE_OWNS_SESSION:-}" != "1" ]; then
       echo "moonshine: graphical-session.target already belongs to a local" \
-           "login; streaming a bare niri without the shell. Log out locally" \
+           "login; streaming a bare Umbriel without the shell. Log out locally" \
            "for a full desktop." >&2
       exit 0
     fi
-
-    # niri sets XDG_CURRENT_DESKTOP for its children only in session mode,
-    # which is the mode we can't use; state it so the import below has
-    # something to import and portals resolve to the niri backend.
-    export XDG_CURRENT_DESKTOP=niri
 
     systemctl --user import-environment ${sessionEnv}
 
@@ -106,38 +99,38 @@ let
     # every activatable service is SystemdService=.
     dbus-update-activation-environment --systemd ${sessionEnv}
 
-    # niri.service would pull this in via BindsTo=, but the compositor is
-    # deliberately not running as that unit here.
-    systemctl --user start graphical-session.target
+    # What a native Umbriel starts once its environment is published:
+    # BindsTo= graphical-session.target, Wants= xdg-desktop-autostart.target.
+    systemctl --user start umbriel-session.target
   '';
 
   desktopSession = pkgs.writeShellScript "moonshine-desktop" ''
     export PATH=/run/current-system/sw/bin:$PATH
 
     # Whether this stream is allowed to drive the session, decided *before*
-    # niri starts. graphical-session.target is per-user, not per-seat, so a
-    # local login already owns it; taking it over would move Noctalia to the
-    # stream, and tearing it down at the end of the stream would kill the
+    # Umbriel starts. graphical-session.target is per-user, not per-seat, so
+    # a local login already owns it; taking it over would move Noctalia to
+    # the stream, and tearing it down at the end of the stream would kill the
     # session on the physical screen. Neither is ours to do, so when it is
-    # already active this degrades to a bare nested niri — no shell, but a
-    # compositor that renders, which is still a usable remote desktop.
+    # already active this degrades to a bare nested Umbriel — no shell, but
+    # a compositor that renders, which is still a usable remote desktop.
     # Headless — the case lingering exists for — takes the other branch and
     # gets the full session.
     if systemctl --user -q is-active graphical-session.target; then
       export MOONSHINE_OWNS_SESSION=0
     else
       export MOONSHINE_OWNS_SESSION=1
-      # Tear the session down when the stream ends, the way niri-session
-      # does: niri-shutdown.target Conflicts= graphical-session.target, so
-      # one job stops everything attached to it. Not `exec niri` below,
+      # Tear the session down when the stream ends, the way start-umbriel
+      # does: umbriel-shutdown.target Conflicts= graphical-session.target, so
+      # one job stops everything attached to it. Not `exec umbriel` below,
       # precisely so this trap still has a shell to run in.
       trap '
-        systemctl --user start --job-mode=replace-irreversibly niri-shutdown.target || true
+        systemctl --user start --job-mode=replace-irreversibly umbriel-shutdown.target || true
         systemctl --user unset-environment ${sessionEnv} || true
       ' EXIT
     fi
 
-    niri -- ${desktopStartup}
+    umbriel -s ${desktopStartup}
   '';
 
   # Where the streamed user's per-launcher data lives. Read off the user
@@ -288,30 +281,26 @@ in
         # with no diagnostics, which is exactly the failure mode the
         # stdout/stderr settings below exist to avoid.
         # The Desktop entry is gated for the same reason the two launcher
-        # entries below are: features.moonshine and features.niri are
+        # entries below are: features.moonshine and features.umbriel are
         # independent flags, and a streaming host with no compositor would
         # otherwise advertise a card whose command isn't installed.
         application =
-          lib.optionals config.features.niri [
+          lib.optionals config.features.umbriel [
             {
-              # The full remote desktop. niri is a Smithay compositor with a
-              # supported nested (Winit) backend, which is what makes it a fit
-              # for Moonshine's isolated-compositor model. GNOME is not an
-              # option here: Mutter grabs the DRM device rather than nesting,
-              # and GNOME 49 removed --nested outright.
+              # The full remote desktop: Umbriel, nested. A wlroots
+              # compositor, so it renders into Moonshine's compositor through
+              # the Wayland backend, which is what makes it a fit for
+              # Moonshine's isolated-compositor model. GNOME is not an option
+              # here: Mutter grabs the DRM device rather than nesting, and
+              # GNOME 49 removed --nested outright.
               #
-              # See desktopSession above for why this is a wrapper rather than
-              # `niri-session` — the short version is that `--session` strips
-              # the very variable that selects the nested backend.
-              #
-              # Note the consequence of doing that session wiring at all:
-              # graphical-session.target lives in the *same* user manager as a
-              # local login. Streaming the desktop while also logged in at the
-              # machine means two niri instances contending over that target
-              # and over WAYLAND_DISPLAY. Headless — the case lingering exists
-              # for — is clean.
+              # See desktopSession above for why this is a wrapper rather
+              # than the session's own start-umbriel, and for the guard that
+              # keeps a stream from taking over a local login: the two share
+              # one user manager, so only a headless stream — the case
+              # lingering exists for — gets the full session.
               title = "Desktop";
-              # niri ships no icon of its own. Papirus' generic
+              # Umbriel ships no icon of its own. Papirus' generic
               # devices/video-display is the obvious stand-in but is a
               # near-black monitor on a transparent background, which
               # disappears into Moonlight's own dark app grid; this one says

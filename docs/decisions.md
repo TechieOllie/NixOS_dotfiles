@@ -5214,6 +5214,59 @@ native-messaging host, no IPC server and no biometric support.
 - **app_id:** `bitwarden`, read with `umbriel windows`. It goes in a
   scratchpad on `Mod+X`, the same autostart-and-store shape as Vesktop.
 
+## The desktop moves to Umbriel (2026-10-20)
+
+The operator moved the desktop from niri to Umbriel, so both real Noctalia
+hosts now run the same compositor and only the VM is on niri. Running both
+compositors side by side was considered first (relax `modules/options.nix`'s
+exactly-one assertion, choose the session at the greeter, choose the replay
+watcher's IPC at runtime) and dropped in favour of a clean switch.
+
+For most of the stack the switch is just the flag and one import. greetd's
+`--session`, Noctalia's per-compositor builtin template, the replay
+watcher's IPC, `home/umbriel.nix` and Xwayland (Umbriel starts its own, so
+xwayland-satellite drops out) all follow `features.umbriel`. Three things
+didn't:
+
+- **The desktop's monitor.** `home/umbriel/cfg/layout.toml` is shared with
+  theseus, so the Samsung (2560x1440, 144 Hz, VRR, as in niri's
+  `display.kdl`) is keyed by **monitor identity**. A connector key
+  wouldn't do: theseus's USB-C outputs are `DP-n` too, so `[output.DP-1]`
+  would apply to any monitor plugged in there. The identity string comes
+  from niri's config and still needs checking against `umbriel outputs` on
+  the machine. HDMI-A-1 has no table.
+- **Moonshine's "Desktop" stream**, which was a nested niri, is now a nested
+  Umbriel. Verified on theseus with `umbriel -s <probe>` under a live
+  session:
+  - it nests by itself when `WAYLAND_DISPLAY` is set (wlroots autocreate)
+  - its startup command gets the nested instance's `WAYLAND_DISPLAY`,
+    `DISPLAY`, `UMBRIEL_SOCKET`, `XDG_CURRENT_DESKTOP=umbriel` and
+    `XDG_SESSION_DESKTOP`
+  - the host's systemd user environment is untouched (`server.cpp` runs its
+    session sync only `if (!m_nested)`)
+
+  So the wrapper keeps the niri version's shape: the same
+  `graphical-session.target` guard, and the wiring done from the startup
+  command (Umbriel's own variable list, then `umbriel-session.target`, with
+  `umbriel-shutdown.target` in the teardown trap). It no longer needs a
+  hand-set `XDG_CURRENT_DESKTOP`, and has no `--session` trap to avoid. The
+  built wrapper was run on theseus with the session active: it took the
+  bare branch, logged the guard line, rendered, and left the host
+  environment unchanged. The headless branch and the stream itself are
+  unverified until the desktop is switched.
+- **The Mod key in a stream.** A nested Umbriel defaults `Mod` to Alt.
+  `home/umbriel/cfg/misc.toml` now pins `general.mod_key = "Super"`, which
+  changes nothing natively. Umbriel's startup log still reads `mod key:
+  Alt (nested session)`, because that line (`server.cpp`, after backend
+  setup) is computed from `m_nested` alone. Bind matching goes through
+  `Server::modKey()`, which checks `general.mod_key` first. So the log line
+  doesn't show whether the pin worked; pressing a bind inside the stream
+  does.
+
+The niri history (`niri --session` stripping the nesting variables, the
+blank-stream symptom) stays in the Moonshine entries above. It's still the
+explanation if a nested compositor ever renders nothing.
+
 ## Host verification log (moved from CLAUDE.md, 2026-10-03)
 
 Dated live-verification record; `CLAUDE.md`'s Hosts table keeps only current

@@ -63,8 +63,9 @@ two keys left of Backspace, because `minus` is workspace 6.
 - **Animations for the config notification and the screenshot UI**: Umbriel
   has neither.
 
-Display layout (niri's `cfg/display.kdl`) isn't ported. It described the
-desktop's two monitors. The laptop panel's one `[output]` table, its scale,
-sits at the end of `cfg/layout.toml` rather than in a `cfg/display.toml` of
-its own: a new include needs a Home Manager switch to create its symlink,
+Display layout (niri's `cfg/display.kdl`) isn't ported wholesale; only the
+outputs that need settings are, at the end of `cfg/layout.toml`: theseus's
+panel by connector (`eDP-1`), and the desktop's Samsung by monitor
+identity, since theseus's USB-C outputs share the desktop's `DP-n` names.
+They sit there rather than in a `cfg/display.toml` of their own: a new include needs a Home Manager switch to create its symlink,
 while a live file already in place takes effect on save.

@@ -12,7 +12,7 @@
     };
 
     # SSH agent auto-unlock at login, same mechanism as the VM's: the
-    # gnome-keyring/GCR agent that programs.niri already pulls in is
+    # gnome-keyring/GCR agent that modules/desktop/session.nix enables is
     # PAM-unlocked at greetd login and picks this up as an identity, so no
     # module or features.* flag is involved — declaring the secret here is
     # the whole signal (see docs/decisions.md's Phase 3 note).

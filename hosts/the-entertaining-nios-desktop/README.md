@@ -2,17 +2,18 @@
 
 An ASRock B550M Pro4 with a Ryzen 5 5600X, 16 GB of RAM and a Radeon RX 6600,
 still running CachyOS. It is the only host that imports `profiles/gaming.nix`,
-and it carries the full niri + Noctalia desktop stack.
+and it carries the full Noctalia desktop stack, on Umbriel since 2026-10-20
+(niri before).
 
 Wired on the Nix side: real `disko.nix` (both disks), `features.nix`, a
 generated `hardware-configuration.nix`, a `nixosConfigurations` entry in
 `flake.nix`, a dedicated sops age key registered in `.sops.yaml`, an
 encrypted `secrets/secrets.yaml` + `secrets.nix`, and the five
-`modules/desktop/*` imports matching `features.niri = true`.
+`modules/desktop/*` imports matching `features.umbriel = true`.
 
 `secrets.nix` provisions two things: the login password hash, and a real
 per-host SSH key decrypted to `~/.ssh/id_ed25519` and unlocked at login by
-the GCR agent niri already runs. Its public half — add this one to GitHub —
+the GCR agent `modules/desktop/session.nix` runs. Its public half — add this one to GitHub —
 is:
 
 ```
@@ -50,7 +51,7 @@ Left to do before this host can actually be installed:
 After install:
 
 - [ ] `git clone <this repo> ~/.dotfiles` — **not optional** with
-      `features.niri`. niri's KDL config and Noctalia's wallpapers are live
+      `features.umbriel`. Umbriel's TOML config and Noctalia's wallpapers are live
       symlinks into that clone and dangle silently without it
       (`docs/live-dotfiles.md`).
 - [ ] `sudo tailscale up`, and `ssh-add ~/.ssh/id_ed25519` once from inside a

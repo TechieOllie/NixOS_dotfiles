@@ -15,7 +15,7 @@ let
   #
   # Two channels, because there are two kinds of user to warn: `wall` reaches
   # TTYs and SSH sessions, notify-send reaches the graphical session, which is
-  # the one that actually matters here — a niri user sees nothing of a wall
+  # the one that actually matters here — a desktop user sees nothing of a wall
   # banner. The bus address is spelled out rather than inherited: this runs
   # from an sshd session, which knows nothing of the graphical session's bus.
   # Both are best-effort; a missing notification daemon must not cost us the
@@ -54,11 +54,13 @@ in
     ../../modules/services/moonshine.nix
     ../../modules/services/kdeconnect.nix
 
-    # The desktop stack, the same six modules the VM imports — this is the
-    # machine's daily driver session, not a headless box. features.desktop
-    # and .niri in ./features.nix are the matching flags; one edit.
+    # The desktop stack, on Umbriel like theseus (niri until 2026-10-20):
+    # the VM's six modules with umbriel.nix in place of niri.nix. This is
+    # the machine's daily driver session, not a headless box.
+    # features.desktop and .umbriel in ./features.nix are the matching
+    # flags; one edit.
     ../../modules/desktop/session.nix
-    ../../modules/desktop/niri.nix
+    ../../modules/desktop/umbriel.nix
     ../../modules/desktop/greetd.nix
     ../../modules/desktop/noctalia.nix
     ../../modules/desktop/theming.nix

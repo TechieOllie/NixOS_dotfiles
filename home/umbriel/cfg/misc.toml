@@ -3,6 +3,11 @@
 [general]
 # niri's hotkey-overlay skip-at-startup.
 show_cheatsheet = false
+# Umbriel's own default, stated: Super natively, but Alt when nested, and
+# the desktop's Moonshine "Desktop" stream is a nested Umbriel
+# (modules/services/moonshine.nix). Pinned so the streamed desktop answers
+# to the same binds as the local one.
+mod_key = "Super"
 
 # Blur is OFF on niri at the operator's request (see the banner in
 # home/niri/cfg/rules.kdl), and with home/transparency.nix at 1.0 there is no

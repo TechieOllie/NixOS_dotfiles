@@ -27,6 +27,16 @@ scale = 1.6
 # without bit_depth, since the HDR format is 10-bit by itself.
 hdr = "off"
 
+# The desktop's main monitor (DP-1 there), from niri's display.kdl. Keyed
+# by monitor identity rather than connector: theseus's USB-C outputs are
+# DP-n too, so an [output.DP-1] table would apply to whatever monitor is
+# plugged in there. Its HDMI-A-1 neighbour needs no table: Umbriel enables
+# it at its preferred mode and places outputs left to right by itself.
+[output."Samsung Electric Company LS27CG51x H9JW901815"]
+mode = "2560x1440@144"
+vrr = "always"
+focus_at_startup = true
+
 # Docked: lid shut on an external monitor. logind leaves the machine running
 # then (HandleLidSwitchDocked defaults to ignore, see hosts/theseus), so the
 # panel is taken out of the layout rather than just blanked — its windows
