@@ -47,6 +47,7 @@
     ./kdeconnect.nix
     ./freecad.nix
     ./kicad.nix
+    ./slicers.nix
     ./jetbrains.nix
     ./claude-code.nix
     ./gh.nix
