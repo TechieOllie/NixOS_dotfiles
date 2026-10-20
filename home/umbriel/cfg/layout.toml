@@ -23,3 +23,15 @@ scale = 1.6
 # on rather than "auto"; SDR content is mapped to sdr_white.
 hdr = "on"
 bit_depth = 10
+
+# Docked: lid shut on an external monitor. logind leaves the machine running
+# then (HandleLidSwitchDocked defaults to ignore, see hosts/theseus), so the
+# panel is taken out of the layout rather than just blanked — its windows
+# move to the external screen and come back when the lid opens. Undocked, the
+# same lid_close fires on the way into suspend, which is harmless. Umbriel
+# also runs the matching command once at startup, so signing in with the lid
+# already shut works too. A temporary disable, not `enabled = false`: the
+# table above still applies when the panel returns.
+[events]
+lid_close = "umbriel msg output-disable:eDP-1"
+lid_open = "umbriel msg output-enable:eDP-1"
