@@ -19,3 +19,7 @@ back_and_forth = true
 # looked at; Umbriel enables it at its preferred mode.
 [output.eDP-1]
 scale = 1.6
+# The panel advertises PQ over BT.2020 (`umbriel color`), so HDR is always
+# on rather than "auto"; SDR content is mapped to sdr_white.
+hdr = "on"
+bit_depth = 10
