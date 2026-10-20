@@ -3132,6 +3132,18 @@ one unit covers both daemon and UI. It carries the same
 plain `Type=simple` unit, so "started" is not "tray host ready", and an SNI
 item registered too early is dropped in silence.
 
+**Superseded 2026-10-20.** "Outside Plasma nothing does" was wrong: the
+package ships `/etc/xdg/autostart/org.kde.kdeconnect.daemon.desktop`, and
+`systemd-xdg-autostart-generator` runs it as
+`app-org.kde.kdeconnect.daemon@autostart.service` under both niri
+(`niri.service` `Wants=xdg-desktop-autostart.target`) and Umbriel. It had
+been starting `kdeconnectd` all along, beside the indicator. The indicator
+unit was removed once Noctalia's `icefish/phone-connect` plugin took over as
+the UI. That plugin looked broken at first for an unrelated reason: it
+probes for the daemon with `gdbus`, which nothing installed, and reported
+"no KDE Connect" with the daemon up and the phone connected.
+`home/kdeconnect.nix` now installs `glib` and `sshfs` and nothing else.
+
 ### `jetbrains.idea-community` does not exist any more, and its successor is flagged insecure
 
 JetBrains discontinued the separate Community edition in 2025 and merged
