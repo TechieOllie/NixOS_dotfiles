@@ -70,7 +70,11 @@ Installed 2026-10-19. Left to do, in order:
 
   Still untested:
   - the LUKS passphrase fallback, at the AZERTY prompt — easiest after the
-    next firmware update, when the TPM refuses anyway
+    next firmware update, when the TPM refuses anyway. The UEFI dbx update
+    fwupd has offered since 2026-10-21 (deferred) is the obvious one: the
+    TPM slot is bound to PCR 7, which measures dbx. Afterwards, re-enroll
+    with `sudo systemd-cryptenroll --wipe-slot=tpm2 --tpm2-device=auto
+    --tpm2-pcrs=7 /dev/disk/by-partlabel/disk-main-luks`
   - the lid-closed suspend-then-hibernate after 2 h on battery: afterwards
     `journalctl -b -1 -u systemd-suspend-then-hibernate` shows whether it
     did
