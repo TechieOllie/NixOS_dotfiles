@@ -5380,6 +5380,40 @@ works, and the `focus=debug` log shows `get_appid_from_pid: found app_id
 surface. The trace drop-in was a runtime override, so a reboot drops it,
 as does `sudo systemctl revert moonshine.service`.
 
+## No OpenGL for Minecraft 26.3 under Umbriel (2026-10-21)
+
+Reported on theseus: the "Vanilla Perfected" pack's 26.3 release aborted
+the JVM at startup after `Failed to create backend OpenGL … OpenGL is not
+supported: Could not retrieve OpenGL functions`. The pack's 26.1.2 release
+ran. Plain 26.3 also "ran", but its log shows the same OpenGL failure
+followed by the Vulkan fallback. The pack dies because Sodium and Iris
+are OpenGL-only, so the fault was never the mods.
+
+Ruled out:
+
+- **The drivers.** Pinned `glxinfo` (Xwayland), `eglinfo` (Wayland) and
+  `vulkaninfo` all report Mesa 26.2.4 on the Intel PTL GPU.
+- **Prism's wrapper.** The game's `LD_LIBRARY_PATH`, read from the core
+  dump, carries libglvnd and `/run/opengl-driver/lib`.
+
+The cause is in `GlBackend.loadLibrary` (javap on the 26.3 client jar). It
+takes the path of the library LWJGL loaded, `GL.getFunctionProvider()`,
+and passes it to `SDL_GL_LoadLibrary`. LWJGL 3.4.3 sees a Wayland session
+and loads `libEGL.so.1`. SDL3 sees that Umbriel lacks `fifo-v1` and moves
+itself to Xwayland. Its X11 loader defaults to GLX, finds no `glX*`
+symbols in libEGL, and fails with exactly that message. A standalone Java
+program making the same two calls with the game's own LWJGL and SDL jars
+reproduced it. `SDL_VIDEO_FORCE_EGL=1` and `SDL_VIDEO_DRIVER=wayland` each
+fixed it. SDL2's `SDL_VIDEO_X11_FORCE_EGL` does nothing, because SDL3
+renamed the hint.
+
+`FORCE_EGL` was chosen: it keeps the window on Xwayland, where SDL wants it
+for frame pacing, and only aligns the GL loader with LWJGL. It is set in a
+wrapper around `prismlauncher` (`home/prismlauncher.nix`), not as a session
+variable, because Steam and Proton games use SDL too. Confirmed the same
+day: the pack's 26.3 release logs `Using graphics backend OpenGL` on
+Xwayland and runs.
+
 ## Standing gotchas, full text (moved from CLAUDE.md, 2026-10-20)
 
 `CLAUDE.md` keeps each standing gotcha as its symptom and rule only. This is
