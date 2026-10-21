@@ -47,6 +47,7 @@
     ./freecad.nix
     ./kicad.nix
     ./slicers.nix
+    ./darktable.nix
     ./jetbrains.nix
     ./claude-code.nix
     ./gh.nix

@@ -53,6 +53,11 @@
           default = false;
           description = "Enable the CAD stack: FreeCAD, on the Home Manager side.";
         };
+        photography = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Enable photo editing: darktable, on the Home Manager side.";
+        };
         development = lib.mkOption {
           type = lib.types.bool;
           default = false;
