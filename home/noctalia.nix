@@ -488,6 +488,11 @@ in
         # images before this was set.
         notification.history_retention_hours = 12;
 
+        # The first low-battery notification at 15% instead of upstream's
+        # 10 (the 5% and 2% escalations are fixed). Set in the UI on theseus
+        # and moved here; inert on a host with no system battery.
+        battery.warning_threshold = 15;
+
         # Noctalia's own plugin system: ids are `<author>/<name>`, fetched
         # and cached by Noctalia into ~/.local/state/noctalia/plugins rather
         # than coming from Nix. Declared here so a rebuilt host re-fetches
@@ -528,6 +533,18 @@ in
 
         # Battery as a number only, without the icon beside it.
         plugin_settings."icefish/phone-connect".battery_display = "percent";
+
+        # Set in the UI on theseus (2026-10-22), moved here. Docker is
+        # socket-activated (modules/services/docker.nix), and the widget's
+        # default polling every 5 s would wake the daemon the whole session;
+        # with this it only polls while Docker is already running. The
+        # manager panel opens attached to its bar widget, not as a centred
+        # floating window at the pointer.
+        plugin_settings."8bury/mini-docker" = {
+          respect_socket_activation = true;
+          manager_placement = "attached";
+          manager_open_near_click = false;
+        };
 
         # Per-widget settings, keyed by the same widget ids the bar layout
         # above lists. All display-independent.
