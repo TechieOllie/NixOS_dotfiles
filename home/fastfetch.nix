@@ -3,10 +3,22 @@
 #
 # Laid out for a half-size Ghostty window, which is how terminals usually
 # sit in a column here: on theseus that is 83x53 cells side by side and about
-# half the rows stacked. Hence the small NixOS logo (16 columns, 7 rows)
+# half the rows stacked. Hence the small NixOS logo (15 columns, 7 rows)
 # rather than the 40-column default, and short formats that keep the widest
-# line under 60 columns and the whole thing at 16 rows. fastfetch truncates
+# line under 70 columns and the whole thing at 17 rows. fastfetch truncates
 # a line that still doesn't fit rather than wrapping it.
+#
+# Hierarchy, not hue. Noctalia derives the ANSI palette from the wallpaper,
+# and a muted one gives colours 2-6 nearly the same grey, so anything that
+# leans on several ANSI colours reads as flat (it did, 2026-10-22). Instead
+# the lines are grouped — system, this repo's generation and commit, then
+# hardware — under dim rules, keys are bold in the accent, and usage gets a
+# thin two-tone bar plus its percentage. The bars have one fixed colour:
+# fastfetch's default shades each bar by position, green to red, which on a
+# 64% battery puts a red stub at the left that reads as a warning. No
+# `colors` row either: on a muted palette it is seven greys and a red.
+# CPU is read from /proc/cpuinfo rather than the cpu module, to drop the
+# (R)/(TM) marks and AMD's "6-Core Processor" suffix.
 #
 # The two `command` modules are what this repo adds over the stock list: the
 # running system generation (what `nixos-rebuild switch --rollback` steps
@@ -14,6 +26,13 @@
 # `*` when the clone has uncommitted changes. Battery and the desktop's
 # /mnt/storage disk are listed everywhere; fastfetch hides a module that
 # finds nothing (theseus has no /mnt/storage, the desktop no battery).
+#
+# The logo is `nixos_old_small`, plain ASCII: fastfetch 2.69's
+# `nixos_small` is drawn in Unicode sextants (U+1FB00 block), which
+# JetBrainsMono Nerd Font doesn't carry (Nerd Fonts patches in icons, not
+# that block), so it renders broken in Ghostty too.
+# Every key icon is a Material Design Nerd glyph (U+F0000 and up); the
+# older BMP private-use ones get stripped on the way into this file.
 #
 # Noctalia's "fastfetch" community template is deliberately not enabled:
 # its apply.sh merges colours into ~/.config/fastfetch/config.jsonc in
@@ -33,96 +52,123 @@
 let
   dots = "${config.home.homeDirectory}/.dotfiles";
   system = "/nix/var/nix/profiles/system";
+  rule = {
+    type = "custom";
+    format = lib.concatStrings (lib.replicate 38 "─");
+    outputColor = "90";
+  };
 in
 lib.mkIf osConfig.features.workstation {
   programs.fastfetch = {
     enable = true;
     settings = {
       logo = {
-        source = "nixos_small";
+        source = "nixos_old_small";
         padding = {
-          top = 1;
-          left = 1;
-          right = 3;
+          top = 2;
+          left = 2;
+          right = 4;
         };
       };
       display = {
         separator = "  ";
-        key.width = 11;
+        key.width = 12;
+        color = {
+          keys = "blue";
+          title = "bold_blue";
+        };
         duration = {
           abbreviation = true;
           spaceBeforeUnit = "never";
         };
         size.ndigits = 1;
+        # Without "bar" here, {percentage-bar} renders empty.
+        percent.type = [
+          "bar"
+          "num"
+        ];
+        bar = {
+          char = {
+            elapsed = "━";
+            total = "─";
+          };
+          border = {
+            left = "";
+            right = "";
+          };
+          width = 12;
+          color = {
+            elapsed = "37";
+            total = "90";
+          };
+        };
       };
       modules = [
         "title"
+        rule
         {
           type = "os";
-          key = "󱄅 os";
+          key = "󱄅  os";
           format = "{pretty-name}";
         }
         {
           type = "kernel";
-          key = " kernel";
+          key = "󰌽  kernel";
           format = "{release}";
         }
+        {
+          type = "uptime";
+          key = "󰔟  uptime";
+        }
+        {
+          type = "packages";
+          key = "󰏖  pkgs";
+          format = "{nix-system} system · {nix-user} user";
+        }
+        rule
         {
           # The profile link's own mtime is when it was switched to; the
           # store path it points at is always dated 1970.
           type = "command";
-          key = "󰑓 gen";
+          key = "󰑓  gen";
           text = "echo \"$(readlink ${system} | tr -dc 0-9) · $(date -d @$(stat -c %Y ${system}) '+%b %d %H:%M')\"";
         }
         {
           type = "command";
-          key = " dots";
+          key = "󰊢  dots";
           text = "echo \"$(git -C ${dots} log -1 --format='%h · %cr')$(git -C ${dots} diff --quiet HEAD || echo ' *')\"";
         }
-        {
-          type = "packages";
-          key = "󰏖 pkgs";
-          format = "{nix-system} system · {nix-user} user";
-        }
-        {
-          type = "uptime";
-          key = "󰔟 uptime";
-        }
+        rule
         {
           type = "wm";
-          key = " wm";
+          key = "󰍹  wm";
           format = "{pretty-name} {version}";
         }
         {
-          type = "cpu";
-          key = " cpu";
-          format = "{name} ({cores-logical})";
+          type = "command";
+          key = "󰘚  cpu";
+          text = "echo \"$(awk -F': ' '/^model name/{print $2; exit}' /proc/cpuinfo | sed -E 's/[(][^)]*[)]//g; s/ [0-9]+-Core Processor//; s/ +/ /g') ($(nproc))\"";
         }
         {
           type = "gpu";
-          key = "󰢮 gpu";
+          key = "󰢮  gpu";
           format = "{name}";
         }
         {
           type = "memory";
-          key = " mem";
+          key = "󰍛  mem";
+          format = "{percentage-bar} {percentage}  {used} / {total}";
         }
         {
           type = "disk";
-          key = "󰋊 disk";
+          key = "󰋊  disk";
           folders = "/:/mnt/storage";
-          format = "{size-used} / {size-total} ({size-percentage})";
+          format = "{size-percentage-bar} {size-percentage}  {size-used} / {size-total}";
         }
         {
           type = "battery";
-          key = "󰁹 bat";
-          format = "{capacity} · {status}";
-        }
-        "break"
-        {
-          type = "colors";
-          symbol = "circle";
-          paddingLeft = 2;
+          key = "󰁹  bat";
+          format = "{capacity-bar} {capacity}  {status}";
         }
       ];
     };
