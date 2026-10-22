@@ -150,4 +150,19 @@ lib.mkIf osConfig.features.desktop {
       }" ${lib.getExe pkgs.bash} "$papirusApply" || true
     fi
   '';
+
+  # The same apply.sh also runs from Noctalia itself on every theme pass, and
+  # there it gets Noctalia's PATH (the per-user profile), not the explicit one
+  # above. Without gtk-update-icon-cache on it, papirus-folders deletes the
+  # recoloured theme's icon cache and can't rebuild it (`command not found` in
+  # `journalctl --user -u noctalia`), so GTK apps scan the theme directories
+  # instead of reading the cache. Only that one binary is linked, not all of
+  # gtk3's bin/ (gtk3-demo, gtk-builder-tool, ...); nixpkgs has no standalone
+  # package for it.
+  home.packages = [
+    (pkgs.runCommand "gtk-update-icon-cache" { } ''
+      mkdir -p $out/bin
+      ln -s ${pkgs.gtk3}/bin/gtk-update-icon-cache $out/bin/
+    '')
+  ];
 }
