@@ -135,7 +135,7 @@
 # ── Scratchpads ───────────────────────────────────────────────────────────
 # See cfg/scratchpad.toml. The first press launches the app if it isn't
 # running yet; after that the key shows and hides it.
-"Mod+Shift+Return" = { action = "scratchpad-toggle:terminal", repeat = false }
+"Mod+Shift+Return" = { action = "scratchpad-toggle:git", repeat = false }
 "Mod+M" = { action = "scratchpad-toggle:music", repeat = false }
 # Mod+D was niri's "spawn vesktop"; here it summons the one already running.
 "Mod+D" = { action = "scratchpad-toggle:discord", repeat = false }

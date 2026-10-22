@@ -13,16 +13,19 @@
 # Scratchpad windows float, so each rule sizes them as a fraction of the
 # output; they appear centred.
 
-# A dropdown terminal, separate from the Mod+Return one. A distinct GTK
-# class gives it its own app_id and its own Ghostty process — Ghostty treats
-# any CLI argument as a reason not to join the existing single instance.
+# A dropdown Lazygit in its own Ghostty. A distinct GTK class gives it its
+# own app_id and its own Ghostty process — Ghostty treats any CLI argument as
+# a reason not to join the existing single instance. It starts in $HOME,
+# which isn't a repo, so home/lazygit.nix's notARepository = "skip" opens the
+# most recent one. Quitting Lazygit closes the window; the next press
+# starts a fresh one.
 [[scratchpad]]
-name = "terminal"
-spawn_when_empty = "ghostty --class=com.mitchellh.ghostty.scratchpad"
+name = "git"
+spawn_when_empty = "ghostty --class=com.mitchellh.ghostty.scratchpad -e lazygit"
 
 [[window_rule]]
 match.app_id = "^com\\.mitchellh\\.ghostty\\.scratchpad$"
-default_scratchpad = "terminal"
+default_scratchpad = "git"
 default_floating_size = { width = 0.7, height = 0.6 }
 
 [[scratchpad]]

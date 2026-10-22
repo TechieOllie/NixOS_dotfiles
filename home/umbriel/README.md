@@ -22,9 +22,9 @@ Three files in `~/.config/umbriel/` don't come from here:
 
 ## Added on top of the niri port
 
-- **Scratchpads** (`cfg/scratchpad.toml`): a dropdown Ghostty
-  (`Mod+Shift+Return`), Feishin (`Mod+M`) and Vesktop (`Mod+D`). The first
-  press launches the app if it isn't running, and later presses show and
+- **Scratchpads** (`cfg/scratchpad.toml`): a dropdown Lazygit
+  in Ghostty (`Mod+Shift+Return`), Feishin (`Mod+M`) and Vesktop
+  (`Mod+D`). The first press launches the app if it isn't running, and later presses show and
   hide it. Vesktop autostarts, so it is already waiting, hidden, after login.
 - **Game rules** (`cfg/rules.toml`): pointer confinement and adaptive sync
   for Proton games and for any window that declares itself a game.
