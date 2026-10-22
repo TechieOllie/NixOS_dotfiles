@@ -30,9 +30,14 @@ lib.mkIf osConfig.features.kdeconnect {
   # (glib's bin output) it reports no KDE Connect at all even with the
   # daemon up and a phone connected — no error anywhere, just an empty
   # widget. sshfs is what kdeconnectd's own sftp plugin mounts the phone
-  # with, for the plugin's "browse files".
+  # with, for the plugin's "browse files". zenity is its file picker, for
+  # both "share" and the device avatar (the button beside the name): it
+  # tries kdialog, then zenity, and with neither it only raises a
+  # "kdialog/zenity not found" error. zenity, being GTK, matches the rest of
+  # the desktop rather than pulling in KDE frameworks.
   home.packages = [
     pkgs.glib
     pkgs.sshfs
+    pkgs.zenity
   ];
 }
