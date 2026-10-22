@@ -46,10 +46,24 @@
 {
   config,
   lib,
+  pkgs,
   osConfig,
   ...
 }:
 let
+  # The logo the Ghostty hook below shows: the BB from the repo's own
+  # wallpaper, cropped below the title at build time, its black background
+  # made transparent so it sits on whatever background the theme gives
+  # Ghostty. Drawn through the kitty graphics protocol, which Ghostty speaks.
+  # 20x7 cells keeps the image's ~1.4:1 shape (a cell is about 1:2).
+  logo = {
+    image = pkgs.runCommand "fastfetch-logo.png" { nativeBuildInputs = [ pkgs.imagemagick ]; } ''
+      magick ${../wallpapers/wallpaper_BB_1920x1080.jpg} \
+        -crop 920x640+510+285 +repage -fuzz 5% -transparent black -resize 460x320 $out
+    '';
+    width = 20;
+    height = 7;
+  };
   dots = "${config.home.homeDirectory}/.dotfiles";
   system = "/nix/var/nix/profiles/system";
   rule = {
@@ -174,17 +188,21 @@ lib.mkIf osConfig.features.workstation {
     };
   };
 
-  # Once per Ghostty window. The variable is exported, so anything started
-  # from that shell (a nested zsh, `nix develop`, Neovim's :terminal)
-  # inherits it and stays quiet, while a new window starts from Ghostty's
-  # own environment and shows it again. Not over SSH, where Ghostty's
+  # Once per Ghostty window, with the image logo above in place of the
+  # config's ASCII one — the config is also what a bare `fastfetch` uses in
+  # a terminal that can't draw images (VS Code's), so its default stays text.
+  # The variable is exported, so anything started from that shell (a nested
+  # zsh, `nix develop`, Neovim's :terminal) inherits it and stays quiet,
+  # while a new window starts from Ghostty's own environment and shows it
+  # again. Not over SSH, where Ghostty's
   # ssh-env would otherwise carry TERM_PROGRAM along, and not in a window
   # too short to hold it without scrolling the prompt away. The lazygit
   # scratchpad runs no shell at all.
   programs.zsh.initContent = lib.mkOrder 1500 ''
     if [[ $TERM_PROGRAM == ghostty && -z $FASTFETCH_SHOWN && -z $SSH_CONNECTION ]] && (( LINES >= 20 && COLUMNS >= 50 )); then
       export FASTFETCH_SHOWN=1
-      fastfetch
+      fastfetch --logo-type kitty-direct --logo ${logo.image} \
+        --logo-width ${toString logo.width} --logo-height ${toString logo.height}
     fi
   '';
 }
