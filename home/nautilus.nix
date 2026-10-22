@@ -64,7 +64,15 @@ let
 in
 lib.mkIf osConfig.features.desktop {
   # Needs home/xdg-mime-apps.nix enabled to reach disk at all.
-  xdg.mimeApps.defaultApplications = lib.genAttrs archiveTypes (_: "org.gnome.Nautilus.desktop");
+  #
+  # inode/directory too: with no default, `xdg-open <folder>` fell back to
+  # the first entry declaring it, which was VS Code (code.desktop) — so
+  # phone-connect's "browse files" opened the phone's storage in an editor
+  # (found 2026-10-22). Anything else that hands xdg-open a folder hit the
+  # same thing.
+  xdg.mimeApps.defaultApplications = lib.genAttrs (archiveTypes ++ [ "inode/directory" ]) (
+    _: "org.gnome.Nautilus.desktop"
+  );
 
   # Sidebar pinned locations. Confirmed live (on the operator's real,
   # currently-used Nautilus 50.2.2) that this legacy gtk-3.0 path is still
