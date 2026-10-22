@@ -44,6 +44,21 @@ lib.mkIf osConfig.features.workstation {
     };
   };
 
+  # The shell integration's prompt marks (OSC 133, `cl=line`) are what let
+  # Ghostty clear and redraw the prompt on resize. Starship's $fill pads
+  # line 1 to exactly the terminal width, so without them a resize reflows
+  # that line and leaves a stale copy behind. Locally Ghostty points
+  # GHOSTTY_RESOURCES_DIR at the integration and Home Manager sources it,
+  # but nothing carries that over SSH. A Ghostty client is still
+  # recognisable there by the TERM that ssh-terminfo sets (TERM_PROGRAM
+  # would need AcceptEnv on sshd), so source this host's own copy. With
+  # GHOSTTY_SHELL_FEATURES unset it adds the prompt marks and nothing else.
+  programs.zsh.initContent = lib.mkOrder 1000 ''
+    if [[ -n $SSH_CONNECTION && -z $GHOSTTY_RESOURCES_DIR && $TERM == xterm-ghostty ]]; then
+      source ${config.programs.ghostty.package}/share/ghostty/shell-integration/zsh/ghostty-integration
+    fi
+  '';
+
   # Home Manager validates this config (`ghostty +validate-config`) as its
   # onChange, and on a fresh install that runs before Noctalia's first
   # template pass has written themes/noctalia — so the unknown theme failed
