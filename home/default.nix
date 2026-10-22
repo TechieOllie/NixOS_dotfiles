@@ -15,6 +15,7 @@
     ./starship.nix
     ./neovim.nix
     ./lazygit.nix
+    ./lazydocker.nix
     ./git.nix
     ./ghostty.nix
     ./yazi.nix
