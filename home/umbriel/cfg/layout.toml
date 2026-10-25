@@ -23,7 +23,7 @@ scale = 1.6
 # since 2026-10-25: the brief "loose cable" artifacting at login that had it
 # turned off on 2026-10-20 was the xe driver's panel self-refresh, now off in
 # hosts/theseus/default.nix. No bit_depth: the HDR format is 10-bit by itself.
-hdr = "on"
+hdr = "off"
 
 # The desktop's main monitor (DP-1 there), from niri's display.kdl. Keyed
 # by monitor identity rather than connector: theseus's USB-C outputs are
