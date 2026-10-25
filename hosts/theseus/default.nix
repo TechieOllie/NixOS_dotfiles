@@ -96,6 +96,13 @@
     vaapiDriver = "intel-media-driver";
   };
 
+  # Panel self-refresh off. With PSR2 (the driver's default for this panel)
+  # some logins showed a few seconds of "loose cable" artifacting at the
+  # switch into the HDR format; with PSR off, HDR logins were clean, and
+  # PSR1 only traded that for 5-10 s of black screen after login (all
+  # tested 2026-10-25 through debugfs). Costs some idle battery.
+  boot.kernelParams = [ "xe.enable_psr=0" ];
+
   # Closing the lid on battery suspends, and hibernates after two hours of
   # that, so a bag-bound laptop doesn't come back flat. Hibernation was
   # already provisioned for: ./disko.nix sizes swap to RAM inside the LUKS

@@ -5179,6 +5179,25 @@ Not ruled out: the xe driver's panel self-refresh (`xe.enable_psr=0`) as the
 underlying cause of the glitch at the format switch. If it shows up when HDR
 content goes fullscreen, try that before turning HDR off entirely.
 
+### Resolved: panel self-refresh (2026-10-25)
+
+It was PSR. The driver ran this panel in PSR2 with selective fetch
+(`i915_edp_psr_status`: `PSR2 enabled`, cycling `SLEEP`/`SU_STANDBY`).
+Tested at runtime through debugfs (`i915_edp_psr_debug`: 1 disables, 3
+forces PSR1, 0 restores the default — lasts until reboot, survives logout),
+with `hdr = "on"` and several logins each:
+
+- PSR off: clean logins, no artifacting.
+- PSR1: no artifacting, but 5-10 s of black screen after each login.
+
+So `xe.enable_psr=0` went into `hosts/theseus/default.nix` and HDR is back
+to always on. The cost is some idle battery.
+
+Not this cause: Umbriel's sporadic `eDP-1: Atomic commit failed: Device or
+resource busy`. It predates the HDR work, kept appearing a few seconds after
+logins with PSR off, and nothing visible goes with it. The kernel logs
+nothing alongside it.
+
 ## Bitwarden's fingerprint unlock (2026-10-20)
 
 The browser extension can't use biometrics by itself. It asks the running
