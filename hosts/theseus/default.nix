@@ -101,7 +101,7 @@
   # switch into the HDR format; with PSR off, HDR logins were clean, and
   # PSR1 only traded that for 5-10 s of black screen after login (all
   # tested 2026-10-25 through debugfs). Costs some idle battery.
-  boot.kernelParams = [ "xe.enable_psr=0" ];
+  # boot.kernelParams = [ "xe.enable_psr=0" ];
 
   # Closing the lid on battery suspends, and hibernates after two hours of
   # that, so a bag-bound laptop doesn't come back flat. Hibernation was
