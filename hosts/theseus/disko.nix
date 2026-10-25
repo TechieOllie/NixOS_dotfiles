@@ -66,9 +66,9 @@ in
                 # TRIM through to the NVMe. Leaks which blocks are free, the
                 # standard trade for SSD wear and performance.
                 allowDiscards = true;
-                # Try the TPM first, then fall back to asking. Needs the
-                # systemd initrd (./default.nix); the scripted one ignores
-                # crypttab options.
+                # Try the TPM first, then fall back to asking. Read by the
+                # systemd initrd — nixpkgs' only one since the scripted
+                # initrd (which ignored crypttab options) was removed.
                 crypttabExtraOpts = [ "tpm2-device=auto" ];
               };
               content = {

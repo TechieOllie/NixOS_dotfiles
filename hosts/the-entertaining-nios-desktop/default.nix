@@ -92,7 +92,31 @@ in
   # chaotic-nyx overlay, which modules/programs/steam.nix brings in via
   # profiles/gaming.nix; the same flake's binary cache is what keeps this
   # from being a from-source kernel build.
-  boot.kernelPackages = pkgs.linuxPackages_cachyos;
+  #
+  # TEMPORARY (2026-10-25), remove once NixOS/nixpkgs#575192 is closed:
+  # since nixpkgs 6bd7526744 the module aggregator `cat`s a `.ko.cer` for
+  # every external module and fails the build when one is missing. These
+  # two, built against this kernel, ship none (xpad-noone comes in through
+  # controllers.nix's hardware.xone). An empty certificate adds nothing to
+  # the merged modules.cer, and the modules load exactly as before.
+  boot.kernelPackages =
+    let
+      withEmptyModuleCerts =
+        pkg:
+        pkg.overrideAttrs (old: {
+          postFixup = (old.postFixup or "") + ''
+            for ko in $(find $out/lib/modules -name '*.ko*' ! -name '*.cer'); do
+              touch "''${ko%.ko*}.ko.cer"
+            done
+          '';
+        });
+    in
+    pkgs.linuxPackages_cachyos.extend (
+      _: prev: {
+        r8168 = withEmptyModuleCerts prev.r8168;
+        xpad-noone = withEmptyModuleCerts prev.xpad-noone;
+      }
+    );
 
   # Fan curves, clock and power limits for the Radeon RX 6600. amdgpu
   # itself needs nothing declared — the kernel driver and Mesa's RADV are

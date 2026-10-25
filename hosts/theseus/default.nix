@@ -112,12 +112,6 @@
   };
   systemd.sleep.settings.Sleep.HibernateDelaySec = "2h";
 
-  # The systemd initrd: what lets ./disko.nix's crypttab entry unlock from
-  # the TPM (tpm2-device=auto), with the passphrase as the fallback prompt.
-  # The scripted initrd ignores crypttab options entirely. It also resumes
-  # from hibernation inside the same unlocked container.
-  boot.initrd.systemd.enable = true;
-
   # The French keymap in the initrd too, not only from stage 2 on. That
   # passphrase prompt is typed on this AZERTY keyboard, and without early
   # setup the initrd has no vconsole.conf and reads keys as US: a correct
