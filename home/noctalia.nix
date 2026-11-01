@@ -246,9 +246,18 @@ in
             # box — the first thing you do when launching anything by path.
             provider_prefix = ":";
 
-            # Also surface emoji hits in unprefixed search, rather than only
-            # behind ":emo". Every other provider stays prefix-only.
-            providers.emoji.global = true;
+            # Search field and toolbar above the results; upstream's default
+            # is "bottom".
+            search_position = "top";
+
+            # Keyboard-only: hover, clicks, scrolling and taps inside the
+            # launcher are ignored, so a pointer resting where the panel opens
+            # can't steal the selection. Clicking outside still closes it.
+            ignore_mouse = true;
+
+            # Emoji stay behind ":emo" like every other provider, rather than
+            # crowding unprefixed app search.
+            providers.emoji.global = false;
           };
 
           # The session menu's 1-5 shortcuts, rebound for AZERTY. Upstream
