@@ -5198,6 +5198,15 @@ resource busy`. It predates the HDR work, kept appearing a few seconds after
 logins with PSR off, and nothing visible goes with it. The kernel logs
 nothing alongside it.
 
+### Reopened: HDR off again, PSR back on (2026-10-25)
+
+Not resolved after all. With PSR off and HDR on, logins on the real screen
+still went black for a few seconds — the artifacting was gone, the black
+screen was not. So `hdr = "off"` again on eDP-1, and `xe.enable_psr=0` is
+commented out in `hosts/theseus/default.nix`, since it no longer buys
+anything and costs idle battery. The cause of the remaining black screen is
+unknown.
+
 ## Bitwarden's fingerprint unlock (2026-10-20)
 
 The browser extension can't use biometrics by itself. It asks the running
