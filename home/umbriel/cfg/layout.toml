@@ -19,20 +19,33 @@ back_and_forth = true
 # looked at; Umbriel enables it at its preferred mode.
 [output.eDP-1]
 scale = 1.6
-# The panel advertises PQ over BT.2020 (`umbriel color`). Always on, back
-# since 2026-10-25: the brief "loose cable" artifacting at login that had it
-# turned off on 2026-10-20 was the xe driver's panel self-refresh, now off in
-# hosts/theseus/default.nix. No bit_depth: the HDR format is 10-bit by itself.
+# The panel advertises PQ over BT.2020 (`umbriel color`), but HDR stays off.
+# With it on, logins showed a few seconds of artifacting (PSR2) or black
+# screen. Turning panel self-refresh off (hosts/theseus/default.nix) cured the
+# artifacting but not the black screen, so HDR went back off and PSR back on.
+# No bit_depth if it is turned on again: the HDR format is 10-bit by itself.
 hdr = "off"
 
-# The desktop's main monitor (DP-1 there), from niri's display.kdl. Keyed
-# by monitor identity rather than connector: theseus's USB-C outputs are
-# DP-n too, so an [output.DP-1] table would apply to whatever monitor is
-# plugged in there. Its HDMI-A-1 neighbour needs no table: Umbriel enables
-# it at its preferred mode and places outputs left to right by itself.
+# The desktop's two monitors, keyed by monitor identity rather than
+# connector: theseus's USB-C outputs are DP-n too, so an [output.DP-1] table
+# would apply to whatever monitor is plugged in there.
+#
+# Both positions are pinned. Left to Umbriel's automatic left-to-right
+# placement, the order follows connector enumeration, which is not stable
+# across boots, so the 1080p screen did not reliably land on the left.
+# Top edges aligned.
+
+# The 1080p secondary (HDMI-A-1), left of the main monitor.
+[output."Samsung Electric Company C27F390 H4ZR113985"]
+position = [0, 0]
+
+# The main monitor (DP-1), from niri's display.kdl. It advertises PQ over
+# BT.2020 (`umbriel color`), so HDR is always on.
 [output."Samsung Electric Company LS27CG51x H9JW901815"]
 mode = "2560x1440@144"
+position = [1920, 0]
 vrr = "always"
+hdr = "on"
 focus_at_startup = true
 
 # Docked: lid shut on an external monitor. logind leaves the machine running

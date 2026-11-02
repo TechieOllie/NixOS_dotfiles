@@ -37,9 +37,14 @@ match.title = "^notificationtoasts_\\d+_desktop$"
 default_position = { x = 10, y = 10, anchor = "bottom_right" }
 default_focused = false
 
+# Zen's Picture-in-Picture window also matches the open-maximized rule
+# above, and a field a later rule leaves unset keeps the earlier value — so
+# without the explicit `false` it opened floating *and* maximized, i.e.
+# covering the whole screen.
 [[window_rule]]
 match.app_id = "^zen(-\\w+)?$"
 match.title = "^Picture-in-Picture$"
+default_maximize = false
 default_floating = true
 default_floating_size_px = { width = 480, height = 270 }
 default_position = { x = 32, y = 32, anchor = "bottom_right" }
