@@ -21,6 +21,11 @@ module, which Proton uses for Windows synchronisation primitives when
 `/dev/ntsync` exists. Here rather than in `modules/programs/steam.nix`
 because it serves every Wine/Proton launcher, Heroic included.
 
+`debug-probes.nix` (`config.features.embedded`): udev access to debug
+probes (OpenOCD's rules, so the ST-Link and the rest) and the `dialout`
+group for their serial ports. The toolchain is deliberately per project, in
+each project's own flake — see `TechieOllie/project-templates`.
+
 `audio.nix` and `graphics.nix` were once planned for this directory and are
 not needed: PipeWire arrives with
 `programs.noctalia.recommendedServices.enable`, and AMD graphics need

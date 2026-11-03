@@ -49,6 +49,7 @@
     ./kicad.nix
     ./slicers.nix
     ./darktable.nix
+    ./stm32cubemx.nix
     ./jetbrains.nix
     ./claude-code.nix
     ./gh.nix

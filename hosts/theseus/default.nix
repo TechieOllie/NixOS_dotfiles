@@ -19,6 +19,7 @@
     ../../modules/services/tailscale.nix
     ../../modules/services/printing.nix
     ../../modules/services/kdeconnect.nix
+    ../../modules/hardware/debug-probes.nix
 
     # The desktop stack, on Umbriel: the desktop's six modules with
     # umbriel.nix in place of niri.nix. features.desktop and .umbriel in

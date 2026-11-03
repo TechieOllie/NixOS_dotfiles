@@ -60,5 +60,7 @@
       # installs it system-wide, since three of that host's four accounts
       # have no Home Manager profile to install anything into.
       "google-chrome"
+      # ST's SLA0048 rather than an OSS license — see home/stm32cubemx.nix.
+      "stm32cubemx"
     ];
 }

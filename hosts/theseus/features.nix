@@ -22,6 +22,9 @@
     # Claude Code and gh on top of the workstation terminal stack.
     cad = true;
     development = true;
+    # STM32 work: ST-Link access and STM32CubeMX; the toolchain comes from
+    # each project's own flake (TechieOllie/project-templates).
+    embedded = true;
     # darktable (home/darktable.nix).
     photography = true;
     # gaming is left to profiles/gaming.nix's mkDefault rather than

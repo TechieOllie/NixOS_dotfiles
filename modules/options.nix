@@ -63,6 +63,11 @@
           default = false;
           description = "Enable developer tooling beyond the universal terminal stack: IntelliJ IDEA and the Claude Code CLI, both on the Home Manager side.";
         };
+        embedded = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Enable microcontroller development: udev access to debug probes (ST-Link and the rest of OpenOCD's list), the dialout group for their serial ports, and STM32CubeMX on the Home Manager side. Toolchains come from each project's own dev shell.";
+        };
         moonshine = lib.mkOption {
           type = lib.types.bool;
           default = false;
