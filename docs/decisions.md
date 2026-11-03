@@ -5584,3 +5584,7 @@ state. Where a fuller write-up exists, the entry points at it.
   Same day, a space bar registering double presses turned out mechanical:
   `evtest` showed one press/release per tap, and pressing the input cover
   down evenly stopped it.
+- 2026-11-03: eduroam at ESEO, declared as an `ensureProfiles` entry with
+  the login and password from sops (`eduroam-env`) in place of the eduroam
+  CAT installer's unread wpa_supplicant file, connected and authenticated
+  on campus: PEAP/MSCHAPv2 against the pinned CA and `eduroam.eseo.fr`.
