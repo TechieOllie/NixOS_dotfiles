@@ -44,8 +44,10 @@
 
       # proton-cachyos over stock Proton, by operator choice: CachyOS's fork
       # carries the scheduler and Wine patches that machine is already
-      # tuned around. The x86-64-v3 (AVX2) build, since the only gaming host
-      # is a Zen 3; Steam lists it as "Proton-CachyOS x86-64-v3", a
+      # tuned around. The x86-64-v3 (AVX2) build, which both gaming hosts
+      # support (the desktop's Zen 3 and theseus's Core Ultra 5 325); a
+      # future gaming host without AVX2 would need the generic build
+      # instead. Steam lists it as "Proton-CachyOS x86-64-v3", a
       # different internal name from the generic build's, so switching
       # variants means re-picking it in Steam's compatibility settings.
       # GE-Proton rides along as the fallback for games CachyOS's build
