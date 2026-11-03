@@ -5588,3 +5588,7 @@ state. Where a fuller write-up exists, the entry points at it.
   the login and password from sops (`eduroam-env`) in place of the eduroam
   CAT installer's unread wpa_supplicant file, connected and authenticated
   on campus: PEAP/MSCHAPv2 against the pinned CA and `eduroam.eseo.fr`.
+- 2026-11-03: `features.embedded` with an ST-Link, from a project made from
+  the `TechieOllie/project-templates#stm32` template: `st-info --probe` sees
+  the probe, flashing works, the virtual COM port reads without sudo
+  (`dialout`), and F5 debugging through OpenOCD and Cortex-Debug works.
