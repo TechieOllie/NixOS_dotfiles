@@ -27,6 +27,14 @@
     };
   };
 
+  # The eduroam login, as a NetworkManager environment file for
+  # ensureProfiles in ./default.nix — its decrypted content is two lines,
+  # `EDUROAM_IDENTITY=<login>` and `EDUROAM_PASSWORD=<password>`. The login
+  # is in here too, not just the password: it's the operator's school
+  # address, and this repo is public. Not neededForUsers, so a missing key
+  # fails at activation rather than breaking eval (see CLAUDE.md).
+  sops.secrets.eduroam-env = { };
+
   # sops-install-secrets creates ~/.ssh itself if missing, but as
   # root:root 0755 — so it is declared first, owned by the user, as on the
   # desktop.

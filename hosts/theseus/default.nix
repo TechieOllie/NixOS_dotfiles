@@ -1,4 +1,5 @@
 {
+  config,
   lib,
   pkgs,
   vars,
@@ -125,6 +126,41 @@
   # passphrase is then simply rejected. The only host that needs this,
   # since it is the only one that asks for anything before stage 2.
   console.earlySetup = true;
+
+  # eduroam at ESEO, declared rather than left to the school's eduroam CAT
+  # installer, which only writes a wpa_supplicant file this NetworkManager
+  # host never reads (and needs dbus-python to do anything better). The
+  # settings are the CAT profile's: PEAP/MSCHAPv2, pinned to the school's
+  # CA and RADIUS server name so the password is only ever sent to it.
+  # Host-level, like inotmac's home network: it describes where this one
+  # laptop goes. The login and password come from sops (./secrets.nix),
+  # substituted by name when NetworkManager writes the profile.
+  networking.networkmanager.ensureProfiles = {
+    environmentFiles = [ config.sops.secrets.eduroam-env.path ];
+    profiles.eduroam = {
+      connection = {
+        id = "eduroam";
+        type = "wifi";
+        autoconnect = true;
+      };
+      wifi = {
+        ssid = "eduroam";
+        mode = "infrastructure";
+      };
+      wifi-security.key-mgmt = "wpa-eap";
+      "802-1x" = {
+        eap = "peap";
+        phase2-auth = "mschapv2";
+        identity = "$EDUROAM_IDENTITY";
+        anonymous-identity = "$EDUROAM_IDENTITY";
+        password = "$EDUROAM_PASSWORD";
+        ca-cert = "${./eduroam-ca.pem}";
+        altsubject-matches = "DNS:eduroam.eseo.fr";
+      };
+      ipv4.method = "auto";
+      ipv6.method = "auto";
+    };
+  };
 
   # The latest released stable at first install (2026-10-19; 26.11 is not
   # out yet). Leave it untouched — it only marks the compatibility baseline
