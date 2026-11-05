@@ -206,6 +206,7 @@ same bold lead.
 ### Moonshine
 
 - **Moonshine's config is NixOS-side, and a `home/moonshine.nix` would be inert** (`services.moonshine.settings`). Likewise a polkit rule needs `security.polkit.extraConfig`, not `/etc/polkit-1/rules.d`.
+- **A streamed gamepad needs `/dev/uinput`, and nixpkgs' `hardware.uinput` re-owns it to group `uinput`** (`programs.kdeconnect` turns it on), overriding Moonshine's `GROUP="input"` rule. A pad that works locally but not in a stream, with `Failed to create gamepad: … Permission denied` in `journalctl -u moonshine`, is this; `modules/services/moonshine.nix` enables the option and joins the group itself. A group change needs a reboot (the user manager lingers).
 - **A Moonshine app that fails to start produces no output by default.** Keep `stdout`/`stderr = "journal"` on every entry; logs are in `journalctl --user -u moonshine-session.service`.
 - **Both game launchers are single-instance, so Moonshine has to close them before it can stream them** (each entry's `pre_command`). The Heroic one refuses while a download, install or game is running — a stream that fails instead of starting can be that guard; read the log first.
 - **Moonshine's automatic box art can never resolve on NixOS, so every app entry must declare `boxart`** (rasterized Papirus-Dark PNGs). Render a candidate icon and look at it against a dark grid before picking it.

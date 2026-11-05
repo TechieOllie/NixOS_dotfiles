@@ -5507,6 +5507,42 @@ connects drops the A2DP endpoints, and the headset comes back offering only
 the HFP profiles (`Could not find valid non-headset profile`). Reconnecting
 it once, with nothing restarting afterwards, restores A2DP.
 
+## Streamed gamepads lost `/dev/uinput` to KDE Connect (2026-11-05)
+
+Reported from theseus: a wired Xbox pad (`xone`) did nothing in a Moonlight
+stream from the desktop, though it had worked over Moonlight before and
+worked locally in Heroic the same day. The client was fine: Moonlight on
+theseus held the pad's `event` node open. The desktop's
+`journalctl -u moonshine` logged, for every pad packet,
+`Failed to create gamepad: Failed to create input device: Permission
+denied`, followed by `Received update for gamepad 0, but no gamepad is
+connected`. Keyboard and mouse were unaffected, because Moonshine doesn't
+create those through uinput.
+
+Moonshine creates its virtual pads through `/dev/uinput`. Upstream's
+`60-moonshine.rules` gives that node `GROUP="input"`, and
+`modules/services/moonshine.nix` has always put `ol` in `input`. But the
+desktop also had a `99-local.rules` line from nixpkgs' `hardware.uinput`
+(`GROUP="uinput"`), which runs later and wins, and `ol` was not in
+`uinput`. `options.hardware.uinput.enable.definitionsWithLocations` traced
+the option to nixpkgs' `programs/kdeconnect.nix`, which now sets it
+`mkDefault true` ("digitizer plugin requires uinput"). It arrived with a
+flake bump. This repo's KDE Connect module hadn't changed. The `uaccess`
+tag on both rules doesn't help: with nobody logged in on the desktop the
+seat ACL went to `greeter`, which is the normal case for a streaming host.
+
+Fixed in `modules/services/moonshine.nix` by setting `hardware.uinput.enable
+= true` there, so the `uinput` group exists whatever KDE Connect does, and
+adding `uinput` to the streamed user's groups. Joining the group was chosen
+over fighting the rule order with a higher-numbered udev rule: it keeps the
+two rules' intent compatible rather than making the last writer win. Group
+membership is read at process start, and the user manager lingers, so a
+reboot (not just a Moonshine restart) is what applies it.
+
+Verified 2026-11-05 after a switch and reboot: `uinput:x:986:ol`,
+`/dev/uinput` at `root:uinput 0660`, the running Moonshine process holding
+group 986, and the pad working in a stream from theseus.
+
 ## Standing gotchas, full text (moved from CLAUDE.md, 2026-10-20)
 
 `CLAUDE.md` keeps each standing gotcha as its symptom and rule only. This is
@@ -5556,6 +5592,7 @@ add the investigation here.
 - **Switching `useUserPackages` on doesn't clean up the old profile, and `~/.nix-profile` wins on PATH.** `environment.profiles` lists `$HOME/.nix-profile` *before* `/etc/profiles/per-user/$USER`, so on a host that was already installed with the flag off, the stale per-user profile keeps shadowing the new location until it is removed by hand. Only the VM is affected — every other host was installed with the flag already on. Symptom: an old version of a `home.packages` program keeps winning after a switch that looks clean.
 - **A system unit naming a user's package needs `/etc/profiles/per-user/<name>/bin/...`, not `/run/current-system/sw/bin/...`.** The two profiles are different things: the latter is `environment.systemPackages`, the former is Home Manager's `home.packages`. Moonshine's Heroic entry is the live example. This only works because `lib/mkHost.nix` sets `home-manager.useUserPackages` — with that off, `home.packages` live in the user's own `~/.nix-profile`, which no system unit can name, and a store path is then the only option. Moonshine entries whose binary comes from `features.gaming` are also gated on that flag, so a streaming-but-not-gaming host doesn't advertise apps that can't launch.
 - **Moonshine's config is NixOS-side, and a `home/moonshine.nix` would be inert.** Upstream's module generates the TOML into the store and passes it to the daemon as argv, and Moonshine only writes a config of its own when the given path doesn't exist — so a Home-Manager-managed `~/.config/moonshine/config.toml` is read by nothing. Everything goes through `services.moonshine.settings`. Same shape one layer over: a polkit rule dropped in `/etc/polkit-1/rules.d` is also read by nothing, because nixpkgs builds polkit against `/run/current-system/sw/share` — use `security.polkit.extraConfig`.
+- **A streamed gamepad needs `/dev/uinput`, and nixpkgs' `hardware.uinput` re-owns it to group `uinput`.** Whoever enables that option decides who can write the node. Upstream's `60-moonshine.rules` gives the node `GROUP="input"`; nixpkgs' `hardware.uinput` adds a `99-local.rules` line with `GROUP="uinput"` that runs later and wins. nixpkgs' `programs.kdeconnect` started enabling that option by `mkDefault` (for its digitizer plugin), and from that bump on every streamed pad failed with `Failed to create gamepad: Failed to create input device: Permission denied` in `journalctl -u moonshine`, while keyboard and mouse kept working. `uaccess` doesn't cover it on a headless host, because the seat ACL goes to the greeter. `modules/services/moonshine.nix` therefore enables `hardware.uinput` itself and puts the user in `uinput` as well as `input`. When a pad works locally but not in a stream, read that log line first and `ls -l /dev/uinput` on the server. A group change needs a reboot, because the user manager lingers. See "Streamed gamepads lost `/dev/uinput` to KDE Connect (2026-11-05)".
 - **A Moonshine app that fails to start produces no output by default.** Apps are launched with `StandardOutput=null`, as *transient* units in the user manager — so their logs are in `journalctl --user -u moonshine-session.service`, not the system service's journal. Every entry in `modules/services/moonshine.nix` sets `stdout`/`stderr` to `"journal"` for this reason; keep that on anything added.
 - **Both game launchers are single-instance, so Moonshine has to close them before it can stream them.** A `steam://` or `heroic://` URL handed to an already-running launcher is forwarded to *that* copy — the game opens on the physical screen and the stream shows an empty compositor. Both the launcher entries and both scanners in `modules/services/moonshine.nix` therefore carry a `pre_command`: Steam gets `-shutdown`, Heroic (which has no such flag) gets SIGTERM to its main process only — identified as a `heroic` whose parent is not also one, since Electron's children share the name. The Heroic one **refuses** (exits non-zero, which fails the transient unit's `ExecStartPre` and aborts the launch) when `legendary`/`gogdl`/`nile`/`comet` is running, i.e. a download, install, or game in progress; it never escalates to SIGKILL. So "the stream failed instead of starting" can be the guard working — read `journalctl --user -u moonshine-session.service` for the reason before treating it as a bug.
 - **Moonshine's automatic box art can never resolve on NixOS, so every app entry must declare `boxart`.** `resolve_missing_boxart()` looks an app's own lowercased title up in the XDG icon directories, and the daemon is a systemd *system* service, which gets no `XDG_DATA_DIRS` — so the search falls back to `/usr/local/share` and `/usr/share`, neither of which exists here. Fixing the variable alone wouldn't be enough either: "Desktop" and "Shutdown" are not application names and match no icon. Each entry in `modules/services/moonshine.nix` therefore names a Papirus-Dark SVG, rasterized to a 600px PNG by a `runCommand` because Moonshine decodes raster formats only. 600 is its own `BOXART_WIDTH`, so the icon is centred on the 600x801 canvas without being rescaled. **Render a candidate icon and look at it before picking it** — `devices/video-display` is the semantically obvious "Desktop" icon and is a near-black monitor on transparency, invisible against Moonlight's dark app grid. Verified live 2026-08-21. The same limit applies to games found by the Steam/Heroic *scanners*: their art comes from each launcher's own cache, and a game the launcher never fetched art for shows a blank card with no repo-side fix — open the launcher once.
@@ -5610,6 +5647,10 @@ state. Where a fuller write-up exists, the entry points at it.
   (`steam_app_0`), and two consecutive Alt+F10 saves after the
   `--kill-whom=main` fix gave 38 s (all the buffer held) and 61 s clips with
   `gsr-kms-server` still alive.
+
+- 2026-11-05: streamed gamepads after the `uinput` group fix (a wired
+  Xbox pad on theseus, through Moonlight). See "Streamed gamepads lost
+  `/dev/uinput` to KDE Connect (2026-11-05)".
 
 **`inotmac`**
 
