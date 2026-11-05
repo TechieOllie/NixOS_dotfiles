@@ -5480,15 +5480,26 @@ pipewire` across an X11 app closing.
 
 Found in the same pass, unrelated to the crash: `security.rtkit.enable`
 was never on. Noctalia's `recommendedServices` enables PipeWire but not
-rtkit, so PipeWire logged `RTKit error: ServiceUnknown` and ran with no
-realtime priority, a common cause of crackles and Bluetooth dropouts. It
-is now on in `modules/desktop/noctalia.nix`.
+rtkit, so PipeWire logs `RTKit error: ServiceUnknown` and runs without
+realtime priority. It was turned on in the same commit, and **reverted
+the same day**. With rtkit on, PipeWire and pipewire-pulse got a sane
+`RLIMIT_RTTIME` (200000 µs, rtkit's `RTTimeUSecMax`), but WirePlumber's
+process came up with realtime `data-loop` threads (SCHED_RR 1) and a
+**0 µs** soft and hard limit. That was not inherited: the unit has
+`LimitRTTIME=infinity`, and the stock `wireplumber.conf` leaves
+`rt.time.soft`/`hard` at their defaults. As soon as a Bluetooth headset
+connected and a data loop ran a whole tick without blocking, the kernel
+SIGKILLed WirePlumber: six kills in 40 s (`status=9/KILL`), with the
+headset left on its HFP profile (`Could not find valid non-headset
+profile, not switching`). It was never killed before rtkit. Where the 0
+comes from was not found. Re-enabling rtkit needs that answered first,
+for example by setting `rt.time.soft`/`rt.time.hard` explicitly in a
+WirePlumber drop-in and reading `/proc/$(pgrep -x wireplumber)/limits`.
+The bell fix never depended on rtkit.
 
-Verified live on theseus the same day, after the switch: the x11-bell
-module is no longer loaded, PipeWire survived three lazy Xwayland restarts
-with no coredump, `rtkit-daemon` is active and PipeWire logs no `RTKit
-error`. Bluetooth audio specifically was not re-tested; the headset was
-disconnected at the time.
+Verified live on theseus after the bell fix: the x11-bell module is no
+longer loaded, and PipeWire survived three lazy Xwayland restarts with no
+coredump.
 
 ## Standing gotchas, full text (moved from CLAUDE.md, 2026-10-20)
 

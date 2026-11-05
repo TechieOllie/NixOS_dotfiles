@@ -21,11 +21,11 @@
     # upstream.
     programs.noctalia.recommendedServices.enable = true;
 
-    # recommendedServices turns PipeWire on but not rtkit, so PipeWire ran
-    # with no realtime priority (`RTKit error: ServiceUnknown` in its log)
-    # and its audio threads compete with ordinary load — the usual cause of
-    # crackles and dropouts, Bluetooth headsets first.
-    security.rtkit.enable = true;
+    # rtkit is deliberately off, though recommendedServices leaves PipeWire
+    # logging `RTKit error: ServiceUnknown`. Turning it on (2026-11-05) gave
+    # WirePlumber realtime data loops with a 0 µs RLIMIT_RTTIME, and the
+    # kernel SIGKILLed it six times in 40 s while a Bluetooth headset
+    # connected. See docs/decisions.md, 2026-11-05, before re-enabling.
 
     # Lets Nix substitute prebuilt Noctalia binaries instead of building
     # this native Wayland/OpenGL project from source on every host.
