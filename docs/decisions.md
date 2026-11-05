@@ -5484,6 +5484,12 @@ rtkit, so PipeWire logged `RTKit error: ServiceUnknown` and ran with no
 realtime priority, a common cause of crackles and Bluetooth dropouts. It
 is now on in `modules/desktop/noctalia.nix`.
 
+Verified live on theseus the same day, after the switch: the x11-bell
+module is no longer loaded, PipeWire survived three lazy Xwayland restarts
+with no coredump, `rtkit-daemon` is active and PipeWire logs no `RTKit
+error`. Bluetooth audio specifically was not re-tested; the headset was
+disconnected at the time.
+
 ## Standing gotchas, full text (moved from CLAUDE.md, 2026-10-20)
 
 `CLAUDE.md` keeps each standing gotcha as its symptom and rule only. This is
