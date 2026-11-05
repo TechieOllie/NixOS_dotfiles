@@ -21,6 +21,12 @@
     # upstream.
     programs.noctalia.recommendedServices.enable = true;
 
+    # recommendedServices turns PipeWire on but not rtkit, so PipeWire ran
+    # with no realtime priority (`RTKit error: ServiceUnknown` in its log)
+    # and its audio threads compete with ordinary load — the usual cause of
+    # crackles and dropouts, Bluetooth headsets first.
+    security.rtkit.enable = true;
+
     # Lets Nix substitute prebuilt Noctalia binaries instead of building
     # this native Wayland/OpenGL project from source on every host.
     nix.settings = {

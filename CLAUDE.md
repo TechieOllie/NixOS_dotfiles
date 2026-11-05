@@ -179,6 +179,7 @@ same bold lead.
 - **"Zen crashes on start" is not a crash — it is `xulstore.json` fighting a niri window-rule** (maximize, then Zen unsets it and lands at half width). The fix is compositor-side: uncomment `default-column-width` in `home/niri/cfg/rules.kdl`. Get the on-screen symptom in one sentence before investigating any "crash".
 - **Blur/transparency is currently OFF**, neutralized not deleted: `home/transparency.nix` is `1.0`. Turning it back on: `0.80` there, `shell.panel.transparency_mode = "glass"`, then delete `[appearance.blur] enabled = false` in `home/umbriel/cfg/misc.toml` (Umbriel) or uncomment the blur blocks in `rules.kdl`/`misc.kdl` (niri).
 - **niri's blur is invisible without real client-side alpha.** It draws behind a surface, so it only shows where the client itself is translucent; niri's `opacity` rule just fades the whole window over a sharp backdrop, which is expected.
+- **PipeWire segfaults whenever Umbriel's lazy Xwayland stops, unless its x11-bell module is off.** Audio vanishing (Zen silent, Bluetooth headsets dropping) with a coredump right after `Restarting Xwayland (lazy)` is this. A libX11 1.8.14 rebuild regression (2026-10-25 bump); `modules/desktop/umbriel.nix` sets `module.x11.bell = false` until upstream fixes it.
 
 ### Home Manager and Nix
 

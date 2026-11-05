@@ -5442,6 +5442,48 @@ variable, because Steam and Proton games use SDL too. Confirmed the same
 day: the pack's 26.3 release logs `Using graphics backend OpenGL` on
 Xwayland and runs.
 
+## PipeWire crashing whenever Xwayland stops, and no rtkit (2026-11-05)
+
+Reported on theseus: audio kept disappearing, Zen (YouTube) going silent in
+particular, and Bluetooth "acting a bit weird". Both were one fault.
+PipeWire was segfaulting, 10 coredumps between 2026-11-03 and 2026-11-05
+and four in the first ten minutes of one boot. Each crash took every
+stream with it. Zen does not reconnect a dead stream, and the Bluetooth
+A2DP endpoints are unregistered and re-registered on each restart, which
+drops a connected headset (the Nothing Ear (open)). The adapter, firmware
+and pairing were all healthy.
+
+The stack trace is `loop_destroy_source` ← `x11_io_error_exit_handler`
+(`libpipewire-module-x11-bell.so`) ← `_XIOError` ← `XPending`. The module
+connects to `DISPLAY=:0`, and Umbriel's Xwayland is lazy (`Restarting
+Xwayland (lazy)` in its log). It stops when the last X client exits, and
+every stop hands the module a fatal X11 I/O error. Each crash in the
+journal directly follows one of those lines.
+
+It was a regression from `dbafd7e Update flake inputs`. The first coredump
+is two minutes after that switch (2026-10-25 02:54), and there are none
+before it. Before it, the same journal has 72 lazy Xwayland restarts and 30
+`mod.x11-bell: X11 I/O error` lines, all survived. PipeWire, Umbriel and
+Xwayland kept their versions (1.6.9, 0.1.0, 24.1.14), but PipeWire was
+rebuilt against libX11 1.8.14 (from 1.8.13) and glibc 2.44-57 (from
+2.44-25), and the x11-bell `.so` differs between the two builds. The crash
+is inside libX11's I/O-error path calling back into the module, which
+points at libX11 1.8.14. That is the likeliest reading, not a proven one.
+
+Fixed by setting `context.properties."module.x11.bell" = false`, which the
+module's own `condition` in the stock `pipewire.conf` honours
+(`modules/desktop/umbriel.nix`, so both Umbriel hosts get it). This was
+chosen over pinning PipeWire or libX11 to the old build, which would hold
+back part of nixpkgs to keep a feature nothing here uses. It is a
+workaround: remove it once upstream is fixed, and check `coredumpctl list
+pipewire` across an X11 app closing.
+
+Found in the same pass, unrelated to the crash: `security.rtkit.enable`
+was never on. Noctalia's `recommendedServices` enables PipeWire but not
+rtkit, so PipeWire logged `RTKit error: ServiceUnknown` and ran with no
+realtime priority, a common cause of crackles and Bluetooth dropouts. It
+is now on in `modules/desktop/noctalia.nix`.
+
 ## Standing gotchas, full text (moved from CLAUDE.md, 2026-10-20)
 
 `CLAUDE.md` keeps each standing gotcha as its symptom and rule only. This is
@@ -5497,6 +5539,7 @@ add the investigation here.
 - **Moonshine's "Desktop" stream is a nested Umbriel started by hand, never the session's own `start-umbriel`.** Moonshine launches each app as a *transient user unit* with `WAYLAND_DISPLAY`/`DISPLAY` pointing at its per-stream compositor; a plain `umbriel` started that way picks wlroots' Wayland backend and nests, and in nested mode it publishes nothing to the systemd user manager (`server.cpp` runs its session sync only `if (!m_nested)`). `start-umbriel` is no route: under a transient unit it takes its `MANAGERPID` branch and execs plain `umbriel` anyway, and its other branch starts `umbriel.service`, the *local* session's unit. So `modules/services/moonshine.nix` runs `umbriel -s <startup>` and does the session wiring from that startup command — import Umbriel's own variable list, then `umbriel-session.target` — because the values to publish are the *nested* instance's `WAYLAND_DISPLAY`/`UMBRIEL_SOCKET`, which don't exist until it is up. A nested Umbriel defaults `Mod` to **Alt**, so `home/umbriel/cfg/misc.toml` pins `general.mod_key = "Super"`; its startup log still prints `mod key: Alt (nested session)`, a hard-coded line that ignores the config — the binds go through `modKey()`, which honours it. **A blank stream with a working mouse cursor means the nested compositor never rendered** (the cursor is Moonshine's own) — the same shape as the greeter's `Writeback-1` bug above, and what the niri version of this entry did until it was fixed (`docs/decisions.md`). Read `journalctl --user -u moonshine-session.service` first.
 - **Streaming the desktop while logged in locally degrades to a bare compositor, deliberately.** `graphical-session.target` is per-*user*, not per-seat, so a local login already owns it. Taking it over would move Noctalia onto the stream, and tearing it down when the stream ended would kill the session on the physical screen — so the wrapper checks `systemctl --user -q is-active graphical-session.target` before starting Umbriel and, when it is already active, skips both the wiring and the teardown (`umbriel-shutdown.target`) and logs why. You get a working nested Umbriel with no bar and no wallpaper; that is the guard doing its job, not a regression. Headless — the case lingering exists for — takes the other branch and gets the full session. Check `journalctl --user -u moonshine-session.service` for the `already belongs to a local login` line before investigating a missing shell. The bare branch was run on theseus and the headless one on the desktop (2026-10-20). **The teardown trap must queue `umbriel-shutdown.target` with `--no-block`**: it runs while Moonshine is stopping that very unit, and a blocking start waits on a transaction that can't finish until the unit has stopped — it hung until the 90 s stop timeout SIGKILLed it, leaving the session and stale `WAYLAND_DISPLAY`/`UMBRIEL_SOCKET` behind. **Noctalia can then hang in its own shutdown**: when its compositor dies first it logs `Wayland display closed … shutting down`, and a SIGTERM landing during that path leaves it stuck until SIGKILL — the same order a normal Umbriel logout produces. `home/noctalia.nix` caps `noctalia.service`'s `TimeoutStopSec` at 5 s; without it `graphical-session.target` stayed up for 90 s and a reconnect inside that window got the bare branch.
 - **The desktop's Z407 has two gain stages, because kernel 7.1 disabled the hardware one.** The speaker advertises a real UAC Feature Unit (50 steps of 1.00 dB, -54..-4 dB) that Windows drives, so there its slider and the puck are the same gain element. Linux refuses it at probe — `sticky mixer values ... disabling`, from `check_sticky_volume_control()`, with no override (`ignore_ctl_error` doesn't reach it, no `QUIRK_FLAG_*` skips it, the call site is unguarded; absent in 6.12, present in 7.1). So PipeWire attenuates in software *on top of* the amplifier the puck still drives directly. A `services.udev.extraHwdb` rule on that host used to stop the puck's HID volume keys reaching niri, leaving the amplifier as the only stage; it was **removed on 2026-08-21** at the operator's request, so the puck once again drives both stages for one gesture — the OSD tracks it, at the cost of uneven stepping and dial/keyboard disagreement. Expect that, don't re-diagnose it; `docs/decisions.md` holds the block to restore if it becomes intolerable. The sink is still a software stage stacked under the amplifier, so it is closest to correct at 100%. **Measure before theorising here:** two diagnoses were argued from Windows' behaviour and both were wrong. The one-minute test is to comment out the two volume binds in `home/umbriel/cfg/keybinds.toml` (Umbriel auto-reloads; it was `keybinds.kdl` under niri), freeze the host volume, and turn the puck — if loudness still changes, the host isn't involved.
+- **PipeWire segfaults whenever Umbriel's lazy Xwayland stops, unless its x11-bell module is off.** Audio vanishing (Zen silent, Bluetooth headsets dropping) with a PipeWire coredump right after `Restarting Xwayland (lazy)` is this. The module's X11 I/O-error handler crashes PipeWire 1.6.9 since the 2026-10-25 input bump rebuilt it against libX11 1.8.14; the same error was harmless before. `modules/desktop/umbriel.nix` sets `module.x11.bell = false`. Keep it until upstream is fixed, then remove it and check `coredumpctl list pipewire`.
 - **PipeWire's volume scale is cubic, so a percentage is not a loudness.** The number `wpctl` prints is the cube root of the gain (0.59 displayed = `channelVolumes` 0.205375, and 0.59³ = 0.205379). That is why 40% here is ~10 dB quieter than 20% on Windows, and why a flat 5% step moves 1.41 dB at 0.90 and 10.57 dB at 0.10. Two further traps when working on this: `wpctl get-volume` rounds its *display* to two decimals while PipeWire stores full precision, so below ~0.26 a 1 dB change is smaller than the printed resolution — read `pw-dump` instead; and a dB-uniform stepping wrapper for the media keys was built, verified and then deliberately removed (see `docs/decisions.md`), so don't re-propose it without a reason the hardware knob doesn't already cover.
 - **`ensurePrinters` with `model = "everywhere"` can take CUPS down at boot.** nixpkgs runs the `lpadmin` calls in `cups.service`'s `ExecStartPost` under `set -e`, and `everywhere` makes `lpadmin` query the printer live to build its PPD. A printer that is switched off when the host boots would fail the whole `cups.service`, not just its own queue. The desktop therefore vendors the PPD (`hosts/the-entertaining-nios-desktop/officejet-4650.ppd`, byte-identical to what CUPS generated, fetched unauthenticated from `http://localhost:631/printers/<queue>.ppd`) and ships it through `services.printing.drivers` as `share/cups/model/`. Regenerate it the same way if the printer's firmware changes what it advertises. Two smaller points: keep a declared queue's `name` equal to a hand-made one's so `lpadmin -p` updates it in place, and turning cups-browsed off leaves its `implicitclass://` queues behind, disabled, until removed by hand with `sudo lpadmin -x`.
 - **The desktop's default audio output is fixed at login, deliberately; a runtime pick does not persist.** `services.pipewire.wireplumber.extraConfig."50-default-output"` sets `node.restore-default-targets = false`, so WirePlumber no longer saves or restores the last-picked output (`~/.local/state/wireplumber/default-nodes` is now read by nothing), and raises the Z407's Bluetooth node to `priority.session = 2000`, above the Yeti Nano (1109) and HDMI (696) that would otherwise win the fallback. A device picked from the panel still wins for the rest of the session (WirePlumber adds 30000 to the current pick, so the speaker reconnecting doesn't steal it back), but the choice is gone after a reboot or a WirePlumber restart. That is the intended behaviour, not a bug. The Z407 only exists once Bluetooth reconnects, so audio plays on the Yeti for roughly the first 10 seconds after login and then moves over by itself. The rule matches the speaker by MAC (`bluez_output.EC_81_93_94_96_DB.*`), so a replacement speaker needs the address updated. Verified live 2026-09-28 by picking the Yeti and restarting WirePlumber.

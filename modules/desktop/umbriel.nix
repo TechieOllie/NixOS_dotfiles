@@ -30,6 +30,22 @@
     # keyring daemon itself is enabled in session.nix.
     xdg.portal.config.umbriel."org.freedesktop.impl.portal.Secret" = "gnome-keyring";
 
+    # Workaround for an upstream regression, removable once it is fixed.
+    # PipeWire's x11-bell module connects to DISPLAY=:0, and Umbriel's
+    # Xwayland is lazy: shut down when the last X client exits, restarted on
+    # demand. Every shutdown hands the module an X11 I/O error. It always
+    # did, harmlessly, until the 2026-10-25 input bump rebuilt pipewire 1.6.9
+    # against libX11 1.8.14 (from 1.8.13; glibc moved too): since then the
+    # module's error handler segfaults PipeWire (loop_destroy_source ←
+    # x11_io_error_exit_handler ← _XIOError), killing every audio stream (Zen
+    # stays silent) and dropping Bluetooth headsets with it. To retire this,
+    # remove the block and check that `coredumpctl list pipewire` stays empty
+    # across an X11 app closing. Nothing on a Wayland desktop needs X11 bells
+    # played as sounds anyway. See docs/decisions.md, 2026-11-05.
+    services.pipewire.extraConfig.pipewire."90-no-x11-bell" = {
+      "context.properties"."module.x11.bell" = false;
+    };
+
     # Substitute prebuilt Umbriel instead of building a wlroots/SceneFX
     # compositor from source — the reason flake.nix's umbriel input
     # deliberately doesn't follow this repo's nixpkgs. Same shape as
