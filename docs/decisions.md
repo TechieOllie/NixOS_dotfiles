@@ -5500,6 +5500,12 @@ The bell fix never depended on rtkit.
 Verified live on theseus after the bell fix: the x11-bell module is no
 longer loaded, and PipeWire survived three lazy Xwayland restarts with no
 coredump.
+After the rtkit revert, WirePlumber stayed up through a Bluetooth reconnect
+and the earbuds came up on `a2dp-sink` with AAC. One trap on the way:
+restarting WirePlumber (or a switch restarting it) right after a headset
+connects drops the A2DP endpoints, and the headset comes back offering only
+the HFP profiles (`Could not find valid non-headset profile`). Reconnecting
+it once, with nothing restarting afterwards, restores A2DP.
 
 ## Standing gotchas, full text (moved from CLAUDE.md, 2026-10-20)
 
