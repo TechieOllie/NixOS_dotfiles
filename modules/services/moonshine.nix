@@ -486,12 +486,25 @@ in
     # lingering) has no active seat, and upstream's module deliberately
     # doesn't grant it.
     #
+    # `uinput` — the virtual gamepads themselves are created through
+    # /dev/uinput, and upstream's GROUP="input" rule for it (60-moonshine)
+    # loses to nixpkgs' hardware.uinput rule (99-local, GROUP="uinput") as
+    # soon as anything enables that option. programs.kdeconnect started doing
+    # so (mkDefault, for its digitizer plugin) in a nixpkgs bump, and every
+    # streamed pad then failed with `Failed to create gamepad: ... Permission
+    # denied` while keyboard and mouse kept working. The `uaccess` tag doesn't
+    # cover it either: headless, the seat's ACL goes to the greeter. So this
+    # enables the option itself — the group exists whatever KDE Connect does —
+    # and joins it.
+    #
     # `moonshine` — the group upstream's own polkit rule is scoped to, which
     # is what lets Moonshine hold a block-type sleep inhibitor for the
     # duration of a stream. Without it streaming still works, but the host
     # may suspend mid-session.
+    hardware.uinput.enable = true;
     users.users.${vars.user.name}.extraGroups = [
       "input"
+      "uinput"
       "moonshine"
     ];
 
