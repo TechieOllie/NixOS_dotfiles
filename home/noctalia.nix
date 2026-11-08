@@ -114,6 +114,16 @@ in
       # per-output table does not, and stays runtime state. Where upstream's
       # own default differs from the value below, the comment says so.
       settings = {
+        # Re-dial paired, trusted devices whenever Bluetooth comes up (startup,
+        # resume, toggle). Upstream's default is false since 5.3.0; 5.2.1 did
+        # this unconditionally, and the desktop's Z407 depends on it — the
+        # speaker waits for the host to connect and never reconnects itself.
+        # With it off the Z407 stopped connecting at login from the 1 Nov
+        # nixpkgs/Noctalia bump on. One attempt per device, one device at a
+        # time, so a trusted device that is switched off delays the rest by a
+        # page timeout.
+        bluetooth.connect_when_enabled = true;
+
         shell = {
           launch_apps_as_systemd_services = true;
 
