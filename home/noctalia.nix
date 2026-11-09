@@ -441,6 +441,42 @@ in
         # regardless. Upstream default is false.
         lockscreen.blurred_desktop = true;
 
+        # Do Not Disturb while locked, so notifications don't light up the
+        # lock screen. Set in the UI on theseus and moved here. Upstream
+        # default is false.
+        lockscreen.dnd = true;
+
+        # Idle behaviour (Noctalia's Power settings), laptop only. Set in the
+        # UI on theseus and moved here: lock at 10 min, screen off at 11,
+        # lock-and-suspend at 15. Upstream ships `lock` and `screen-off`
+        # disabled and no suspend step; the desktop keeps those defaults, at
+        # the operator's choice. The lid and battery side of
+        # theseus's power policy is logind's (hosts/theseus/default.nix).
+        idle = lib.mkIf osConfig.features.laptop {
+          behavior_order = [
+            "lock"
+            "screen-off"
+            "lock-and-suspend"
+          ];
+          behavior = {
+            lock = {
+              action = "lock";
+              enabled = true;
+              timeout = 600;
+            };
+            screen-off = {
+              action = "screen_off";
+              enabled = true;
+              timeout = 660;
+            };
+            lock-and-suspend = {
+              action = "lock_and_suspend";
+              enabled = true;
+              timeout = 900;
+            };
+          };
+        };
+
         # Desktop widgets are Noctalia's other canvas — same editor, same
         # per-output absolute-pixel placement problem. Left off, which is
         # both upstream's default and the exported state, so the question of
@@ -534,6 +570,9 @@ in
           # Its runtime tools (gdbus, sshfs) and the daemon itself come from
           # home/kdeconnect.nix, not from Noctalia.
           "icefish/phone-connect"
+
+          # VS Code's recent workspaces in the launcher (home/vscode.nix).
+          "3dprogramin/vscode"
         ];
 
         # Per-plugin settings, keyed by the same `<author>/<name>` ids as
@@ -552,6 +591,9 @@ in
 
         # Battery as a number only, without the icon beside it.
         plugin_settings."icefish/phone-connect".battery_display = "percent";
+
+        # How many recent workspaces the VS Code plugin lists.
+        plugin_settings."3dprogramin/vscode".recent_count = 6;
 
         # Set in the UI on theseus (2026-10-22), moved here. Docker is
         # socket-activated (modules/services/docker.nix), and the widget's
@@ -572,7 +614,7 @@ in
           # long title push the bar's other groups around.
           active_window = {
             min_length = 60;
-            title_scroll = "always";
+            title_scroll = "on_hover";
           };
 
           # The generic plugin slot. `type` is what binds a slot to a
