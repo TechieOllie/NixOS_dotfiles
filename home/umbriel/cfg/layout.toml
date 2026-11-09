@@ -57,5 +57,5 @@ focus_at_startup = true
 # already shut works too. A temporary disable, not `enabled = false`: the
 # table above still applies when the panel returns.
 [events]
-lid_close = "umbriel msg output-disable:eDP-1"
-lid_open = "umbriel msg output-enable:eDP-1"
+lid_close = "umbriel msg output-disable eDP-1"
+lid_open = "umbriel msg output-enable eDP-1"

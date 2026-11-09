@@ -15,34 +15,34 @@
 
 [keybinds]
 # ── Noctalia ──────────────────────────────────────────────────────────────
-"Mod+S" = { action = "spawn:noctalia msg panel-toggle control-center", repeat = false }
-"Mod+Comma" = { action = "spawn:noctalia msg settings-toggle", repeat = false }
-"Alt+Tab" = { action = "spawn:noctalia msg window-switcher", repeat = false }
-"Mod+Space" = { action = "spawn:noctalia msg panel-toggle launcher", repeat = false }
-"Mod+Alt+L" = { action = "spawn:noctalia msg session lock", repeat = false }
-"Mod+Shift+Q" = { action = "spawn:noctalia msg panel-toggle session", repeat = false }
-"Mod+P" = { action = "spawn:noctalia msg panel-toggle elijaharch/wl-screen-mirror:controls", repeat = false }
-"Mod+V" = { action = "spawn:noctalia msg panel-toggle clipboard", repeat = false }
+"Mod+S" = { action = "spawn noctalia msg panel-toggle control-center", repeat = false }
+"Mod+Comma" = { action = "spawn noctalia msg settings-toggle", repeat = false }
+"Alt+Tab" = { action = "spawn noctalia msg window-switcher", repeat = false }
+"Mod+Space" = { action = "spawn noctalia msg panel-toggle launcher", repeat = false }
+"Mod+Alt+L" = { action = "spawn noctalia msg session lock", repeat = false }
+"Mod+Shift+Q" = { action = "spawn noctalia msg panel-toggle session", repeat = false }
+"Mod+P" = { action = "spawn noctalia msg panel-toggle elijaharch/wl-screen-mirror:controls", repeat = false }
+"Mod+V" = { action = "spawn noctalia msg panel-toggle clipboard", repeat = false }
 
 # ── Apps ──────────────────────────────────────────────────────────────────
-"Mod+Return" = { action = "spawn:ghostty", repeat = false }
-"Mod+Z" = { action = "spawn:zen-beta || zen-twilight || zen", repeat = false }
-"Mod+B" = { action = "spawn:obsidian", repeat = false }
-"Mod+E" = { action = "spawn:nautilus", repeat = false }
-"Mod+Shift+S" = { action = "spawn:screenshot", repeat = false }
+"Mod+Return" = { action = "spawn ghostty", repeat = false }
+"Mod+Z" = { action = "spawn zen-beta || zen-twilight || zen", repeat = false }
+"Mod+B" = { action = "spawn obsidian", repeat = false }
+"Mod+E" = { action = "spawn nautilus", repeat = false }
+"Mod+Shift+S" = { action = "spawn screenshot", repeat = false }
 
 # ── Media and hardware keys ───────────────────────────────────────────────
 # These repeat on purpose, so a held key keeps stepping.
-"XF86AudioRaiseVolume" = { action = "spawn:noctalia msg volume-up", allow_when_locked = true }
-"XF86AudioLowerVolume" = { action = "spawn:noctalia msg volume-down", allow_when_locked = true }
-"XF86AudioMute" = { action = "spawn:noctalia msg volume-mute", allow_when_locked = true, repeat = false }
-"XF86AudioMicMute" = { action = "spawn:noctalia msg mic-mute", allow_when_locked = true, repeat = false }
-"XF86AudioNext" = { action = "spawn:noctalia msg media next", allow_when_locked = true, repeat = false }
-"XF86AudioPrev" = { action = "spawn:noctalia msg media previous", allow_when_locked = true, repeat = false }
-"XF86AudioPlay" = { action = "spawn:noctalia msg media toggle", allow_when_locked = true, repeat = false }
-"XF86AudioPause" = { action = "spawn:noctalia msg media toggle", allow_when_locked = true, repeat = false }
-"XF86MonBrightnessUp" = { action = "spawn:noctalia msg brightness-up", allow_when_locked = true }
-"XF86MonBrightnessDown" = { action = "spawn:noctalia msg brightness-down", allow_when_locked = true }
+"XF86AudioRaiseVolume" = { action = "spawn noctalia msg volume-up", allow_when_locked = true }
+"XF86AudioLowerVolume" = { action = "spawn noctalia msg volume-down", allow_when_locked = true }
+"XF86AudioMute" = { action = "spawn noctalia msg volume-mute", allow_when_locked = true, repeat = false }
+"XF86AudioMicMute" = { action = "spawn noctalia msg mic-mute", allow_when_locked = true, repeat = false }
+"XF86AudioNext" = { action = "spawn noctalia msg media next", allow_when_locked = true, repeat = false }
+"XF86AudioPrev" = { action = "spawn noctalia msg media previous", allow_when_locked = true, repeat = false }
+"XF86AudioPlay" = { action = "spawn noctalia msg media toggle", allow_when_locked = true, repeat = false }
+"XF86AudioPause" = { action = "spawn noctalia msg media toggle", allow_when_locked = true, repeat = false }
+"XF86MonBrightnessUp" = { action = "spawn noctalia msg brightness-up", allow_when_locked = true }
+"XF86MonBrightnessDown" = { action = "spawn noctalia msg brightness-down", allow_when_locked = true }
 
 # ── Windows and columns ───────────────────────────────────────────────────
 "Mod+Q" = { action = "window-close", repeat = false }
@@ -70,10 +70,10 @@
 # the window's height within it. On the two keys left of Backspace, the
 # AZERTY counterparts of US -/=: `minus` itself is the 6 key here, which
 # is workspace 6.
-"Mod+parenright" = "window-modify-primary-extent:-0.1"
-"Mod+equal" = "window-modify-primary-extent:0.1"
-"Mod+Shift+parenright" = "window-modify-secondary-extent:-0.1"
-"Mod+Shift+equal" = "window-modify-secondary-extent:0.1"
+"Mod+parenright" = "window-modify-primary-extent -0.1"
+"Mod+equal" = "window-modify-primary-extent 0.1"
+"Mod+Shift+parenright" = "window-modify-secondary-extent -0.1"
+"Mod+Shift+equal" = "window-modify-secondary-extent 0.1"
 
 # ── Outputs ───────────────────────────────────────────────────────────────
 "Mod+Shift+Left" = "output-focus-left"
@@ -111,39 +111,39 @@
 "Mod+Ctrl+J" = { action = "column-move-to-workspace-next", cooldown_ms = 150 }
 
 # The AZERTY number row, by its unshifted symbols (see the top of this file).
-"Mod+ampersand" = "workspace-switch:1"
-"Mod+eacute" = "workspace-switch:2"
-"Mod+quotedbl" = "workspace-switch:3"
-"Mod+apostrophe" = "workspace-switch:4"
-"Mod+parenleft" = "workspace-switch:5"
-"Mod+minus" = "workspace-switch:6"
-"Mod+egrave" = "workspace-switch:7"
-"Mod+underscore" = "workspace-switch:8"
-"Mod+ccedilla" = "workspace-switch:9"
-"Mod+Ctrl+ampersand" = "column-move-to-workspace:1"
-"Mod+Ctrl+eacute" = "column-move-to-workspace:2"
-"Mod+Ctrl+quotedbl" = "column-move-to-workspace:3"
-"Mod+Ctrl+apostrophe" = "column-move-to-workspace:4"
-"Mod+Ctrl+parenleft" = "column-move-to-workspace:5"
-"Mod+Ctrl+minus" = "column-move-to-workspace:6"
-"Mod+Ctrl+egrave" = "column-move-to-workspace:7"
-"Mod+Ctrl+underscore" = "column-move-to-workspace:8"
-"Mod+Ctrl+ccedilla" = "column-move-to-workspace:9"
+"Mod+ampersand" = "workspace-switch 1"
+"Mod+eacute" = "workspace-switch 2"
+"Mod+quotedbl" = "workspace-switch 3"
+"Mod+apostrophe" = "workspace-switch 4"
+"Mod+parenleft" = "workspace-switch 5"
+"Mod+minus" = "workspace-switch 6"
+"Mod+egrave" = "workspace-switch 7"
+"Mod+underscore" = "workspace-switch 8"
+"Mod+ccedilla" = "workspace-switch 9"
+"Mod+Ctrl+ampersand" = "column-move-to-workspace 1"
+"Mod+Ctrl+eacute" = "column-move-to-workspace 2"
+"Mod+Ctrl+quotedbl" = "column-move-to-workspace 3"
+"Mod+Ctrl+apostrophe" = "column-move-to-workspace 4"
+"Mod+Ctrl+parenleft" = "column-move-to-workspace 5"
+"Mod+Ctrl+minus" = "column-move-to-workspace 6"
+"Mod+Ctrl+egrave" = "column-move-to-workspace 7"
+"Mod+Ctrl+underscore" = "column-move-to-workspace 8"
+"Mod+Ctrl+ccedilla" = "column-move-to-workspace 9"
 "Mod+Tab" = { action = "workspace-focus-last", repeat = false }
 "Mod+O" = { action = "overview-toggle", repeat = false }
 
 # ── Scratchpads ───────────────────────────────────────────────────────────
 # See cfg/scratchpad.toml. The first press launches the app if it isn't
 # running yet; after that the key shows and hides it.
-"Mod+Shift+Return" = { action = "scratchpad-toggle:git", repeat = false }
-"Mod+M" = { action = "scratchpad-toggle:music", repeat = false }
+"Mod+Shift+Return" = { action = "scratchpad-toggle git", repeat = false }
+"Mod+M" = { action = "scratchpad-toggle music", repeat = false }
 # Mod+D was niri's "spawn vesktop"; here it summons the one already running.
-"Mod+D" = { action = "scratchpad-toggle:discord", repeat = false }
+"Mod+D" = { action = "scratchpad-toggle discord", repeat = false }
 
 # ── Replay buffer ─────────────────────────────────────────────────────────
 # home/gpu-screen-recorder.nix: the same two keys as on niri.
-"Alt+Shift+F10" = { action = "spawn:replay toggle", repeat = false }
-"Alt+F10" = { action = "spawn:replay save", repeat = false }
+"Alt+Shift+F10" = { action = "spawn replay toggle", repeat = false }
+"Alt+F10" = { action = "spawn replay save", repeat = false }
 
 # ── Session ───────────────────────────────────────────────────────────────
 "Mod+Escape" = { action = "shortcuts-inhibit-toggle", allow_when_inhibited = true, repeat = false }
