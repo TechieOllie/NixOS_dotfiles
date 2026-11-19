@@ -27,6 +27,9 @@
     development = true;
     # darktable (home/darktable.nix).
     photography = true;
+    # Star Citizen (modules/programs/star-citizen.nix). Only here: it wants
+    # the RX 6600 and ~100G of the system disk.
+    starCitizen = true;
     # gaming is left to profiles/gaming.nix's mkDefault rather than
     # restated here — a host's features.nix is for overriding a profile,
     # not for echoing it.

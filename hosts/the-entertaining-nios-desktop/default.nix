@@ -53,6 +53,7 @@ in
     ../../modules/services/printing.nix
     ../../modules/services/moonshine.nix
     ../../modules/services/kdeconnect.nix
+    ../../modules/programs/star-citizen.nix
 
     # The desktop stack, on Umbriel like theseus (niri until 2026-10-20):
     # the VM's six modules with umbriel.nix in place of niri.nix. This is
@@ -124,6 +125,20 @@ in
   # machine needs. Host-level for the same reason as the kernel above: it
   # describes this machine's hardware, not a reusable capability.
   services.lact.enable = true;
+
+  # Compressed swap in RAM, ahead of the 16G partition, for Star Citizen:
+  # 16G of RAM is its floor and it routinely spills past it. zram's
+  # priority (5) beats the partition's (-1), so pages go to compressed RAM
+  # first and only reach the NVMe once that's full — cheaper stalls than
+  # disk swap for the same overflow. zstd at 50% of RAM is the module's
+  # default; stated so the sizing is visible. Host-level: it's sized to this
+  # machine's RAM, and the only other swap-backed host (theseus) needs its
+  # disk swap for hibernation and has twice the memory.
+  zramSwap = {
+    enable = true;
+    algorithm = "zstd";
+    memoryPercent = 50;
+  };
 
   # The 2TB bulk-storage drive from ./disko.nix. Host-level for the same
   # reason as the kernel and lact above: only this machine has this drive.

@@ -28,6 +28,11 @@
           default = false;
           description = "Enable the gaming stack: Steam (Millennium-patched) with proton-cachyos, Xbox controller drivers, and Heroic on the Home Manager side.";
         };
+        starCitizen = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Enable Star Citizen: the RSI Launcher on wine-astral from the nix-citizen flake, plus the vm.max_map_count and joystick udev rules it needs.";
+        };
         docker = lib.mkOption {
           type = lib.types.bool;
           default = false;

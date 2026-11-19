@@ -84,6 +84,14 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Star Citizen's RSI Launcher (wine-astral, DXVK, the launcher's install
+    # script) and the sysctl/udev prerequisites, from the Star Citizen Linux
+    # Users Group's own flake. Not in nixpkgs. Deliberately does **not**
+    # follow this repo's nixpkgs: its Cachix cache is built against its own
+    # pin, and a miss means compiling a Wine fork from source. Imported by
+    # modules/programs/star-citizen.nix, desktop only.
+    nix-citizen.url = "github:LovingMelody/nix-citizen";
+
     # Claude Code, on its own update cadence. Upstream ships a release most
     # days, and nixpkgs' `claude-code` trails it by however long the bump PR
     # takes to reach nixos-unstable — while moving it any faster meant
@@ -149,6 +157,7 @@
       chaotic,
       millennium,
       moonshine,
+      nix-citizen,
       claude-code,
       nix-index-database,
       umbriel,
@@ -172,6 +181,7 @@
           chaotic
           millennium
           moonshine
+          nix-citizen
           claude-code
           nix-index-database
           umbriel

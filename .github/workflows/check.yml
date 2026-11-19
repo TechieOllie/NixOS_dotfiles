@@ -27,8 +27,8 @@ jobs:
             # but CI has no such config — without them, this job would
             # build a Wayland/OpenGL shell, a kernel and a compositor from
             # source.
-            extra-substituters = https://noctalia.cachix.org https://nyx-cache.chaotic.cx https://umbriel.cachix.org
-            extra-trusted-public-keys = noctalia.cachix.org-1:pCOR47nnMEo5thcxNDtzWpOxNFQsBRglJzxWPp3dkU4= nyx-cache.chaotic.cx:dJxTrgMC3V3cFfyIiBQDQorG6k1LsqurH/srpMSq7qk= umbriel.cachix.org-1:JfNq/2yg2S6D6z4Z2dVSZrZlDPQTKtexB6GAVLD98nw=
+            extra-substituters = https://noctalia.cachix.org https://nyx-cache.chaotic.cx https://umbriel.cachix.org https://nix-citizen.cachix.org
+            extra-trusted-public-keys = noctalia.cachix.org-1:pCOR47nnMEo5thcxNDtzWpOxNFQsBRglJzxWPp3dkU4= nyx-cache.chaotic.cx:dJxTrgMC3V3cFfyIiBQDQorG6k1LsqurH/srpMSq7qk= umbriel.cachix.org-1:JfNq/2yg2S6D6z4Z2dVSZrZlDPQTKtexB6GAVLD98nw= nix-citizen.cachix.org-1:lPMkWc2X8XD4/7YPEEwXKKBg+SVbYTVrAaLA2wQTKCo=
 
       - name: nix flake check
         run: nix flake check --print-build-logs

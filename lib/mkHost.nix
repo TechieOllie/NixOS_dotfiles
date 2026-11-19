@@ -12,6 +12,7 @@
   chaotic,
   millennium,
   moonshine,
+  nix-citizen,
   claude-code,
   nix-index-database,
   umbriel,
@@ -30,7 +31,8 @@ nixpkgs.lib.nixosSystem {
   # chaotic/millennium get the identical treatment for the gaming stack:
   # modules/programs/steam.nix imports them, so a host that isn't a gaming
   # host never pulls either into its closure. moonshine likewise, imported
-  # by modules/services/moonshine.nix, and umbriel by
+  # by modules/services/moonshine.nix, nix-citizen by
+  # modules/programs/star-citizen.nix, and umbriel by
   # modules/desktop/umbriel.nix. nixos-hardware is the one a *host* imports
   # (hosts/theseus/default.nix): its modules describe one machine model.
   specialArgs = {
@@ -41,6 +43,7 @@ nixpkgs.lib.nixosSystem {
       chaotic
       millennium
       moonshine
+      nix-citizen
       umbriel
       nixos-hardware
       ;
