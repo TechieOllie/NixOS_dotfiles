@@ -8,6 +8,11 @@
           default = false;
           description = "Enable automatic btrfs snapshots (snapper) of / and /home.";
         };
+        backup = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Back up the operator's home daily to the NAS's restic rest-server. Needs the restic-repository and restic-password sops secrets in the host's secrets.nix.";
+        };
         desktop = lib.mkOption {
           type = lib.types.bool;
           default = false;

@@ -15,6 +15,7 @@
     ../../profiles/base.nix
     ../../profiles/gaming.nix
     ../../modules/services/snapper.nix
+    ../../modules/services/backup.nix
     ../../modules/services/docker.nix
     ../../modules/services/tailscale.nix
     ../../modules/services/printing.nix

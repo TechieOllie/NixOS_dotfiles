@@ -2,6 +2,8 @@
 {
   features = {
     snapshots = true;
+    # Daily restic backup of ~ to the NAS (modules/services/backup.nix).
+    backup = true;
     # Battery and Wi-Fi in Noctalia's bar (home/noctalia.nix).
     laptop = true;
     # The operator's own machines: their full terminal environment

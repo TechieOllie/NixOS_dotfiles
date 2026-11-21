@@ -84,6 +84,12 @@ Installed 2026-10-19. Left to do, in order:
     game (`confine_pointer`)
   - the touchscreen staying on the laptop panel with an external monitor
     connected
+- [ ] Backups to the NAS (`features.backup`, `modules/services/backup.nix`):
+  create the `theseus` user on the NAS's rest-server, add
+  `restic-repository` (`rest:http://theseus:<login>@nas:8000/theseus/`) and
+  `restic-password` with `sops hosts/theseus/secrets/secrets.yaml`, switch,
+  then `sudo systemctl start restic-backups-nas` and
+  `sudo restic-nas snapshots`. Restore one folder elsewhere and compare.
 
 See `CLAUDE.md`'s "Hosts" section for the authoritative, kept-current
 status.

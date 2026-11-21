@@ -35,6 +35,14 @@
   # fails at activation rather than breaking eval (see CLAUDE.md).
   sops.secrets.eduroam-env = { };
 
+  # The restic backup to the NAS (modules/services/backup.nix). The
+  # repository is a whole URL, `rest:http://theseus:<login>@nas:8000/theseus/`,
+  # because it carries the rest-server login; the password encrypts the
+  # backup itself and is also in the password manager, since without it the
+  # backup can't be restored. Root-only, read by the root backup unit.
+  sops.secrets.restic-repository = { };
+  sops.secrets.restic-password = { };
+
   # sops-install-secrets creates ~/.ssh itself if missing, but as
   # root:root 0755 — so it is declared first, owned by the user, as on the
   # desktop.

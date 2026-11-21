@@ -9,6 +9,10 @@ flag (see `modules/options.nix`):
 
 - `snapper.nix` (`features.snapshots`) — file-level recovery via the
   `snapper` CLI, deliberately not wired into the bootloader.
+- `backup.nix` (`features.backup`) — restic, daily, from the operator's
+  home to the NAS's append-only rest-server. The repository URL (it holds
+  the rest-server login) and the password come from the host's sops file;
+  pruning is the NAS's job, so the host never forgets snapshots.
 - `docker.nix` (`features.docker`) — Docker Engine plus the Compose CLI
   plugin, socket-activated rather than started at boot. Note that the
   `docker` group it puts the operator in is root-equivalent by design; that

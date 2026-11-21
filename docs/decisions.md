@@ -5543,6 +5543,40 @@ Verified 2026-11-05 after a switch and reboot: `uinput:x:986:ol`,
 `/dev/uinput` at `root:uinput 0660`, the running Moonshine process holding
 group 986, and the pad working in a stream from theseus.
 
+## Backups to the NAS (2026-11-21)
+
+The deferred restic backup (2026-10-10), now that the NAS exists. theseus
+first; the desktop can follow with the same flag.
+
+- **Destination: the NAS's rest-server, append-only, private repos.** One
+  user and repo per host. Append-only means a compromised laptop can add
+  snapshots but never delete old ones, so the host runs no `forget`/`prune`
+  (`pruneOpts` stays empty) and the NAS's Backrest prunes each device repo
+  instead. Set up in the DockerComposeFiles repo, MIGRATION 7.5.
+- **Reached as `nas:8000` over the tailnet**, at home and away alike, so no
+  port is forwarded and the plain HTTP is inside WireGuard. restic encrypts
+  the data itself either way.
+- **Contents: `~` minus `~/.local/share/Steam`, `~/Games`, `~/.cache`,
+  Trash and `~/Downloads`**, plus `--exclude-caches`. The two game
+  subvolumes are re-downloadable and large; Downloads is excluded by the
+  operator's choice. The system needs no backup: it is the flake.
+- **Both secrets in sops, including the URL.** `restic-repository` holds
+  `rest:http://theseus:<login>@nas:8000/theseus/`, because the rest-server
+  login is part of it and this repo is public. The module only reads the
+  paths and asserts both secrets are declared, following `users.nix`'s
+  pattern: the host's `secrets.nix` declares them.
+- **Daily, `Persistent`, `RandomizedDelaySec = 1h`.** A laptop is often
+  asleep at midnight; Persistent runs the missed backup on wake.
+  `inhibitsSleep` keeps idle suspend from cutting an upload short (the lid
+  still suspends: logind ignores inhibitors for it by default).
+- **Failures notify through systembus-notify**, like smartd: an
+  `onFailure` unit sends the desktop notification, since a timer failing
+  silently is how backups quietly stop.
+- **Live `~`, not a Snapper snapshot.** Backing up a snapshot would make
+  open databases (browser profiles) consistent, but needs a fixed-path
+  mount of the newest snapshot first. Left out for now; restic copes with
+  a live home well enough for a workstation.
+
 ## Standing gotchas, full text (moved from CLAUDE.md, 2026-10-20)
 
 `CLAUDE.md` keeps each standing gotcha as its symptom and rule only. This is
