@@ -84,7 +84,9 @@ Installed 2026-10-19. Left to do, in order:
     game (`confine_pointer`)
   - the touchscreen staying on the laptop panel with an external monitor
     connected
-- [ ] Backups to the NAS (`features.backup`, `modules/services/backup.nix`):
+- [x] Backups to the NAS (`features.backup`, `modules/services/backup.nix`),
+  verified 2026-11-21: first backup 41 GiB, forget + prune, and a restore of
+  `~/Documents` identical to the original. Setup:
   create the `theseus` user on the NAS's rest-server, add
   `restic-repository` (`rest:http://theseus:<login>@nas:8000/theseus/`) and
   `restic-password` with `sops hosts/theseus/secrets/secrets.yaml`, switch,
