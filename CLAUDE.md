@@ -244,7 +244,7 @@ same bold lead.
 | 7 | Extra features — Docker, Tailscale, printing, gaming profile | done, **verified live** on the desktop (2026-08-20): Steam under `xwayland-satellite`, a game played through Heroic on `proton-cachyos`, and a wired Xbox pad on `xone`. `nix flake check` also eval's and closure-builds the gaming stack on its real host rather than by temporarily importing `profiles/gaming.nix` on the VM. Only `xpadneo` (Bluetooth pads) is still untested. |
 | 8 | Long-term — `nix flake check` as the CI gate, `justfile`, doc upkeep, multi-host hardening | done except multi-host hardening, now partly closed: the desktop has its flake entry, age key, real system-disk path and desktop stack. theseus is installed and largely verified live (2026-10-19); what remains is its few untested items (`hosts/theseus/README.md`) and inotmac's recovery-key re-encryption |
 
-**Backups: theseus only, to the NAS.** `features.backup` (`modules/services/backup.nix`) runs restic daily from `~` to the NAS's append-only rest-server, over the tailnet. No forget/prune on the host; the NAS prunes. The desktop isn't on it yet: it needs its own rest-server user and the two sops secrets. See `docs/decisions.md`, "Backups to the NAS (2026-11-21)".
+**Backups: theseus only, to the NAS.** `features.backup` (`modules/services/backup.nix`) runs restic daily from `~` to the NAS's rest-server, over the tailnet, then forgets and prunes its own repo (7 daily, 4 weekly, 12 monthly). The desktop isn't on it yet: it needs its own rest-server user and the two sops secrets. See `docs/decisions.md`, "Backups to the NAS (2026-11-21)".
 
 Six once-planned modules were abandoned and will not be created:
 `modules/desktop/stylix.nix` (superseded by Noctalia's own native theming —

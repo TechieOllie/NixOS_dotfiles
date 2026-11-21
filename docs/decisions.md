@@ -5548,11 +5548,15 @@ group 986, and the pad working in a stream from theseus.
 The deferred restic backup (2026-10-10), now that the NAS exists. theseus
 first; the desktop can follow with the same flag.
 
-- **Destination: the NAS's rest-server, append-only, private repos.** One
-  user and repo per host. Append-only means a compromised laptop can add
-  snapshots but never delete old ones, so the host runs no `forget`/`prune`
-  (`pruneOpts` stays empty) and the NAS's Backrest prunes each device repo
-  instead. Set up in the DockerComposeFiles repo, MIGRATION 7.5.
+- **Destination: the NAS's rest-server, private repos, not append-only.**
+  One user and repo per host, and each host prunes its own repo after the
+  backup (`pruneOpts`: 7 daily, 4 weekly, 12 monthly). Append-only was the
+  first plan, reversed the same day: it moves pruning to the NAS, and the
+  NAS's Backrest can't do it (its forget only selects snapshots tagged with
+  its own plans), which left a hand-made timer and a per-host password
+  file on the NAS. What append-only guarded against, a compromised host
+  deleting its own backups, the NAS covers anyway with ZFS snapshots of the
+  repos and its off-site copy. Set up in DockerComposeFiles, MIGRATION 7.5.
 - **Reached as `nas:8000` over the tailnet**, at home and away alike, so no
   port is forwarded and the plain HTTP is inside WireGuard. restic encrypts
   the data itself either way.

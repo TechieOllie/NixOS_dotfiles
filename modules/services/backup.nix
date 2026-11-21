@@ -1,10 +1,11 @@
 # Off-machine backup of the operator's home to the NAS, with restic.
 #
 # Snapper's snapshots live on the disk they protect; this is the copy that
-# survives the disk. The NAS runs restic's rest-server in append-only mode,
-# one private repo per host, so a compromised host can add snapshots but
-# not delete old ones. That is also why nothing here forgets or prunes:
-# the NAS's own Backrest does it (DockerComposeFiles, MIGRATION 7.5).
+# survives the disk. The NAS runs restic's rest-server with one private
+# repo per host, not append-only: each host forgets and prunes its own
+# snapshots after backing up. A host that deletes its backups (say, a
+# compromised laptop) can be undone on the NAS, from its ZFS snapshots of
+# the repos or from its off-site copy (DockerComposeFiles, MIGRATION 7.5).
 #
 # The repository URL and the encryption password come from the host's
 # sops file (hosts/<name>/secrets.nix declares them): the URL carries the
@@ -56,6 +57,13 @@ lib.mkIf config.features.backup {
       Persistent = true;
       RandomizedDelaySec = "1h";
     };
+    # After each backup: forget beyond these, then prune the unused data.
+    pruneOpts = [
+      "--keep-daily 7"
+      "--keep-weekly 4"
+      "--keep-monthly 12"
+    ];
+
     # Idle sleep waits for the upload to finish. Closing the lid still
     # suspends: logind ignores inhibitors for the lid switch by default.
     inhibitsSleep = true;
