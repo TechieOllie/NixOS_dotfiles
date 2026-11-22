@@ -58,5 +58,32 @@ After install:
       real graphical session (not an SSH shell — see `docs/decisions.md` for
       why `ssh-add -l` is the wrong way to check it worked).
 
+Backups to the NAS (to do; theseus has had them since 2026-11-21, see
+`docs/decisions.md`, "Backups to the NAS"):
+
+- [ ] On the NAS (DockerComposeFiles, MIGRATION 7.5): add a rest-server
+      user and repo named `the-entertaining-nios-desktop`, as for theseus.
+- [ ] Add two keys to this host's sops file (its age key is root-only):
+      `sudo SOPS_AGE_KEY_FILE=/var/lib/sops-nix/key.txt sops hosts/the-entertaining-nios-desktop/secrets/secrets.yaml`
+      - `restic-repository: rest:http://the-entertaining-nios-desktop:<login>@nas:8000/the-entertaining-nios-desktop/`
+      - `restic-password:` a new random one (`openssl rand -base64 32`),
+        also saved in the password manager — without it nothing restores.
+- [ ] Only then wire the Nix side, in one commit. Doing it first breaks the
+      next switch, since sops can't find the keys at activation:
+      - `default.nix`: import `../../modules/services/backup.nix`.
+      - `features.nix`: `backup = true;`.
+      - `secrets.nix`: `secrets.restic-repository = { };` and
+        `secrets.restic-password = { };` inside `sops`, as in theseus's.
+- [ ] Switch, run `sudo systemctl start restic-backups-nas`, check
+      `journalctl -u restic-backups-nas`, and test a restore. The first run
+      is ~50G.
+- [ ] Update `CLAUDE.md` ("The desktop isn't on it yet") and the decisions
+      entry.
+
+Not in scope: `~/Storage` is a symlink to the 2T drive, which restic stores as
+a link and doesn't follow. Fine while that drive holds only `SteamLibrary`.
+Maybe: `~/.android` (7.8G) and `~/.gradle` (3.1G) can be downloaded again,
+but excluding them is a change to the shared module, so theseus too.
+
 See `CLAUDE.md`'s "Hosts" section for the authoritative, kept-current status;
 this list is a convenience copy for whoever is working in this directory.
